@@ -47,6 +47,7 @@ internal class SubscriptionReorderState(
     private var itemSize = 0
     private var pinned: PinnableContainer.PinnedHandle? = null
     private var scrolling: Job? = null
+    var onMove: () -> Unit = {}
     var onFinish: (List<Long>) -> Unit = {}
 
     fun indexOf(id: Long): Int = order.indexOf(id)
@@ -108,7 +109,10 @@ internal class SubscriptionReorderState(
         val neighbor = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == neighborId } ?: return
         val midpoint = neighbor.offset + neighbor.size / 2f
         val crossed = if (direction > 0) top + itemSize > midpoint else top < midpoint
-        if (crossed) order.add(next, order.removeAt(current))
+        if (crossed) {
+            order.add(next, order.removeAt(current))
+            onMove()
+        }
     }
 
     fun finish(cancelled: Boolean = false) {

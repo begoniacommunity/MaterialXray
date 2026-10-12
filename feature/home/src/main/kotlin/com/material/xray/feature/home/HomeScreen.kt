@@ -279,10 +279,12 @@ fun HomeScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val reorderEdgeSize = with(LocalDensity.current) { 56.dp.toPx() }
+    val reorderHaptics = LocalHapticFeedback.current
     val subscriptionReorder = remember(listState, subscriptionOrder, coroutineScope, reorderEdgeSize) {
         SubscriptionReorderState(listState, subscriptionOrder, coroutineScope, reorderEdgeSize)
     }
     subscriptionReorder.onFinish = viewModel::reorderSubscriptions
+    subscriptionReorder.onMove = { reorderHaptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick) }
     DisposableEffect(subscriptionReorder) {
         onDispose { subscriptionReorder.finish(cancelled = true) }
     }
