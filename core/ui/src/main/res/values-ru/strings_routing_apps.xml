@@ -3,6 +3,9 @@
     <string name="routing_title">Маршрутизация</string>
     <string name="routing_tab_rules">Правила</string>
     <string name="routing_tab_apps">Приложения</string>
+    <string name="routing_search_rules">Поиск по любому полю</string>
+    <string name="routing_no_matching_rules">Правила не найдены</string>
+    <string name="search_clear">Очистить поиск</string>
     <string name="apps_finding_apps">Поиск приложений…</string>
     <string name="apps_loading_progress">Загрузка приложений: %1$d / %2$d</string>
     <plurals name="routing_rules_selected">
@@ -46,6 +49,7 @@
     <string name="routing_rules_automatic_selected_subscription_description">Текущие правила маршрутизации предоставлены выбранной подпиской и обновляются автоматически. Их изменение отключит автоматические обновления.</string>
     <string name="routing_switch_to_manual_mode">Перейти в ручной режим</string>
     <string name="routing_leave_as_is">Оставить как есть</string>
+    <string name="routing_add_rule_title">Добавить новое правило</string>
     <string name="routing_edit_rule_title">Изменить правило</string>
     <string name="routing_save">Сохранить</string>
     <string name="routing_cancel">Отмена</string>
@@ -138,7 +142,7 @@
     <string name="apps_bypass_all_description">Для всех приложений будет выбрано «Без прокси».</string>
     <string name="apps_close">Закрыть</string>
     <string name="apps_route_title">Маршрут для %1$s</string>
-    <string name="apps_search_configurations">Поиск конфигураций</string>
+    <string name="apps_find_servers">Найти серверы</string>
     <string name="apps_route_default_outbound_title">Исходящее соединение по умолчанию</string>
     <string name="apps_route_default_outbound_description">Использовать исходящее соединение, выбранное по умолчанию в настройках.</string>
     <string name="apps_route_default_server_title">Выбранный сервер по умолчанию</string>
@@ -159,6 +163,4 @@
         <item quantity="many">multi &#8226; %1$d серверов</item>
         <item quantity="other">multi &#8226; %1$d сервера</item>
     </plurals>
-    <string name="routing_add_rule_title">Добавить новое правило</string>
-    <string name="search_clear">Очистить поиск</string>
 </resources>

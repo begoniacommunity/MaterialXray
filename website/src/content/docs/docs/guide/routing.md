@@ -5,6 +5,8 @@ description: Send traffic through the proxy, around it, or nowhere, by domain, I
 
 Open **Routing → Rules** to manage the rules Xray applies to each connection. Rules are checked top to bottom, and the first match wins.
 
+Use the search bar to filter custom, subscription-wide and profile-specific rules by name, destination tag or matching conditions, including domains, geosite/geoip entries, IPs, ports and protocols. Search ignores letter case and keeps the original rule order. Filtering the list does not change which rules Xray applies.
+
 ## Built-in rules
 
 A fresh install includes:

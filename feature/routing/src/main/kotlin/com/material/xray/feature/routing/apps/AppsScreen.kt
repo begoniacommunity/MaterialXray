@@ -7,15 +7,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
@@ -23,6 +27,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
@@ -35,6 +40,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalContext
@@ -70,11 +78,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
-import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.OptionFocusHighlight
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SelectableOptionRow
+import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.feature.routing.RoutingSearchField
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -149,18 +158,14 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                 return@Column
             }
 
+            RoutingSearchField(
+                state = searchQuery,
+                hint = stringResource(R.string.apps_search),
+            )
+
             if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
                 SubscriptionRoutingBanner(automaticRoutingProviderName)
             }
-
-            OutlinedTextField(
-                state = searchQuery,
-                label = { Text(stringResource(R.string.apps_search)) },
-                lineLimits = TextFieldLineLimits.SingleLine,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 8.dp),
-            )
 
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -201,7 +206,7 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.width(176.dp),
+                                    modifier = Modifier.width(176.dp).offset(x = 7.dp),
                                 ) {
                                     Text(
                                         text = app.routeTitle.resolve(context),
@@ -412,11 +417,11 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
             onClick = { viewModel.refreshApps() },
             enabled = !isLoadingApps,
         ) {
-            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.apps_refresh))
+            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.apps_refresh), modifier = Modifier.size(24.dp))
         }
         Box {
             TooltipIconButton(tooltip = stringResource(R.string.apps_routing_menu), onClick = { appRoutingMenuExpanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.apps_routing_menu))
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.apps_routing_menu), modifier = Modifier.size(24.dp))
             }
             AnimatedDropdownMenu(
                 expanded = appRoutingMenuExpanded,
@@ -635,24 +640,20 @@ private fun AppRoutePickerDialog(
 ) {
     val context = LocalContext.current
     val query = remember(app.appKey) { TextFieldState() }
-    val filteredOptions by remember(routeOptions, query) {
+    val presetOptions = remember(routeOptions) { routeOptions.filter { it.kind != AppRouteKind.SERVER } }
+    val allServerOptions = remember(routeOptions) { routeOptions.filter { it.kind == AppRouteKind.SERVER } }
+    val serverOptions by remember(allServerOptions, query) {
         derivedStateOf {
             val trimmed = query.text.trim()
             if (trimmed.isEmpty()) {
-                routeOptions
+                allServerOptions
             } else {
-                routeOptions.filter { option ->
+                allServerOptions.filter { option ->
                     option.title.resolve(context).contains(trimmed, ignoreCase = true) ||
                         option.description.resolve(context).contains(trimmed, ignoreCase = true)
                 }
             }
         }
-    }
-    val presetOptions by remember(filteredOptions) {
-        derivedStateOf { filteredOptions.filter { it.kind != AppRouteKind.SERVER } }
-    }
-    val serverOptions by remember(filteredOptions) {
-        derivedStateOf { filteredOptions.filter { it.kind == AppRouteKind.SERVER } }
     }
 
     AlertDialog(
@@ -664,15 +665,7 @@ private fun AppRoutePickerDialog(
         },
         title = { Text(stringResource(R.string.apps_route_title, app.name)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (routeOptions.size > 8) {
-                    OutlinedTextField(
-                        state = query,
-                        label = { Text(stringResource(R.string.apps_search_configurations)) },
-                        lineLimits = TextFieldLineLimits.SingleLine,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(SettingsFieldSpacing)) {
                 Box(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(
@@ -710,7 +703,7 @@ private fun AppRoutePickerDialog(
                                 }
                             }
                         }
-                        if (serverOptions.isNotEmpty()) {
+                        if (allServerOptions.isNotEmpty()) {
                             item(contentType = "routeOptionDivider") {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                             }
@@ -719,6 +712,20 @@ private fun AppRoutePickerDialog(
                                     stringResource(R.string.apps_route_specific_server_heading),
                                     style = MaterialTheme.typography.titleSmall,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                )
+                            }
+                        }
+                        if (allServerOptions.isNotEmpty() && routeOptions.size > 8) {
+                            item(key = "serverSearch", contentType = "serverSearch") {
+                                val cursorColor = if (WindowInsets.ime.getBottom(LocalDensity.current) > 0) MaterialTheme.colorScheme.primary else Color.Transparent
+                                OutlinedTextField(
+                                    state = query,
+                                    label = { Text(stringResource(R.string.apps_find_servers)) },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                    shape = RoundedCornerShape(32.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(cursorColor = cursorColor),
+                                    lineLimits = TextFieldLineLimits.SingleLine,
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
