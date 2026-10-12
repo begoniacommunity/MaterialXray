@@ -45,7 +45,11 @@ jobs:
           sdkmanager "platform-tools" "platforms;android-37.0" "cmake;3.31.6"
 
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug
+        # Universal and per-ABI APK packaging share the Gradle heap.
+        run: >-
+          ./gradlew --stacktrace --max-workers=2
+          "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          :app:assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
