@@ -5,13 +5,17 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
@@ -19,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,6 +57,8 @@ import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SettingsFieldSpacing
+import com.material.xray.core.ui.components.SettingsItemSpacing
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.text.catchAllEffectResource
 import com.material.xray.core.ui.text.descriptionResource
@@ -107,6 +114,7 @@ fun RoutingRuleEditorScreen(
     }
     val canSave = editableRule.profileOriginalRuleJson == null || profileRule != null
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val layoutDirection = LocalLayoutDirection.current
 
     fun saveRule(updatedRule: RoutingRule) {
         if (editableRule.subscriptionWide) {
@@ -164,9 +172,10 @@ fun RoutingRuleEditorScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             ScrolledTopAppBar(
-                title = stringResource(R.string.routing_edit_rule_title),
+                title = stringResource(if (editableRule.isNew) R.string.routing_add_rule_title else R.string.routing_edit_rule_title),
                 scrollBehavior = scrollBehavior,
                 showLogo = false,
                 navigationIcon = {
@@ -174,40 +183,45 @@ fun RoutingRuleEditorScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.routing_rule_viewer_back),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 },
-            )
-        },
-        bottomBar = {
-            Button(
-                enabled = canSave,
-                onClick = {
-                    val edited = editedRule()
-                    if (edited.matchesAllTraffic()) {
-                        pendingCatchAllRule = edited
-                    } else if (editableRule.providerSourced &&
-                        routingPolicyControl == RoutingPolicyControl.SubscriptionProvider
+                actions = {
+                    TooltipIconButton(
+                        tooltip = stringResource(R.string.routing_save),
+                        enabled = canSave,
+                        onClick = {
+                            val edited = editedRule()
+                            if (edited.matchesAllTraffic()) {
+                                pendingCatchAllRule = edited
+                            } else if (editableRule.providerSourced &&
+                                routingPolicyControl == RoutingPolicyControl.SubscriptionProvider
+                            ) {
+                                pendingProviderRule = edited
+                            } else {
+                                saveRule(edited)
+                            }
+                        },
                     ) {
-                        pendingProviderRule = edited
-                    } else {
-                        saveRule(edited)
+                        Icon(painterResource(R.drawable.save_24px), contentDescription = stringResource(R.string.routing_save), modifier = Modifier.size(24.dp))
                     }
                 },
-                shape = CircleShape,
-                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text(stringResource(R.string.routing_save))
-            }
+            )
         },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(
+                    start = padding.calculateStartPadding(layoutDirection),
+                    top = padding.calculateTopPadding(),
+                    end = padding.calculateEndPadding(layoutDirection),
+                )
+                .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp + padding.calculateBottomPadding()),
+            verticalArrangement = Arrangement.spacedBy(SettingsFieldSpacing),
         ) {
             OutlinedTextField(
                 state = name,
@@ -251,54 +265,56 @@ fun RoutingRuleEditorScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Text(stringResource(R.string.routing_protocols_label), style = MaterialTheme.typography.labelLarge)
-            Text(
-                stringResource(R.string.routing_protocols_empty_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            availableProtocolOptions.forEach { protocol ->
-                val checked = protocol in selectedProtocols
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.small,
-                    color = if (checked) {
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLow
-                    },
-                    border = BorderStroke(
-                        1.dp,
-                        if (checked) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant,
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = checked,
-                                onValueChange = { enabled ->
-                                    selectedProtocols = if (enabled) {
-                                        selectedProtocols + protocol
-                                    } else {
-                                        selectedProtocols - protocol
-                                    }
-                                },
-                            )
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            Column(verticalArrangement = Arrangement.spacedBy(SettingsItemSpacing)) {
+                Text(stringResource(R.string.routing_protocols_label), style = MaterialTheme.typography.labelLarge)
+                Text(
+                    stringResource(R.string.routing_protocols_empty_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                availableProtocolOptions.forEach { protocol ->
+                    val checked = protocol in selectedProtocols
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.small,
+                        color = if (checked) {
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            if (checked) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant,
+                        ),
                     ) {
-                        Checkbox(
-                            checked = checked,
-                            onCheckedChange = null,
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = protocol.uppercase(Locale.ROOT),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = checked,
+                                    onValueChange = { enabled ->
+                                        selectedProtocols = if (enabled) {
+                                            selectedProtocols + protocol
+                                        } else {
+                                            selectedProtocols - protocol
+                                        }
+                                    },
+                                )
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = null,
                             )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = protocol.uppercase(Locale.ROOT),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
                         }
                     }
                 }
@@ -365,7 +381,7 @@ private fun CatchAllRuleWarningDialog(
             }
         },
         dismissButton = {
-            Button(onClick = onKeepEditing) {
+            TextButton(onClick = onKeepEditing) {
                 Text(stringResource(R.string.routing_catch_all_keep_editing))
             }
         },

@@ -159,4 +159,6 @@
         <item quantity="many">multi &#8226; %1$d серверов</item>
         <item quantity="other">multi &#8226; %1$d сервера</item>
     </plurals>
+    <string name="routing_add_rule_title">Добавить новое правило</string>
+    <string name="search_clear">Очистить поиск</string>
 </resources>

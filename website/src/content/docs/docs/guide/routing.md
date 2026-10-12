@@ -16,6 +16,8 @@ Toggle them, edit them, or use **Reset to default** from the menu.
 
 ## Writing a rule
 
+The rule editor's disk-shaped **Save** icon is in the header. New rules open with the title **Add new rule**, and existing rules with **Edit rule**. The form scrolls behind the transparent system navigation bar, with enough bottom padding to keep its last fields accessible.
+
 | Field | Example | Notes |
 | --- | --- | --- |
 | **Outbound tag** | `proxy`, `direct`, `block` | Where matching traffic goes. |

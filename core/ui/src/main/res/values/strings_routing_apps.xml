@@ -44,7 +44,7 @@
     <string name="routing_rules_automatic_selected_subscription_description">Your current routing rules are provided by the selected subscription and are updated automatically. Editing them will disable automatic updates.</string>
     <string name="routing_switch_to_manual_mode">Switch to manual mode</string>
     <string name="routing_leave_as_is">Leave as is</string>
-    <string name="routing_edit_rule_title">Edit Rule</string>
+    <string name="routing_edit_rule_title">Edit rule</string>
     <string name="routing_save">Save</string>
     <string name="routing_cancel">Cancel</string>
     <string name="routing_ok">OK</string>
@@ -143,4 +143,6 @@
         <item quantity="one">multi &#8226; %1$d server</item>
         <item quantity="other">multi &#8226; %1$d servers</item>
     </plurals>
+    <string name="routing_add_rule_title">Add new rule</string>
+    <string name="search_clear">Clear search</string>
 </resources>

@@ -96,6 +96,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -781,7 +782,7 @@ private fun SettingsScreenContent(
                                         )
                                     } else {
                                         Icon(
-                                            Icons.Default.Refresh,
+                                            painterResource(R.drawable.download_24px),
                                             contentDescription = stringResource(R.string.settings_update_geoip),
                                         )
                                     }
@@ -835,7 +836,7 @@ private fun SettingsScreenContent(
                                         )
                                     } else {
                                         Icon(
-                                            Icons.Default.Refresh,
+                                            painterResource(R.drawable.download_24px),
                                             contentDescription = stringResource(R.string.settings_update_geosite),
                                         )
                                     }
@@ -1882,6 +1883,7 @@ private fun DeleteGeoDataDialog(
     val message = stringResource(R.string.settings_delete_geo_asset_message, size)
     val sizeStart = message.indexOf(size)
     AlertDialog(
+        icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = {
             Text(

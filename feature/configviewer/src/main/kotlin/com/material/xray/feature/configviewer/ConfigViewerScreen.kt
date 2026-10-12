@@ -41,15 +41,11 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -82,6 +78,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
@@ -103,6 +100,7 @@ import com.material.xray.core.ui.components.ExpansionArrow
 import com.material.xray.core.ui.components.FadingOutlinedTextField
 import com.material.xray.core.ui.components.MaskOutputTransformation
 import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.selectedOptionFocusModifier
 import com.material.xray.core.ui.configviewer.JsonToken
@@ -198,7 +196,7 @@ fun ConfigViewerScreen(
                     actions = {
                         if (editing) {
                             TooltipIconButton(tooltip = stringResource(R.string.config_viewer_save), onClick = onSave) {
-                                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.config_viewer_save))
+                                Icon(painterResource(R.drawable.save_24px), contentDescription = stringResource(R.string.config_viewer_save))
                             }
                         } else {
                             if (copyable != null) {
@@ -218,7 +216,7 @@ fun ConfigViewerScreen(
                             guarded?.let { isGuarded ->
                                 TooltipIconButton(tooltip = stringResource(if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard), onClick = viewModel::toggleGuard) {
                                     Icon(
-                                        imageVector = if (isGuarded) Icons.Filled.Shield else Icons.Outlined.Shield,
+                                        painter = painterResource(if (isGuarded) R.drawable.lock_open_24px else R.drawable.lock_24px),
                                         contentDescription = stringResource(
                                             if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard,
                                         ),
@@ -227,7 +225,7 @@ fun ConfigViewerScreen(
                             }
                             if (content.state.isEditable()) {
                                 TooltipIconButton(tooltip = stringResource(R.string.config_viewer_edit), onClick = viewModel::beginEdit) {
-                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.config_viewer_edit))
+                                    Icon(painterResource(R.drawable.edit_24px), contentDescription = stringResource(R.string.config_viewer_edit))
                                 }
                             }
                         }
@@ -503,7 +501,7 @@ private fun EditSectionCard(section: EditSection, drafts: Map<EditKey, TextField
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsFieldSpacing),
         ) {
             Text(
                 text = stringResource(section.titleRes),
@@ -598,6 +596,7 @@ private fun SaveModeDialog(onDismiss: () -> Unit, onConfirm: (ServerSaveMode) ->
     var selected by rememberSaveable { mutableStateOf(ServerSaveMode.KEEP) }
 
     AlertDialog(
+        icon = { Icon(painterResource(R.drawable.save_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.config_viewer_save_mode_title)) },
         text = {

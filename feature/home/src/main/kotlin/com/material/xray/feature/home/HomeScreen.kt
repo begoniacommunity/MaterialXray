@@ -81,9 +81,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NetworkPing
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -146,6 +144,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -199,6 +198,7 @@ import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedT
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SelectableOptionRow
+import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.rememberSystemState
@@ -795,6 +795,7 @@ private fun QrScannerPermissionGate(onGranted: () -> Unit): () -> Unit {
 
     promptAccess?.let { requestedAccess ->
         AlertDialog(
+            icon = { Icon(painterResource(R.drawable.ic_qr_code_scanner_24), contentDescription = null) },
             onDismissRequest = { promptAccess = null },
             title = { Text(stringResource(R.string.home_camera_permission_title)) },
             text = { Text(stringResource(R.string.home_camera_permission_message)) },
@@ -2474,10 +2475,10 @@ private fun ServerRow(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (server.entity.edited) {
-                            ServerStateBadge(Icons.Outlined.Edit, R.string.home_server_edited)
+                            ServerStateBadge(ImageVector.vectorResource(R.drawable.edit_24px), R.string.home_server_edited)
                         }
                         if (server.entity.guarded) {
-                            ServerStateBadge(Icons.Outlined.Shield, R.string.home_server_guarded)
+                            ServerStateBadge(ImageVector.vectorResource(R.drawable.lock_24px), R.string.home_server_guarded)
                         }
                     }
                     Text(
@@ -2885,6 +2886,7 @@ private fun EditSubscriptionDialog(
         customUserAgent.text.toString().trim().ifBlank { null } != subscription.customUserAgent ||
         customHeaders.text.toString().trim().ifBlank { null } != subscription.customHeaders
     AlertDialog(
+        icon = { Icon(painterResource(R.drawable.edit_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         modifier = Modifier.stableDialogHeight(onDismiss),
         properties = DialogProperties(decorFitsSystemWindows = false),
@@ -2900,14 +2902,14 @@ private fun EditSubscriptionDialog(
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(SettingsFieldSpacing))
                 OutlinedTextField(
                     state = url,
                     label = { Text(stringResource(R.string.home_field_url)) },
                     lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(SettingsFieldSpacing))
                 key(subscription.id) {
                     ReadOnlyDropdownField(
                         label = stringResource(R.string.home_auto_update_label),
@@ -2921,7 +2923,7 @@ private fun EditSubscriptionDialog(
                         onSelected = { autoUpdateIntervalHours = it },
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(SettingsFieldSpacing))
                 SubscriptionAdvancedOptions(
                     expanded = advancedExpanded,
                     onExpandedChange = { advancedExpanded = it },
@@ -2969,11 +2971,12 @@ private fun ApplySubscriptionRoutingDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
+        icon = { Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_apply_subscription_routing_title)) },
         text = { Text(stringResource(R.string.home_apply_subscription_routing_message)) },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            TextButton(onClick = onConfirm) {
                 Text(stringResource(R.string.home_apply_subscription_routing_confirm))
             }
         },
@@ -2992,6 +2995,7 @@ private fun RemoveSubscriptionDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
+        icon = { Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_remove_subscription_title)) },
         text = {
@@ -3004,7 +3008,7 @@ private fun RemoveSubscriptionDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            TextButton(onClick = onConfirm) {
                 Text(stringResource(R.string.home_action_remove))
             }
         },
@@ -3031,6 +3035,7 @@ private fun AddSubscriptionDialog(
     val customHeaders = rememberTextFieldState()
 
     AlertDialog(
+        icon = { Icon(painterResource(R.drawable.ic_add_24), contentDescription = null) },
         onDismissRequest = onDismiss,
         modifier = Modifier.stableDialogHeight(onDismiss),
         properties = DialogProperties(decorFitsSystemWindows = false),
@@ -3045,7 +3050,7 @@ private fun AddSubscriptionDialog(
                     lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(SettingsFieldSpacing))
                 OutlinedTextField(
                     state = name,
                     label = { Text(stringResource(R.string.home_field_name)) },
@@ -3053,7 +3058,7 @@ private fun AddSubscriptionDialog(
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = { Text(stringResource(R.string.home_name_from_provider_hint)) },
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(SettingsFieldSpacing))
                 SubscriptionAdvancedOptions(
                     expanded = advancedExpanded,
                     onExpandedChange = { advancedExpanded = it },
@@ -3135,19 +3140,19 @@ private fun SubscriptionAdvancedOptions(
     }
     AnimatedOptionContent(visible = expanded) {
         Column {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(SettingsFieldSpacing))
             SubscriptionFetchTypeDropdown(
                 preferJson = preferJson,
                 onPreferJsonChange = onPreferJsonChange,
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(SettingsFieldSpacing))
             SubscriptionUserAgentSection(
                 selectedMode = userAgentMode,
                 customUserAgent = customUserAgent,
                 customHeaders = customHeaders,
                 onModeChange = onUserAgentModeChange,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(SettingsFieldSpacing))
             SettingsSwitchRow(
                 title = stringResource(R.string.home_allow_insecure_updates),
                 description = stringResource(R.string.home_allow_insecure_updates_description),
@@ -3205,7 +3210,7 @@ private fun SubscriptionUserAgentSection(
         onSelected = onModeChange,
     )
     AnimatedOptionContent(visible = selectedMode == SubscriptionUserAgentMode.CUSTOM) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(SettingsFieldSpacing))
         OutlinedTextField(
             state = customUserAgent,
             label = { Text(stringResource(R.string.home_field_user_agent)) },
@@ -3220,7 +3225,7 @@ private fun SubscriptionUserAgentSection(
             lineLimits = TextFieldLineLimits.SingleLine,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(SettingsFieldSpacing))
         OutlinedTextField(
             state = customHeaders,
             label = { Text(stringResource(R.string.home_field_headers)) },

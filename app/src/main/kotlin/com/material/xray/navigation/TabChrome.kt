@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +23,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
@@ -40,6 +43,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -64,41 +69,57 @@ import com.material.xray.core.navigation.TopLevelKey
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.useNavigationRail
 import com.material.xray.core.ui.components.AppTopBarHeight
+import com.material.xray.core.ui.components.LocalBottomBarVisibility
 import com.material.xray.core.ui.components.LocalTopBarTint
 
 /** One persistent navigation bar or rail; only the clipped content viewport changes tabs. */
 @Composable
 internal fun TabChrome(state: TabChromeState, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val useRail = useNavigationRail()
+    val bottomBarVisible = remember { mutableStateOf(true) }
     val bottomInset = with(LocalDensity.current) { NavigationBarDefaults.windowInsets.getBottom(this).toDp() }
     Row(modifier = modifier.fillMaxSize()) {
         if (useRail) {
             AppNavigationRail(state = state, modifier = Modifier)
         }
-        Scaffold(
-            modifier = Modifier.weight(1f),
-            // Without a bottom bar to absorb them, the rail layout has to keep content clear of the
-            // gesture area itself, and of a side navigation bar or cutout at the end.
-            contentWindowInsets = if (useRail) {
-                WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
-            } else {
-                WindowInsets(0.dp)
-            },
-            bottomBar = {
-                if (!useRail) {
-                    AppNavigationBar(
-                        state = state,
-                        height = CompactNavigationBarHeight + bottomInset,
-                        modifier = Modifier,
-                    )
+        Box(modifier = Modifier.weight(1f)) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                // During search the screen alone owns IME padding. Keep cutouts and system
+                // navigation safe, including in rail layouts.
+                contentWindowInsets = if (useRail && bottomBarVisible.value) {
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
+                } else {
+                    WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
+                },
+                bottomBar = {
+                    if (!useRail && bottomBarVisible.value) {
+                        Spacer(Modifier.height(CompactNavigationBarHeight + bottomInset))
+                    }
+                },
+            ) { innerPadding ->
+                Box(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).clipToBounds()) {
+                    CompositionLocalProvider(
+                        LocalTopBarTint provides state.topBarTint,
+                        LocalBottomBarVisibility provides bottomBarVisible,
+                    ) {
+                        content()
+                    }
                 }
-            },
-        ) { innerPadding ->
-            // Consumed so the screens' own top bars do not add the rail layout's end inset again.
-            Box(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).clipToBounds()) {
-                CompositionLocalProvider(LocalTopBarTint provides state.topBarTint) {
-                    content()
-                }
+            }
+            // Fade as an overlay: an outgoing bar must not reserve a changing height while
+            // the search panel follows the keyboard's animated insets.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !useRail && bottomBarVisible.value,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(200)),
+            ) {
+                AppNavigationBar(
+                    state = state,
+                    height = CompactNavigationBarHeight + bottomInset,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

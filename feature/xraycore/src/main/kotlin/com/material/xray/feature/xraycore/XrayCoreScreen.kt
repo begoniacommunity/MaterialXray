@@ -151,7 +151,7 @@ fun XrayCoreScreen(
                 showLogo = false,
                 navigationIcon = {
                     TooltipIconButton(tooltip = stringResource(R.string.settings_dns_back), onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.settings_dns_back))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.settings_dns_back), modifier = Modifier.size(24.dp))
                     }
                 },
             )
@@ -277,6 +277,7 @@ fun XrayCoreScreen(
     }
     if (showFileWarning) {
         AlertDialog(
+            icon = { Icon(Icons.Outlined.UploadFile, contentDescription = null) },
             onDismissRequest = { showFileWarning = false },
             title = { Text(stringResource(R.string.settings_xray_core_file_warning_title)) },
             text = {
