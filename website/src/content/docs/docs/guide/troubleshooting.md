@@ -7,6 +7,10 @@ description: Logs, common problems and how to report an issue.
 
 The **Logs** tab shows live output from both the app and Xray-core. Raise the **Xray log level** in Settings (advanced) for more detail. With advanced options on, you can also open the generated configuration in the viewer.
 
+Tap **Search logs** to open a search field above the keyboard. Search filters the current **All**, **App** or **Xray** tab by message text, ignoring case. The header's close button closes search and the keyboard. With a query entered, the header shows the number of matching lines. Dismissing the keyboard with a back gesture keeps a nonempty query and its results visible. With an empty search and no selection, the close button is the only header content.
+
+Long-press a log line to select it, then drag or tap to select more. When at least one line is selected and the current list contains more than one line, **Select all** appears as the first toolbar action and selects every visible result in the active tab. Once all those lines are selected, it becomes **Deselect**, which clears the selection while keeping any search open. The selection toolbar can copy the selected lines; its export menu offers **Save to file** and **Share logs** for just those lines. Without a selection, the export menu saves or shares every log in the active **All**, **App** or **Xray** tab. Filenames end in `-all.txt`, `-app-only.txt`, `-core-only.txt` or `-selected.txt` to identify the exported scope. Clearing logs asks for confirmation and removes both app and Xray entries.
+
 The JSON editor for the active Xray configuration or an individual server has no fade or fixed bands at its top and bottom edges. Its content padding scrolls with the text, and a small gap keeps the text clear of the outline.
 
 ## Common problems

@@ -27,10 +27,13 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,13 +42,14 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -55,9 +59,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
@@ -67,6 +73,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -81,13 +88,17 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -99,6 +110,7 @@ import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AppBarTitle
 import com.material.xray.core.ui.components.AppTopBarHeight
 import com.material.xray.core.ui.components.FloatingButtonShadow
+import com.material.xray.core.ui.components.LocalBottomBarVisibility
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SegmentedTabRow
 import com.material.xray.core.ui.components.TooltipIconButton
@@ -110,10 +122,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
-private enum class LogFilter(@param:StringRes val labelRes: Int) {
-    ALL(R.string.logs_filter_all),
-    APP(R.string.logs_filter_app),
-    XRAY(R.string.logs_filter_xray),
+private enum class LogFilter(@param:StringRes val labelRes: Int, val source: LogSource?) {
+    ALL(R.string.logs_filter_all, null),
+    APP(R.string.logs_filter_app, LogSource.APP),
+    XRAY(R.string.logs_filter_xray, LogSource.XRAY),
 }
 
 internal enum class LogSeverity { ERROR, WARNING, NORMAL }
@@ -131,27 +143,70 @@ internal fun LogEntry.severity(): LogSeverity = when (source) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class LogsActions(
+    val onCancel: () -> Unit,
+    val onCopy: (List<LogEntry>) -> Unit,
+    val onSave: (Set<Long>) -> Unit,
+    val onShare: (Set<Long>) -> Unit,
+    val onClear: () -> Unit,
+    val onSearch: () -> Unit,
+    val onSelectAll: () -> Unit,
+    val onRemoveSelection: () -> Unit,
+)
+
+private data class LogsHeaderState(
+    val selecting: Boolean,
+    val searching: Boolean,
+    val emptyQuery: Boolean,
+    val selectedEntries: List<LogEntry>,
+    val resultCount: Int,
+    val allSelected: Boolean,
+)
+
 @Composable
 fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewModel()) {
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { LogFilter.entries.size })
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val searchQuery = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
+    var searchRequested by rememberSaveable { mutableStateOf(false) }
+    var searchClosing by remember { mutableStateOf(false) }
+    val searching = searchRequested || searchClosing
+    val bottomBarVisibility = LocalBottomBarVisibility.current
+    DisposableEffect(bottomBarVisibility, searching) {
+        bottomBarVisibility?.value = !searching
+        onDispose { bottomBarVisibility?.value = true }
+    }
+    val query = if (searching) searchQuery.text.toString() else ""
     var isExporting by remember { mutableStateOf(false) }
-    var showExportMenu by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
     val selectedEntries = remember(allEntries, selectedIds) { allEntries.filter { it.id in selectedIds } }
     val selectionMode = selectedIds.isNotEmpty()
-    BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
-    LaunchedEffect(allEntries) {
-        if (selectedIds.isNotEmpty()) {
-            selectedIds = selectedIds.intersect(allEntries.map { it.id }.toSet())
-        }
+    val selectedFilter by remember { derivedStateOf { LogFilter.entries[pagerState.targetPage] } }
+    val visibleEntries = remember(allEntries, selectedFilter, query) { visibleLogEntries(allEntries, selectedFilter.source, query) }
+
+    fun closeSearch() {
+        searchClosing = imeBottom > 0
+        searchRequested = false
+        selectedIds = emptySet()
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
     }
-    val saveLogsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/plain"),
-    ) { destination ->
+
+    BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
+    LogSearchNavigation(searchRequested, searching, searchQuery.text.isNotEmpty(), imeBottom, ::closeSearch) {
+        searchClosing = false
+    }
+    LaunchedEffect(allEntries) {
+        selectedIds = selectedIds.intersect(allEntries.mapTo(mutableSetOf(), LogEntry::id))
+    }
+    LaunchedEffect(selectedFilter, query) { selectedIds = emptySet() }
+    val saveLogsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { destination ->
         if (destination != null) {
             coroutineScope.launch {
                 isExporting = true
@@ -168,169 +223,252 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
             }
         }
     }
-    val selectedFilter by remember {
-        derivedStateOf { LogFilter.entries[pagerState.targetPage] }
-    }
-
-    LaunchedEffect(selectedFilter) { selectedIds = emptySet() }
-
+    val actions = LogsActions(
+        onCancel = { if (searching) closeSearch() else selectedIds = emptySet() },
+        onCopy = { entries ->
+            viewModel.copyEntries(entries)
+            Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
+            selectedIds = emptySet()
+        },
+        onSave = { ids ->
+            val fileName = viewModel.prepareExport(allEntries, ids, selectedFilter.source)
+            try {
+                saveLogsLauncher.launch(fileName)
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(context, R.string.logs_save_failed, Toast.LENGTH_SHORT).show()
+            }
+        },
+        onShare = { ids ->
+            val snapshot = logExportSnapshot(allEntries, ids, selectedFilter.source)
+            val fileName = logExportFileName(selectedFilter.source, ids.isNotEmpty())
+            coroutineScope.launch {
+                isExporting = true
+                try {
+                    shareLogFile(context, viewModel.createShareFile(snapshot, fileName))
+                } catch (_: IOException) {
+                    Toast.makeText(context, R.string.logs_share_failed, Toast.LENGTH_SHORT).show()
+                } catch (_: IllegalArgumentException) {
+                    Toast.makeText(context, R.string.logs_share_failed, Toast.LENGTH_SHORT).show()
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(context, R.string.logs_share_failed, Toast.LENGTH_SHORT).show()
+                } finally {
+                    isExporting = false
+                }
+            }
+        },
+        onClear = { confirmClear = true },
+        onSelectAll = { selectedIds = visibleEntries.mapTo(mutableSetOf(), LogEntry::id) },
+        onRemoveSelection = { selectedIds = emptySet() },
+        onSearch = {
+            selectedIds = emptySet()
+            searchQuery.edit { replace(0, length, "") }
+            searchClosing = false
+            searchRequested = true
+        },
+    )
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             AnimatedContent(
-                targetState = selectionMode to selectedEntries,
-                contentKey = { it.first },
+                targetState = LogsHeaderState(
+                    selectionMode,
+                    searching,
+                    query.isBlank(),
+                    selectedEntries,
+                    visibleEntries.size,
+                    areAllLogEntriesSelected(visibleEntries, selectedIds),
+                ),
+                contentKey = { Triple(it.selecting, it.searching, it.emptyQuery) },
                 transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
                 label = "logsHeader",
-            ) { (selecting, entries) ->
-                TopAppBar(
-                    title = {
-                        AppBarTitle(
-                            if (selecting) {
-                                stringResource(R.string.logs_selected_count, entries.size)
-                            } else {
-                                stringResource(R.string.navigation_logs)
-                            },
-                            showTitleBarLogo && !selecting,
-                        )
-                    },
-                    navigationIcon = {
-                        if (selecting) {
-                            TooltipIconButton(
-                                tooltip = stringResource(R.string.logs_cancel_selection),
-                                onClick = { selectedIds = emptySet() },
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_cancel_selection))
-                            }
-                        }
-                    },
-                    expandedHeight = AppTopBarHeight,
-                    windowInsets = TopAppBarDefaults.windowInsets,
-                    actions = {
-                        if (selecting) {
-                            TooltipIconButton(
-                                tooltip = stringResource(R.string.logs_copy_selected),
-                                onClick = {
-                                    viewModel.copyEntries(entries)
-                                    Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
-                                    selectedIds = emptySet()
-                                },
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_selected))
-                            }
-                        } else {
-                            Box {
-                                TooltipIconButton(
-                                    tooltip = stringResource(R.string.logs_export),
-                                    enabled = !isExporting,
-                                    onClick = { showExportMenu = true },
-                                ) {
-                                    Icon(Icons.Default.Save, contentDescription = stringResource(R.string.logs_export))
-                                }
-                                AnimatedDropdownMenu(
-                                    expanded = showExportMenu,
-                                    onDismissRequest = { showExportMenu = false },
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.logs_save_to_file)) },
-                                        leadingIcon = { Icon(Icons.Default.Save, contentDescription = null) },
-                                        onClick = {
-                                            showExportMenu = false
-                                            try {
-                                                saveLogsLauncher.launch(LOG_EXPORT_FILE_NAME)
-                                            } catch (_: ActivityNotFoundException) {
-                                                Toast.makeText(
-                                                    context,
-                                                    R.string.logs_save_failed,
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            }
-                                        },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.logs_share)) },
-                                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
-                                        onClick = {
-                                            showExportMenu = false
-                                            coroutineScope.launch {
-                                                isExporting = true
-                                                try {
-                                                    shareLogFile(context, viewModel.createShareFile())
-                                                } catch (_: IOException) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        R.string.logs_share_failed,
-                                                        Toast.LENGTH_SHORT,
-                                                    ).show()
-                                                } catch (_: IllegalArgumentException) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        R.string.logs_share_failed,
-                                                        Toast.LENGTH_SHORT,
-                                                    ).show()
-                                                } catch (_: ActivityNotFoundException) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        R.string.logs_share_failed,
-                                                        Toast.LENGTH_SHORT,
-                                                    ).show()
-                                                } finally {
-                                                    isExporting = false
-                                                }
-                                            }
-                                        },
-                                    )
-                                }
-                            }
-                            TooltipIconButton(tooltip = stringResource(R.string.logs_copy_all), onClick = {
-                                viewModel.copyAll()
-                                Toast.makeText(context, R.string.logs_copied, Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_all))
-                            }
-                            TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = { viewModel.clear() }) {
-                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.logs_clear))
-                            }
-                        }
-                    },
-                )
+            ) { header ->
+                LogsTopBar(showTitleBarLogo, header, isExporting, actions)
             }
         },
         bottomBar = {
-            SegmentedTabRow(
-                labels = LogFilter.entries.map { stringResource(it.labelRes) },
-                selectedIndex = LogFilter.entries.indexOf(selectedFilter),
-                onSelected = { index ->
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
+            // Only this container owns IME padding. Animate the small panels inside it,
+            // so AnimatedContent never animates a keyboard-height spacer.
+            Box(modifier = Modifier.fillMaxWidth().imePadding()) {
+                AnimatedContent(
+                    targetState = searching,
+                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
+                    label = "logsBottomPanel",
+                ) { search ->
+                    if (search) {
+                        LogSearchPanel(state = searchQuery, open = searchRequested)
+                    } else {
+                        SegmentedTabRow(
+                            labels = LogFilter.entries.map { stringResource(it.labelRes) },
+                            selectedIndex = LogFilter.entries.indexOf(selectedFilter),
+                            onSelected = { index -> coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                        )
                     }
-                },
-            )
+                }
+            }
         },
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-            ) { page ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 val pageFilter = LogFilter.entries[page]
-                val entries = remember(allEntries, pageFilter) {
-                    allEntries.filterBy(pageFilter)
+                val entries = remember(allEntries, pageFilter, query) {
+                    visibleLogEntries(allEntries, pageFilter.source, query)
                 }
                 LogEntriesList(
                     entries = entries,
                     selectedIds = selectedIds,
+                    searching = searching,
+                    searchQuery = query,
                     onSelectionChange = { selectedIds = it },
                     onSelect = { entry ->
                         selectedIds = if (entry.id in selectedIds) selectedIds - entry.id else selectedIds + entry.id
                     },
                 )
+                if (searching && query.isNotBlank() && entries.isEmpty()) {
+                    Text(
+                        stringResource(R.string.logs_search_no_matches),
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             ScrollFadeEdges()
+        }
+    }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
+            title = { Text(stringResource(R.string.logs_clear_title)) },
+            text = { Text(stringResource(R.string.logs_clear_description)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClear = false
+                        viewModel.clear()
+                        selectedIds = emptySet()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text(stringResource(R.string.logs_clear))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogsTopBar(
+    showLogo: Boolean,
+    header: LogsHeaderState,
+    exporting: Boolean,
+    actions: LogsActions,
+) {
+    val selecting = header.selecting
+    val searching = header.searching
+    val emptyQuery = header.emptyQuery
+    val entries = header.selectedEntries
+    TopAppBar(
+        title = { LogsTitle(showLogo, header) },
+        navigationIcon = {
+            if (searching) {
+                TooltipIconButton(tooltip = stringResource(R.string.logs_close_search), onClick = actions.onCancel) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_close_search), modifier = Modifier.size(24.dp))
+                }
+            } else if (selecting) {
+                TooltipIconButton(tooltip = stringResource(R.string.logs_cancel_selection), onClick = actions.onCancel) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_cancel_selection), modifier = Modifier.size(24.dp))
+                }
+            }
+        },
+        expandedHeight = AppTopBarHeight,
+        windowInsets = TopAppBarDefaults.windowInsets,
+        actions = {
+            if (selecting || !(searching && emptyQuery)) {
+                if (selecting && header.resultCount > 1) {
+                    LogSelectionButton(header.allSelected, actions)
+                }
+                if (selecting) {
+                    LogsExportMenu(exporting, actions, entries.mapTo(mutableSetOf(), LogEntry::id))
+                    TooltipIconButton(tooltip = stringResource(R.string.logs_copy_selected), onClick = { actions.onCopy(entries) }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_selected), modifier = Modifier.size(24.dp))
+                    }
+                } else {
+                    if (!searching) {
+                        TooltipIconButton(tooltip = stringResource(R.string.logs_search), onClick = actions.onSearch) {
+                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.logs_search), modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    LogsExportMenu(exporting, actions)
+                    TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = actions.onClear) {
+                        Icon(painterResource(R.drawable.delete_24px), contentDescription = stringResource(R.string.logs_clear), modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun LogSelectionButton(allSelected: Boolean, actions: LogsActions) {
+    val label = stringResource(if (allSelected) R.string.logs_deselect else R.string.logs_select_all)
+    TooltipIconButton(tooltip = label, onClick = if (allSelected) actions.onRemoveSelection else actions.onSelectAll) {
+        Icon(
+            painterResource(if (allSelected) R.drawable.deselect_24px else R.drawable.select_all_24px),
+            contentDescription = label,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun LogsTitle(showLogo: Boolean, header: LogsHeaderState) {
+    if (header.searching && header.emptyQuery && !header.selecting) return
+    val found = stringResource(R.string.logs_found_count, header.resultCount)
+    Column {
+        AppBarTitle(
+            when {
+                header.selecting -> stringResource(R.string.logs_selected_count, header.selectedEntries.size)
+                header.searching && !header.emptyQuery -> found
+                else -> stringResource(R.string.navigation_logs)
+            },
+            showLogo && !header.selecting && !header.searching,
+        )
+        if (header.selecting && header.searching && !header.emptyQuery) {
+            Text(found, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+@Composable
+private fun LogsExportMenu(exporting: Boolean, actions: LogsActions, selectedIds: Set<Long> = emptySet()) {
+    val exportLabel = stringResource(if (selectedIds.isEmpty()) R.string.logs_export else R.string.logs_export_selected)
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TooltipIconButton(tooltip = exportLabel, enabled = !exporting, onClick = { expanded = true }) {
+            Icon(painterResource(R.drawable.upload_24px), contentDescription = exportLabel, modifier = Modifier.size(24.dp))
+        }
+        AnimatedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.logs_save_to_file)) },
+                leadingIcon = { Icon(painterResource(R.drawable.file_save_24px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                onClick = {
+                    expanded = false
+                    actions.onSave(selectedIds)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.logs_share)) },
+                leadingIcon = { Icon(painterResource(R.drawable.share_24px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                onClick = {
+                    expanded = false
+                    actions.onShare(selectedIds)
+                },
+            )
         }
     }
 }
@@ -351,9 +489,55 @@ private fun shareLogFile(context: Context, uri: Uri) {
 }
 
 @Composable
+private fun LogSearchNavigation(
+    searchRequested: Boolean,
+    searching: Boolean,
+    hasQuery: Boolean,
+    imeBottom: Int,
+    onClose: () -> Unit,
+    onClosed: () -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    BackHandler(enabled = searchRequested) {
+        if (imeBottom > 0 && hasQuery) {
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+        } else {
+            onClose()
+        }
+    }
+    var keyboardSeen by remember { mutableStateOf(false) }
+    LaunchedEffect(searching, imeBottom) {
+        if (searching && imeBottom > 0) keyboardSeen = true
+        if (imeBottom == 0 && keyboardSeen) {
+            keyboardSeen = false
+            onClosed()
+            if (searchRequested && !hasQuery) onClose()
+        }
+    }
+}
+
+@Composable
+private fun ScrollToFirstSearchResult(state: LazyListState, query: String, searching: Boolean, hasEntries: Boolean) {
+    LaunchedEffect(query) {
+        if (searching && query.isNotBlank() && hasEntries) state.scrollToItem(0)
+    }
+}
+
+@Composable
+private fun FollowLatestLogEntry(state: LazyListState, entries: List<LogEntry>, enabled: Boolean) {
+    LaunchedEffect(entries.lastOrNull()?.id, enabled) {
+        if (enabled && entries.isNotEmpty()) state.scrollToItem(entries.lastIndex)
+    }
+}
+
+@Composable
 private fun LogEntriesList(
     entries: List<LogEntry>,
     selectedIds: Set<Long>,
+    searching: Boolean,
+    searchQuery: String,
     onSelectionChange: (Set<Long>) -> Unit,
     onSelect: (LogEntry) -> Unit,
 ) {
@@ -394,13 +578,10 @@ private fun LogEntriesList(
     var followTail by listState.rememberFollowTail()
 
     val selectionMode = selectedIds.isNotEmpty()
-    val autoScroll = followTail && !selectionMode && gesture == null
-    LaunchedEffect(entries.lastOrNull()?.id, autoScroll) {
-        if (autoScroll && entries.isNotEmpty()) {
-            listState.scrollToItem(entries.size - 1)
-        }
-    }
+    val autoScroll = followTail && !selectionMode && gesture == null && !searching
+    FollowLatestLogEntry(listState, entries, autoScroll)
 
+    ScrollToFirstSearchResult(listState, searchQuery, searching, entries.isNotEmpty())
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -451,7 +632,7 @@ private fun LogEntriesList(
             }
         }
         ScrollToBottomButton(
-            visible = !followTail && entries.isNotEmpty(),
+            visible = !followTail && entries.isNotEmpty() && !searching,
             onClick = {
                 coroutineScope.launch {
                     listState.animateScrollToItem(currentEntries.lastIndex)
@@ -527,12 +708,6 @@ private fun LazyListState.logAt(y: Float): Long? {
         visible.firstOrNull { y >= it.offset && y < it.offset + it.size }
             ?: if (y < (visible.firstOrNull()?.offset ?: 0)) visible.firstOrNull() else visible.lastOrNull()
         )?.key as? Long
-}
-
-private fun List<LogEntry>.filterBy(filter: LogFilter): List<LogEntry> = when (filter) {
-    LogFilter.ALL -> this
-    LogFilter.APP -> filter { it.source == LogSource.APP }
-    LogFilter.XRAY -> filter { it.source == LogSource.XRAY }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
