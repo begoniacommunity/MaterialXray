@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -75,7 +76,6 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -88,7 +88,6 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -99,6 +98,7 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AppBarTitle
 import com.material.xray.core.ui.components.AppTopBarHeight
+import com.material.xray.core.ui.components.FloatingButtonShadow
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SegmentedTabRow
 import com.material.xray.core.ui.components.TooltipIconButton
@@ -480,9 +480,9 @@ private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier
         ) {
             SmallFloatingActionButton(
                 onClick = onClick,
-                modifier = Modifier.dropShadow(
+                modifier = Modifier.size(46.dp).dropShadow(
                     FloatingActionButtonDefaults.smallShape,
-                    Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.08f), offset = DpOffset(0.dp, 1.dp)),
+                    FloatingButtonShadow,
                 ),
                 elevation = FloatingActionButtonDefaults.elevation(
                     defaultElevation = 0.dp,
@@ -491,7 +491,11 @@ private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier
                     hoveredElevation = 0.dp,
                 ),
             ) {
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.logs_scroll_to_bottom))
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.logs_scroll_to_bottom),
+                    modifier = Modifier.size(27.6.dp),
+                )
             }
         }
     }

@@ -76,7 +76,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -122,6 +121,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -195,6 +195,7 @@ import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ExpansionArrow
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
+import com.material.xray.core.ui.components.FloatingButtonShadow
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SelectableOptionRow
@@ -1464,9 +1465,9 @@ private fun ConnectionFab(
             MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_FAB_CONTENT_ALPHA)
         },
         shape = shape,
-        shadowElevation = 6.dp,
         modifier = Modifier
             .size(64.dp)
+            .dropShadow(shape, FloatingButtonShadow)
             .clip(shape)
             .combinedClickable(
                 enabled = enabled,
@@ -1592,13 +1593,14 @@ private fun connectionActionLabel(
 }
 
 /** Icon counterpart to [connectionActionLabel], for the compact button that has no room for text. */
+@Composable
 private fun connectionActionIcon(
     isConnected: Boolean,
     isAlwaysOnVpn: Boolean,
     isRestartRequired: Boolean,
     isInterfaceBusy: Boolean,
 ): ImageVector = when {
-    isConnected && isAlwaysOnVpn -> Icons.Default.Settings
+    isConnected && isAlwaysOnVpn -> ImageVector.vectorResource(R.drawable.check_24px)
     isConnected -> Icons.Default.Stop
     isRestartRequired || isInterfaceBusy -> Icons.Default.RestartAlt
     else -> Icons.Default.PlayArrow

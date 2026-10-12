@@ -48,7 +48,7 @@ The navigation bar and rail stay in place while tab content moves within its vie
 
 - **App language**: English or Russian, or follow the system.
 - **App icon**: the default icon or a Material-style alternative.
-- **Floating connect button**: a small corner button instead of the large power button.
+- **Floating connect button**: a small corner button instead of the large power button. A check mark indicates an active always-on VPN connection; tapping it opens Android's VPN settings.
 - **Notification fields**: pick what the connection notification shows and how often it updates.
   In rootful mode, **Pinned interface** can be selected alongside metrics such as ping and traffic speed, and reordered with them. It is hidden in rootless mode. With no fields selected, the notification still shows the connection status and interface as before.
 
