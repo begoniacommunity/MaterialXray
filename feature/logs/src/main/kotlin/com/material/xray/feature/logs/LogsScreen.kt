@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -96,6 +95,7 @@ import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.common.log.displayMessage
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.AppBarTitle
 import com.material.xray.core.ui.components.AppTopBarHeight
 import com.material.xray.core.ui.components.FloatingButtonShadow
@@ -325,7 +325,7 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
         }
     }
     if (confirmClear) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { confirmClear = false },
             icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
             title = { Text(stringResource(R.string.logs_clear_title)) },

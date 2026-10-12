@@ -82,7 +82,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.NetworkPing
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -197,6 +196,7 @@ import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.ui.components.AnimatedActionIcon
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AnimatedOptionContent
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ExpansionArrow
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
@@ -662,13 +662,12 @@ private fun HwidRequiredDialogHost(
     if (prompt == null) return
 
     key(prompt.id) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = onDismiss,
             title = {
                 Text(
                     stringResource(R.string.home_hwid_required_title),
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
                 )
             },
             text = { Text(stringResource(R.string.home_hwid_required_body, prompt.subscription)) },
@@ -694,7 +693,7 @@ private fun DiscardEditedActiveConfigDialogHost(
 ) {
     if (!visible) return
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_discard_edited_config_title)) },
         text = { Text(stringResource(R.string.home_discard_edited_config_body)) },
@@ -777,7 +776,7 @@ private fun QrScannerPermissionGate(onGranted: () -> Unit): () -> Unit {
     }
 
     promptAccess?.let { requestedAccess ->
-        AlertDialog(
+        AppAlertDialog(
             icon = { Icon(painterResource(R.drawable.ic_qr_code_scanner_24), contentDescription = null) },
             onDismissRequest = { promptAccess = null },
             title = { Text(stringResource(R.string.home_camera_permission_title)) },
@@ -914,7 +913,7 @@ private fun RootFallbackDialogHost(
 ) {
     if (!visible) return
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         text = { Text(stringResource(R.string.home_root_fallback_message)) },
         confirmButton = {
@@ -980,7 +979,7 @@ private fun InstallPermissionRationaleDialogHost(
 ) {
     if (!visible) return
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_app_update_permission_title)) },
         text = { Text(stringResource(R.string.home_app_update_permission_message)) },
@@ -2378,7 +2377,7 @@ private fun PingMethodDialog(
     onDismiss: () -> Unit,
     onSelected: (PingMethod) -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) {
@@ -2445,7 +2444,7 @@ private fun SubscriptionDescriptionText(description: String) {
     if (touch) SelectionContainer(content = descriptionText) else descriptionText()
 
     pendingUrl?.let { url ->
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { pendingUrl = null },
             title = { Text(stringResource(R.string.home_open_link_title)) },
             text = {
@@ -2921,7 +2920,7 @@ private fun EditSubscriptionDialog(
         userAgentMode != SubscriptionUserAgentMode.fromValue(subscription.userAgentMode) ||
         customUserAgent.text.toString().trim().ifBlank { null } != subscription.customUserAgent ||
         customHeaders.text.toString().trim().ifBlank { null } != subscription.customHeaders
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.edit_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         modifier = Modifier.stableDialogHeight(onDismiss),
@@ -3006,7 +3005,7 @@ private fun ApplySubscriptionRoutingDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_apply_subscription_routing_title)) },
@@ -3030,7 +3029,7 @@ private fun RemoveSubscriptionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_remove_subscription_title)) },
@@ -3070,7 +3069,7 @@ private fun AddSubscriptionDialog(
     val customUserAgent = rememberTextFieldState()
     val customHeaders = rememberTextFieldState()
 
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.ic_add_24), contentDescription = null) },
         onDismissRequest = onDismiss,
         modifier = Modifier.stableDialogHeight(onDismiss),

@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +52,7 @@ import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.RoutingRuleOperator
 import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
@@ -362,7 +362,7 @@ private fun CatchAllRuleWarningDialog(
     onKeepEditing: () -> Unit,
     onSaveAnyway: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onKeepEditing,
         icon = { Icon(Icons.Default.Warning, contentDescription = null) },
         title = { Text(stringResource(R.string.routing_catch_all_warning_title)) },

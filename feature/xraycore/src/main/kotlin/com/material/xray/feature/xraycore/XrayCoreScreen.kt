@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.UploadFile
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -80,6 +79,7 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.ui.components.AnimatedActionIcon
 import com.material.xray.core.ui.components.AnimatedOptionContent
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.ScrolledTopAppBar
@@ -287,7 +287,7 @@ fun XrayCoreScreen(
         )
     }
     if (showFileWarning) {
-        AlertDialog(
+        AppAlertDialog(
             icon = { Icon(Icons.Outlined.UploadFile, contentDescription = null) },
             onDismissRequest = { showFileWarning = false },
             title = { Text(stringResource(R.string.settings_xray_core_file_warning_title)) },

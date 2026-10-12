@@ -6,7 +6,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.material.xray.core.model.OtherVpnMode
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 import com.material.xray.core.ui.components.TooltipIconButton
@@ -58,7 +58,7 @@ internal fun OtherVpnModeSetting(mode: OtherVpnMode, onModeChange: (OtherVpnMode
     )
 
     explanationMode?.let { selectedMode ->
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { explanationMode = null },
             title = { Text(stringResource(selectedMode.labelResource)) },
             text = {

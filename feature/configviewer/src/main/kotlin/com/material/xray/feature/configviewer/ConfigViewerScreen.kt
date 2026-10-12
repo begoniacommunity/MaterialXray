@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -98,6 +97,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AnimatedOptionContent
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.ExpansionArrow
 import com.material.xray.core.ui.components.FadingOutlinedTextField
 import com.material.xray.core.ui.components.MaskOutputTransformation
@@ -631,7 +631,7 @@ private fun ProtocolDropdown(field: EditField, draft: TextFieldState) {
 private fun SaveModeDialog(onDismiss: () -> Unit, onConfirm: (ServerSaveMode) -> Unit) {
     var selected by rememberSaveable { mutableStateOf(ServerSaveMode.KEEP) }
 
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.save_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.config_viewer_save_mode_title)) },

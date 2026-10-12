@@ -3,7 +3,6 @@ package com.material.xray.feature.routing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
 
@@ -41,7 +41,7 @@ internal fun RoutingRulesResetDialog(target: RoutingResetTarget?, sources: List<
     val subscription = target as? RoutingResetTarget.Subscription
     var chosenSource by remember(target) { mutableStateOf(subscription?.sourceId ?: sources.singleOrNull()?.id) }
     val selectedSource = sources.firstOrNull { it.id == chosenSource }
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(painterResource(R.drawable.settings_backup_restore_24px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         title = { Text(stringResource(if (server != null) R.string.routing_reset_server_rules_title else R.string.routing_reset_subscription_rules_title)) },

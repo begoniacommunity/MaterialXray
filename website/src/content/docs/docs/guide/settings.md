@@ -40,6 +40,8 @@ Resolvers are comma-separated and tried in order. Each one is an IP address or a
 
 Dependent controls expand and collapse smoothly when their parent option changes, including root-service options, custom DNS fields and update settings. Hidden controls leave no empty gaps. Ordinary settings use compact 6 dp spacing, text and dropdown fields use 8 dp, and section headers retain extra separation.
 
+Dialog titles are centered when an icon appears above them, including titles that wrap to several lines. Dialog titles without an icon remain aligned to the start.
+
 Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, and geodata URLs and update interval.
 
 Geodata downloads, subscription refreshes, app update checks and Xray version-list refreshes use a quick shrinking and growing icon transition. A completed operation shows **Check** for about two seconds; a failed operation shows **Error** for the same time. The original download or refresh icon then returns with the same transition. Core downloads and file installations use the same result indicators. Cancelling an operation does not show an error.

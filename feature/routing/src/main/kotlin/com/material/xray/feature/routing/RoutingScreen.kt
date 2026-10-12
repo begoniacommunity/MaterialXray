@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -69,7 +68,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.data.parser.ProfileRoutingRule
@@ -81,6 +79,7 @@ import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.AppBarTitle
 import com.material.xray.core.ui.components.AppTopBarHeight
 import com.material.xray.core.ui.components.SegmentedTabRow
@@ -345,7 +344,7 @@ fun RoutingScreen(
     )
 
     if (confirmResetToDefault) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { confirmResetToDefault = false },
             title = { Text(stringResource(R.string.routing_reset_to_default_title)) },
             text = { Text(stringResource(R.string.routing_reset_to_default_description)) },
@@ -639,7 +638,7 @@ private fun RemoveRulesDialog(
     onConfirm: (Set<String>) -> Unit,
 ) {
     if (ruleIds.isNullOrEmpty()) return
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = {
@@ -747,12 +746,11 @@ internal fun AutomaticRuleRoutingDialog(
     onDismiss: () -> Unit,
     onSwitchToManual: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 text = stringResource(R.string.routing_rules_automatic_title),
-                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
         },

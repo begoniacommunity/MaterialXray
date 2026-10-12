@@ -54,7 +54,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -150,6 +149,7 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.ui.components.AnimatedActionIcon
 import com.material.xray.core.ui.components.AnimatedOptionContent
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
@@ -1483,7 +1483,7 @@ private fun NotificationSettingsSection(
     }
 
     if (showAccessDialog) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { showAccessDialog = false },
             title = { Text(stringResource(R.string.settings_notification_permission_title)) },
             text = { Text(stringResource(R.string.settings_notification_permission_message)) },
@@ -1612,7 +1612,7 @@ private fun SettingsDialogs(
     actions: SettingsDialogActions,
 ) {
     if (backupImportSummary != null) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = actions.onDismissBackupImport,
             title = { Text(stringResource(R.string.settings_backup_import_title)) },
             text = {
@@ -1663,7 +1663,7 @@ private fun SettingsDialogs(
     }
 
     if (showRootAccessDeniedDialog) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = actions.onDismissRootAccessDenied,
             text = { Text(stringResource(R.string.settings_root_access_denied)) },
             confirmButton = {
@@ -1724,7 +1724,7 @@ private fun OpenSourceLicensesDialog(onDismiss: () -> Unit) {
         context.assets.open(selectedDocument.assetPath).bufferedReader().use { it.readText() }
     }
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_open_source_licenses)) },
         text = {
@@ -1892,7 +1892,7 @@ private fun DeleteGeoDataDialog(
     val size = Formatter.formatShortFileSize(LocalContext.current, bytes)
     val message = stringResource(R.string.settings_delete_geo_asset_message, size)
     val sizeStart = message.indexOf(size)
-    AlertDialog(
+    AppAlertDialog(
         icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = {
@@ -2107,7 +2107,7 @@ private fun AppLanguageDialog(
     onDismiss: () -> Unit,
     onSelect: (Locale?) -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_app_language_dialog_title)) },
         text = {
@@ -2188,7 +2188,7 @@ private fun FieldStyleDialog(
     onDismiss: () -> Unit,
     onSelect: (NotificationStyle) -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_notification_field_style)) },
         text = {
@@ -2242,7 +2242,7 @@ private fun UpdateFrequencyDialog(
     val isValid = parsed != null &&
         parsed in NotificationSettings.MIN_UPDATE_INTERVAL_MS..NotificationSettings.MAX_UPDATE_INTERVAL_MS
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_notification_update_frequency)) },
         text = {
@@ -2289,7 +2289,7 @@ private fun NotificationFieldsDialog(
 ) {
     val order = remember(rootMode) { settings.normalizedFieldOrder(rootMode).toMutableStateList() }
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_notification_fields_title)) },
         text = {

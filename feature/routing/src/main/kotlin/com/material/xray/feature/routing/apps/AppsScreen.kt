@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -78,6 +77,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
+import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.OptionFocusHighlight
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SelectableOptionRow
@@ -532,12 +532,11 @@ private fun AutomaticRoutingDialog(
     onDismiss: () -> Unit,
     onSwitchToManual: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 text = stringResource(R.string.apps_routing_automatic_title),
-                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
         },
@@ -577,7 +576,7 @@ private fun SpecificServerRouteNoteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.apps_specific_server_routing_title)) },
         text = {
@@ -611,7 +610,7 @@ private fun BulkAppRouteConfirmationDialog(
         BulkAppRouteAction.BypassAllApps -> stringResource(R.string.apps_bypass_all_description)
     }
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(description) },
@@ -656,7 +655,7 @@ private fun AppRoutePickerDialog(
         }
     }
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) {

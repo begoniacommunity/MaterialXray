@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -30,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AppAlertDialog
 
 @Composable
 fun DatabaseRecoveryScreen(
@@ -85,7 +85,7 @@ fun DatabaseRecoveryScreen(
     }
 
     if (showConfirmation) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { showConfirmation = false },
             title = { Text(stringResource(R.string.database_recovery_confirm_title)) },
             text = { Text(stringResource(R.string.database_recovery_confirm_message)) },

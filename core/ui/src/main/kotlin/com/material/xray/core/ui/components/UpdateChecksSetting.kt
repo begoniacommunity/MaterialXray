@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -83,7 +82,7 @@ fun <T> UpdateIntervalDialog(
     onConfirm: (T) -> Unit,
 ) {
     var selectedIndex by rememberSaveable { mutableIntStateOf(options.indexOfFirst { it.value == current }.coerceAtLeast(0)) }
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_app_update_interval_title)) },
         text = {
