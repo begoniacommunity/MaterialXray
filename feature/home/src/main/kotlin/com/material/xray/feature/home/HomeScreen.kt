@@ -2517,14 +2517,27 @@ private fun ServerRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (server.configurationEdited) {
-                            ServerStateBadge(ImageVector.vectorResource(R.drawable.edit_filled_24px), R.string.home_server_edited)
-                        }
-                        if (server.routingEdited) {
-                            ServerStateBadge(ImageVector.vectorResource(R.drawable.ic_arrow_split_24), R.string.home_server_routing_edited)
-                        }
-                        if (server.entity.guarded) {
-                            ServerStateBadge(ImageVector.vectorResource(R.drawable.lock_24px), R.string.home_server_guarded)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            if (server.configurationEdited) {
+                                ServerStateBadge(ImageVector.vectorResource(R.drawable.edit_filled_24px), R.string.home_server_edited)
+                            }
+                            if (server.entity.guarded) {
+                                ServerStateBadge(ImageVector.vectorResource(R.drawable.lock_filled_24px), R.string.home_server_guarded)
+                            }
+                            if (server.routingEdited) {
+                                ServerStateBadge(
+                                    ImageVector.vectorResource(R.drawable.ic_arrow_split_24),
+                                    R.string.home_server_routing_edited,
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = 1.2f
+                                        scaleY = 1.2f
+                                        translationY = 1.dp.toPx()
+                                    },
+                                )
+                            }
                         }
                     }
                     Text(
@@ -2570,11 +2583,11 @@ private fun ServerRow(
 }
 
 @Composable
-private fun ServerStateBadge(icon: ImageVector, @StringRes descriptionRes: Int) {
+private fun ServerStateBadge(icon: ImageVector, @StringRes descriptionRes: Int, modifier: Modifier = Modifier) {
     Icon(
         imageVector = icon,
         contentDescription = stringResource(descriptionRes),
-        modifier = Modifier.size(14.dp),
+        modifier = Modifier.size(14.dp).then(modifier),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

@@ -38,7 +38,7 @@ Each subscription has its own settings, set when you add it manually or later by
 To keep a server from being replaced on the next refresh, use **Lock configuration** in its viewer. A closed lock and a red **Server configuration is locked** banner show that subscription updates cannot replace it. Use **Unlock configuration** to allow updates again.
 :::
 
-Server rows show a filled pencil for an edited configuration and a routing icon for edited server or subscription rules. When both are changed, the pencil comes first. Resetting routing clears its icon while retaining the configuration edit.
+Server rows show a filled pencil for an edited configuration, a filled lock for a locked configuration, and a routing icon for edited server or subscription rules. These indicators have the same size and spacing, in that order. Resetting routing clears its icon while retaining the configuration edit.
 
 ## Hardware ID
 
