@@ -19,7 +19,16 @@
         <item quantity="other">Выбрано: %1$d</item>
     </plurals>
     <string name="routing_clear_selection">Снять выделение</string>
-    <string name="routing_delete_selected_rules">Удалить выбранные правила</string>
+    <string name="routing_remove_selected_rules">Удалить выбранные</string>
+    <string name="routing_remove">Удалить</string>
+    <string name="routing_remove_rule_title">Удалить правило?</string>
+    <string name="routing_remove_rules_title">Удалить правила?</string>
+    <plurals name="routing_remove_rules_message">
+        <item quantity="one">%1$d выбранное правило будет удалено.</item>
+        <item quantity="few">%1$d выбранных правила будут удалены.</item>
+        <item quantity="many">%1$d выбранных правил будут удалены.</item>
+        <item quantity="other">Выбранные правила будут удалены (%1$d).</item>
+    </plurals>
     <string name="routing_add_rule">Добавить правило</string>
     <string name="routing_rules_menu">Меню правил маршрутизации</string>
     <string name="routing_enable_all">Включить все</string>

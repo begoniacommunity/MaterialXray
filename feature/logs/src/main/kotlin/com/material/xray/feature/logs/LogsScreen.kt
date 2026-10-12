@@ -20,11 +20,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
-import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +63,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,20 +70,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -114,11 +103,11 @@ import com.material.xray.core.ui.components.LocalBottomBarVisibility
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SegmentedTabRow
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.rememberLazyListSelectionGesture
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -545,41 +534,17 @@ private fun LogEntriesList(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val currentEntries by rememberUpdatedState(entries)
-    val currentSelectedIds by rememberUpdatedState(selectedIds)
-    val changeSelection by rememberUpdatedState(onSelectionChange)
-    val hapticFeedback = LocalHapticFeedback.current
-    val edgeSize = with(LocalDensity.current) { 48.dp.toPx() }
-    var gesture by remember { mutableStateOf<LogDragSelection?>(null) }
-    var fingerY by remember { mutableFloatStateOf(0f) }
-
-    fun extendSelection(y: Float) {
-        val endId = listState.logAt(y) ?: return
-        gesture?.let { changeSelection(it.selectionAt(currentEntries.map { entry -> entry.id }, endId)) }
-    }
-
-    LaunchedEffect(gesture) {
-        if (gesture == null) return@LaunchedEffect
-        var previousFrame = withFrameNanos { it }
-        while (isActive) {
-            val frame = withFrameNanos { it }
-            val viewport = listState.layoutInfo
-            val edgeDistance = when {
-                fingerY < viewport.viewportStartOffset + edgeSize -> fingerY - viewport.viewportStartOffset - edgeSize
-                fingerY > viewport.viewportEndOffset - edgeSize -> fingerY - viewport.viewportEndOffset + edgeSize
-                else -> 0f
-            }.coerceIn(-edgeSize, edgeSize)
-            if (edgeDistance != 0f) {
-                listState.scrollBy(edgeDistance * 10f * ((frame - previousFrame) / 1_000_000_000f).coerceAtMost(0.05f))
-                extendSelection(fingerY)
-            }
-            previousFrame = frame
-        }
-    }
+    val selectionGesture = rememberLazyListSelectionGesture(
+        listState = listState,
+        keys = remember(entries) { entries.map(LogEntry::id) },
+        selectedKeys = selectedIds,
+        onSelectionChange = onSelectionChange,
+    )
 
     var followTail by listState.rememberFollowTail()
 
     val selectionMode = selectedIds.isNotEmpty()
-    val autoScroll = followTail && !selectionMode && gesture == null && !searching
+    val autoScroll = followTail && !selectionMode && !selectionGesture.dragging && !searching
     FollowLatestLogEntry(listState, entries, autoScroll)
 
     ScrollToFirstSearchResult(listState, searchQuery, searching, entries.isNotEmpty())
@@ -588,34 +553,7 @@ private fun LogEntriesList(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(listState) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val anchorId = listState.logAt(down.position.y) ?: return@awaitEachGesture
-                        val longPress = awaitLongPressOrCancellation(down.id)
-                        if (longPress == null) {
-                            if (currentEvent.changes.any { it.id == down.id && it.changedToUp() } && currentSelectedIds.isNotEmpty()) {
-                                changeSelection(if (anchorId in currentSelectedIds) currentSelectedIds - anchorId else currentSelectedIds + anchorId)
-                            }
-                        } else {
-                            try {
-                                gesture = LogDragSelection(anchorId, currentSelectedIds)
-                                fingerY = longPress.position.y
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                extendSelection(fingerY)
-                                longPress.consume()
-                                drag(longPress.id) { change ->
-                                    fingerY = change.position.y
-                                    extendSelection(fingerY)
-                                    change.consume()
-                                }
-                                currentEvent.changes.forEach { it.consume() }
-                            } finally {
-                                gesture = null
-                            }
-                        }
-                    }
-                },
+                .then(selectionGesture.modifier),
             contentPadding = PaddingValues(vertical = 4.dp),
         ) {
             itemsIndexed(
@@ -701,14 +639,6 @@ private fun LazyListState.rememberFollowTail(): MutableState<Boolean> {
             }
     }
     return followTail
-}
-
-private fun LazyListState.logAt(y: Float): Long? {
-    val visible = layoutInfo.visibleItemsInfo
-    return (
-        visible.firstOrNull { y >= it.offset && y < it.offset + it.size }
-            ?: if (y < (visible.firstOrNull()?.offset ?: 0)) visible.firstOrNull() else visible.lastOrNull()
-        )?.key as? Long
 }
 
 @OptIn(ExperimentalFoundationApi::class)

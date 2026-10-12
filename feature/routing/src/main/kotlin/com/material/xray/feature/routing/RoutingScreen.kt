@@ -3,6 +3,12 @@ package com.material.xray.feature.routing
 import androidx.activity.compose.BackHandler
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +31,6 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -57,8 +62,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -105,6 +114,10 @@ private sealed interface ProviderRoutingRuleAction {
 
 private val defaultRoutingRulesById = RoutingRuleCatalog.defaults().associateBy(RoutingRule::id)
 
+private data class RoutingHeaderState(val selectedIds: Set<String>, val appsTabSelected: Boolean) {
+    val selecting: Boolean get() = selectedIds.isNotEmpty()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutingScreen(
@@ -130,6 +143,7 @@ fun RoutingScreen(
     var pendingProviderAction by remember { mutableStateOf<ProviderRoutingRuleAction?>(null) }
     var confirmResetToDefault by remember { mutableStateOf(false) }
     var resetTarget by remember { mutableStateOf<RoutingResetTarget?>(null) }
+    var rulesToRemove by remember { mutableStateOf<Set<String>?>(null) }
     val selectionMode by remember { derivedStateOf { selectedRuleIds.isNotEmpty() } }
     val selectedTab = pagerState.currentPage
     val newRuleName = stringResource(R.string.routing_new_rule_name)
@@ -174,8 +188,7 @@ fun RoutingScreen(
             is RoutingRuleAction.Edit -> onEditRule(EditableRoutingRule(rule = action.rule, isNew = false))
             is RoutingRuleAction.Toggle -> viewModel.updateRule(action.rule.copy(enabled = action.enabled))
             is RoutingRuleAction.Delete -> {
-                viewModel.deleteRules(action.ruleIds)
-                selectedRuleIds = emptySet()
+                rulesToRemove = action.ruleIds
             }
         }
     }
@@ -228,6 +241,7 @@ fun RoutingScreen(
             onProviderGeoDataNoticeClick = viewModel::onProviderGeoDataNoticeClick,
             selectionMode = selectionMode,
             selectedRuleIds = selectedRuleIds,
+            onSelectionChange = { selectedRuleIds = it },
             actions = RoutingRuleActions(
                 onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
                 onRuleClick = { rule ->
@@ -285,14 +299,11 @@ fun RoutingScreen(
             ),
         )
     }
-    val ruleActions: @Composable () -> Unit = {
+    val ruleActions: @Composable (Set<String>) -> Unit = { headerSelectedIds ->
         RuleActions(
-            selectionMode = selectionMode,
-            selectedRuleIds = selectedRuleIds,
+            selectionMode = headerSelectedIds.isNotEmpty(),
+            selectedRuleIds = headerSelectedIds,
             rules = rules,
-            onClearSelection = {
-                selectedRuleIds = emptySet()
-            },
             onRuleAction = ::applyRuleAction,
         )
     }
@@ -300,7 +311,8 @@ fun RoutingScreen(
     RoutingLayout(
         pagerState = pagerState,
         showTitleBarLogo = showTitleBarLogo,
-        selectionCount = selectedRuleIds.size.takeIf { selectionMode },
+        selectedRuleIds = selectedRuleIds,
+        onClearSelection = { selectedRuleIds = emptySet() },
         onSelectTab = { index -> coroutineScope.launch { pagerState.animateScrollToPage(index) } },
         ruleActions = ruleActions,
         rulesTab = rulesTab,
@@ -320,6 +332,16 @@ fun RoutingScreen(
         onDismiss = { resetTarget = null },
         onServerReset = viewModel::resetServerRules,
         onSubscriptionReset = viewModel::resetSubscriptionRules,
+    )
+
+    RemoveRulesDialog(
+        ruleIds = rulesToRemove,
+        onDismiss = { rulesToRemove = null },
+        onConfirm = { ids ->
+            viewModel.deleteRules(ids)
+            rulesToRemove = null
+            selectedRuleIds = emptySet()
+        },
     )
 
     if (confirmResetToDefault) {
@@ -350,9 +372,10 @@ fun RoutingScreen(
 private fun RoutingLayout(
     pagerState: PagerState,
     showTitleBarLogo: Boolean,
-    selectionCount: Int?,
+    selectedRuleIds: Set<String>,
+    onClearSelection: () -> Unit,
     onSelectTab: (Int) -> Unit,
-    ruleActions: @Composable () -> Unit,
+    ruleActions: @Composable (Set<String>) -> Unit,
     rulesTab: @Composable () -> Unit,
 ) {
     val selectedTab = pagerState.currentPage
@@ -360,19 +383,29 @@ private fun RoutingLayout(
         // With the width for it, rules and apps sit side by side, each with its own actions, so
         // neither has to be paged away to reach the other.
         val sideBySide = maxWidth >= TwoPaneMinWidth
+        val headerState = RoutingHeaderState(selectedRuleIds, selectedTab == RoutingTab.Apps.ordinal)
         Scaffold(
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                RoutingTopBar(
-                    showTitleBarLogo = showTitleBarLogo,
-                    selectionCount = selectionCount.takeIf { sideBySide || selectedTab == RoutingTab.Rules.ordinal },
-                    actions = {
-                        // Side by side, each pane carries its own actions instead.
-                        if (!sideBySide) {
-                            PagedTabActions(appsTabSelected = selectedTab == RoutingTab.Apps.ordinal, ruleActions = ruleActions)
-                        }
-                    },
-                )
+                AnimatedContent(
+                    targetState = headerState,
+                    contentKey = { it.selecting to it.appsTabSelected },
+                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+                    label = "routingHeader",
+                ) { header ->
+                    RoutingTopBar(
+                        showTitleBarLogo = showTitleBarLogo,
+                        selectionCount = header.selectedIds.size.takeIf { header.selecting && (sideBySide || !header.appsTabSelected) },
+                        onClearSelection = onClearSelection,
+                        modifier = Modifier.blockInactiveToolbar(header.selecting == headerState.selecting && header.appsTabSelected == headerState.appsTabSelected),
+                        actions = {
+                            // Side by side, each pane carries its own actions instead.
+                            if (!sideBySide) {
+                                PagedTabActions(appsTabSelected = header.appsTabSelected, ruleActions = { ruleActions(header.selectedIds) })
+                            }
+                        },
+                    )
+                }
             },
             bottomBar = {
                 if (!sideBySide) {
@@ -392,7 +425,17 @@ private fun RoutingLayout(
                 ) {
                     RoutingPane(
                         title = stringResource(RoutingTab.Rules.titleResource),
-                        actions = { ruleActions() },
+                        actions = {
+                            AnimatedContent(
+                                targetState = selectedRuleIds,
+                                contentKey = { it.isNotEmpty() },
+                                contentAlignment = Alignment.CenterEnd,
+                                transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+                                label = "routingPaneActions",
+                            ) { ids ->
+                                Row(modifier = Modifier.blockInactiveToolbar(ids.isNotEmpty() == selectedRuleIds.isNotEmpty())) { ruleActions(ids) }
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                         content = rulesTab,
                     )
@@ -464,9 +507,12 @@ private fun RoutingPane(
 private fun RoutingTopBar(
     showTitleBarLogo: Boolean,
     selectionCount: Int?,
+    onClearSelection: () -> Unit,
+    modifier: Modifier,
     actions: @Composable RowScope.() -> Unit,
 ) {
     TopAppBar(
+        modifier = modifier,
         title = {
             AppBarTitle(
                 if (selectionCount != null) {
@@ -474,8 +520,19 @@ private fun RoutingTopBar(
                 } else {
                     stringResource(R.string.routing_title)
                 },
-                showTitleBarLogo,
+                showTitleBarLogo && selectionCount == null,
             )
+        },
+        navigationIcon = {
+            if (selectionCount != null) {
+                TooltipIconButton(tooltip = stringResource(R.string.routing_clear_selection), onClick = onClearSelection) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.routing_clear_selection),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
         },
         expandedHeight = AppTopBarHeight,
         windowInsets = TopAppBarDefaults.windowInsets,
@@ -488,79 +545,118 @@ private fun RuleActions(
     selectionMode: Boolean,
     selectedRuleIds: Set<String>,
     rules: List<RoutingRule>,
-    onClearSelection: () -> Unit,
     onRuleAction: (RoutingRuleAction) -> Unit,
 ) {
     var rulesMenuExpanded by remember { mutableStateOf(false) }
-    when {
-        selectionMode -> {
-            TooltipIconButton(tooltip = stringResource(R.string.routing_clear_selection), onClick = onClearSelection) {
+    val canRemoveSelected = selectionMode && selectedRuleIds.isNotEmpty() && selectedRuleIds.all { it.startsWith("custom:") }
+    if (!selectionMode) {
+        TooltipIconButton(tooltip = stringResource(R.string.routing_add_rule), onClick = { onRuleAction(RoutingRuleAction.Add) }) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = stringResource(R.string.routing_add_rule),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Box {
+            TooltipIconButton(tooltip = stringResource(R.string.routing_rules_menu), onClick = { rulesMenuExpanded = true }) {
                 Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.routing_clear_selection),
+                    Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.routing_rules_menu),
                     modifier = Modifier.size(24.dp),
                 )
             }
-            if (selectedRuleIds.all { it.startsWith("custom:") }) {
-                TooltipIconButton(
-                    tooltip = stringResource(R.string.routing_delete_selected_rules),
-                    onClick = { onRuleAction(RoutingRuleAction.Delete(selectedRuleIds.mapTo(mutableSetOf()) { it.removePrefix("custom:") })) },
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.routing_delete_selected_rules),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+            AnimatedDropdownMenu(
+                expanded = rulesMenuExpanded,
+                onDismissRequest = { rulesMenuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.routing_enable_all)) },
+                    enabled = rules.any { !it.enabled },
+                    onClick = {
+                        rulesMenuExpanded = false
+                        onRuleAction(RoutingRuleAction.EnableAll)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.routing_disable_all)) },
+                    enabled = rules.any { it.enabled },
+                    onClick = {
+                        rulesMenuExpanded = false
+                        onRuleAction(RoutingRuleAction.DisableAll)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.routing_reset_to_default)) },
+                    onClick = {
+                        rulesMenuExpanded = false
+                        onRuleAction(RoutingRuleAction.ResetToDefault)
+                    },
+                )
             }
         }
-        else -> {
-            TooltipIconButton(tooltip = stringResource(R.string.routing_add_rule), onClick = { onRuleAction(RoutingRuleAction.Add) }) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = stringResource(R.string.routing_add_rule),
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            Box {
-                TooltipIconButton(tooltip = stringResource(R.string.routing_rules_menu), onClick = { rulesMenuExpanded = true }) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = stringResource(R.string.routing_rules_menu),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                AnimatedDropdownMenu(
-                    expanded = rulesMenuExpanded,
-                    onDismissRequest = { rulesMenuExpanded = false },
+    }
+    if (selectionMode) {
+        Box(
+            modifier = Modifier.size(48.dp).blockInactiveToolbar(canRemoveSelected),
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedVisibility(
+                visible = canRemoveSelected,
+                enter = fadeIn(tween(300)),
+                exit = fadeOut(tween(300)),
+            ) {
+                TooltipIconButton(
+                    tooltip = stringResource(R.string.routing_remove_selected_rules),
+                    onClick = {
+                        if (canRemoveSelected) onRuleAction(RoutingRuleAction.Delete(selectedRuleIds.mapTo(mutableSetOf()) { it.removePrefix("custom:") }))
+                    },
                 ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.routing_enable_all)) },
-                        enabled = rules.any { !it.enabled },
-                        onClick = {
-                            rulesMenuExpanded = false
-                            onRuleAction(RoutingRuleAction.EnableAll)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.routing_disable_all)) },
-                        enabled = rules.any { it.enabled },
-                        onClick = {
-                            rulesMenuExpanded = false
-                            onRuleAction(RoutingRuleAction.DisableAll)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.routing_reset_to_default)) },
-                        onClick = {
-                            rulesMenuExpanded = false
-                            onRuleAction(RoutingRuleAction.ResetToDefault)
-                        },
+                    Icon(
+                        painterResource(R.drawable.delete_24px),
+                        contentDescription = stringResource(R.string.routing_remove_selected_rules),
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
         }
     }
+}
+
+private fun Modifier.blockInactiveToolbar(active: Boolean): Modifier = then(
+    if (active) Modifier else Modifier.clearAndSetSemantics {},
+).pointerInput(active) {
+    if (!active) {
+        awaitPointerEventScope {
+            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+        }
+    }
+}
+
+@Composable
+private fun RemoveRulesDialog(
+    ruleIds: Set<String>?,
+    onDismiss: () -> Unit,
+    onConfirm: (Set<String>) -> Unit,
+) {
+    if (ruleIds.isNullOrEmpty()) return
+    AlertDialog(
+        icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(if (ruleIds.size == 1) R.string.routing_remove_rule_title else R.string.routing_remove_rules_title))
+        },
+        text = { Text(pluralStringResource(R.plurals.routing_remove_rules_message, ruleIds.size, ruleIds.size)) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(ruleIds) }) {
+                Text(stringResource(R.string.routing_remove), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.routing_cancel))
+            }
+        },
+    )
 }
 
 @Composable

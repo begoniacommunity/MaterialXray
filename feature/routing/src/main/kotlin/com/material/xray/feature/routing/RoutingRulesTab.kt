@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +71,7 @@ import com.material.xray.core.model.reorderedBy
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.rememberLazyListSelectionGesture
 import com.material.xray.core.xray.ProviderGeoDataNotice
 
 internal fun routingSelectionKey(scope: RoutingRuleScope, id: String): String = "${scope.value}:$id"
@@ -94,6 +100,7 @@ internal fun RoutingRulesTab(
     onProviderGeoDataNoticeClick: () -> Unit,
     selectionMode: Boolean,
     selectedRuleIds: Set<String>,
+    onSelectionChange: (Set<String>) -> Unit,
     actions: RoutingRuleActions,
 ) {
     val listState = rememberLazyListState()
@@ -120,6 +127,17 @@ internal fun RoutingRulesTab(
         RoutingRuleScope.Profile to profile.filter { it.matchesSearch(query) }.map { RuleRow(RoutingRuleScope.Profile, profile = it) },
     )
     val visibleScopes = scopes.filter { rows.getValue(it).isNotEmpty() }
+    val selectionGesture = rememberLazyListSelectionGesture(
+        listState = listState,
+        keys = visibleScopes.flatMap { scope -> rows.getValue(scope).map { it.key } },
+        selectedKeys = selectedRuleIds,
+        onSelectionChange = onSelectionChange,
+        // List inset + card padding + the complete trailing control slot.
+        protectedEnd = 16.dp + 16.dp + 52.dp,
+        startOnItemOnly = true,
+        enabled = drag.draggingKey == null,
+        handleTaps = false,
+    )
     drag.keys = { key ->
         if (key.startsWith("scope:")) visibleScopes.map { it.headerKey() } else rows.values.firstOrNull { group -> group.any { it.key == key } }.orEmpty().filterNot { it.orphaned }.map { it.key }
     }
@@ -156,7 +174,7 @@ internal fun RoutingRulesTab(
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().then(selectionGesture.modifier),
                 contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -256,7 +274,25 @@ private fun RoutingRuleCard(row: RuleRow, shape: RoundedCornerShape, selected: B
             else -> if (long) actions.onSubscriptionRuleLongClick(requireNotNull(rule)) else actions.onSubscriptionRuleClick(requireNotNull(rule))
         }
     }
-    Surface(color = containerColor, shape = shape, modifier = modifier.fillMaxWidth().alpha(if (row.orphaned) 0.55f else 1f).clip(shape).combinedClickable(onClick = { click(false) }, onLongClick = { click(true) })) {
+    Surface(
+        color = containerColor,
+        shape = shape,
+        modifier = modifier.fillMaxWidth()
+            .alpha(if (row.orphaned) 0.55f else 1f)
+            .clip(shape)
+            .clickable(onClick = { click(false) })
+            .semantics {
+                this.selected = selected
+                onClick {
+                    click(false)
+                    true
+                }
+                onLongClick {
+                    click(true)
+                    true
+                }
+            },
+    ) {
         Row(modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(profile?.name ?: routingRuleDisplayName(requireNotNull(rule)), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)

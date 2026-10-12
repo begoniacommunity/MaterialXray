@@ -17,7 +17,14 @@
         <item quantity="other">%1$d selected</item>
     </plurals>
     <string name="routing_clear_selection">Clear selection</string>
-    <string name="routing_delete_selected_rules">Delete selected rules</string>
+    <string name="routing_remove_selected_rules">Remove selected</string>
+    <string name="routing_remove">Remove</string>
+    <string name="routing_remove_rule_title">Remove rule?</string>
+    <string name="routing_remove_rules_title">Remove rules?</string>
+    <plurals name="routing_remove_rules_message">
+        <item quantity="one">The selected rule will be removed.</item>
+        <item quantity="other">The %1$d selected rules will be removed.</item>
+    </plurals>
     <string name="routing_add_rule">Add rule</string>
     <string name="routing_rules_menu">Routing rules menu</string>
     <string name="routing_enable_all">Enable all</string>

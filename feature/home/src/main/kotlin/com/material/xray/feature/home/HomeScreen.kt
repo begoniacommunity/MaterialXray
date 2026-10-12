@@ -2319,7 +2319,7 @@ private fun SubscriptionHeader(
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.home_action_remove)) },
                         leadingIcon = {
-                            Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null)
+                            Icon(painterResource(R.drawable.delete_24px), contentDescription = null)
                         },
                         onClick = {
                             showMenu = false
@@ -3005,7 +3005,7 @@ private fun RemoveSubscriptionDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
-        icon = { Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null) },
+        icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_remove_subscription_title)) },
         text = {
@@ -3019,7 +3019,7 @@ private fun RemoveSubscriptionDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.home_action_remove))
+                Text(stringResource(R.string.home_action_remove), color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {

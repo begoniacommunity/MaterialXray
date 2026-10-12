@@ -14,9 +14,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.PinnableContainer
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -138,6 +140,7 @@ internal fun <T> List<T>.moved(from: T, to: T): List<T> {
 @Composable
 internal fun RoutingDragHandle(key: String, label: String, moveUp: String, moveDown: String, state: RoutingReorderState, enabled: Boolean = true) {
     val container = LocalPinnableContainer.current
+    val haptics = LocalHapticFeedback.current
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(48.dp)
@@ -153,7 +156,10 @@ internal fun RoutingDragHandle(key: String, label: String, moveUp: String, moveD
             .pointerInput(key, enabled, state) {
                 if (enabled) {
                     detectDragGesturesAfterLongPress(
-                        onDragStart = { state.start(key, container) },
+                        onDragStart = {
+                            state.start(key, container)
+                            if (state.draggingKey == key) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
                         onDragEnd = { state.finish() },
                         onDragCancel = { state.finish(cancelled = true) },
                         onDrag = { change, delta ->
