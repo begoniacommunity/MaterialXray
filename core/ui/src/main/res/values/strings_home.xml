@@ -209,7 +209,8 @@
         <item quantity="other">%1$d days left</item>
     </plurals>
     <string name="home_gigabytes">%1$s GB</string>
-    <string name="home_server_edited">Edited locally</string>
+    <string name="home_server_edited">Server configuration edited</string>
+    <string name="home_server_routing_edited">Server routing edited</string>
     <string name="home_server_guarded">Server configuration is locked</string>
     <string name="home_discard_edited_config_title">Discard edited config?</string>
     <string name="home_discard_edited_config_body">You edited the active Xray config. Selecting another server throws that edit away.</string>

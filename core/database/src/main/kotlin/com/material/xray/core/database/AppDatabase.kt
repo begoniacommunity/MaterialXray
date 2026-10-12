@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.SQLiteConnection
 import com.material.xray.core.database.dao.AppBypassDao
 import com.material.xray.core.database.dao.ServerDao
+import com.material.xray.core.database.dao.ServerEditsDao
 import com.material.xray.core.database.dao.SubscriptionDao
 import com.material.xray.core.database.entity.AppBypassEntity
 import com.material.xray.core.database.entity.DatabaseMetadataEntity
@@ -18,6 +19,7 @@ import com.material.xray.core.database.entity.SubscriptionEntity
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao
+    abstract fun serverEditsDao(): ServerEditsDao
     abstract fun subscriptionDao(): SubscriptionDao
     abstract fun appBypassDao(): AppBypassDao
 

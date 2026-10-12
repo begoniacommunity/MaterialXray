@@ -6,6 +6,8 @@ import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.data.repository.SubscriptionAppRoutingRepository
 import com.material.xray.core.data.repository.SubscriptionRoutingRepository
+import com.material.xray.core.database.dao.ServerDao
+import com.material.xray.core.database.dao.ServerEditsDao
 import com.material.xray.core.database.dao.SubscriptionDao
 import org.koin.core.annotation.ComponentScan
 import org.koin.core.annotation.Module
@@ -14,6 +16,9 @@ import org.koin.core.annotation.Singleton
 @Module
 @ComponentScan("com.material.xray.core.data")
 class CoreDataModule {
+
+    @Singleton
+    fun serverRepository(serverDao: ServerDao, serverEditsDao: ServerEditsDao): ServerRepository = ServerRepository(serverDao, serverEditsDao)
 
     // The primary constructor takes test seams, so the graph uses the secondary one.
     @Singleton

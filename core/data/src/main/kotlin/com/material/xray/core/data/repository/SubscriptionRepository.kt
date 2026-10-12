@@ -243,7 +243,7 @@ class SubscriptionRepository(
 
     internal suspend fun <T> withRefreshTracking(subscriptionId: Long, block: suspend () -> T): T = refreshState.withRefreshTracking(subscriptionId, block)
 
-    suspend fun delete(sub: SubscriptionEntity) {
+    suspend fun delete(sub: SubscriptionEntity) = withRefreshLock(sub.id) {
         subscriptionDao.delete(sub)
     }
 
@@ -477,7 +477,7 @@ internal fun carryProfileRoutingOverridesInto(
             index = index,
             entity = entity,
             config = config,
-            baseConfigJson = json.encodeToString(config.copy(profileRoutingOverrides = emptyList())),
+            baseConfigJson = json.encodeToString(config.copy(profileRoutingOverrides = emptyList(), configurationEdited = null)),
         )
     }
     if (existingOverrides.isEmpty()) return fetchedServers
@@ -496,7 +496,7 @@ internal fun carryProfileRoutingOverridesInto(
     return fetchedServers.map { fetched ->
         val fetchedConfig = runCatching { json.decodeFromString<ServerConfig>(fetched.configJson) }.getOrNull()
             ?: return@map fetched
-        val fetchedBaseJson = json.encodeToString(fetchedConfig.copy(profileRoutingOverrides = emptyList()))
+        val fetchedBaseJson = json.encodeToString(fetchedConfig.copy(profileRoutingOverrides = emptyList(), configurationEdited = null))
         val exact = existingOverrides.firstOrNull {
             it.index !in claimedExistingIndices && it.baseConfigJson == fetchedBaseJson
         }
@@ -515,7 +515,7 @@ internal fun carryProfileRoutingOverridesInto(
             matched.config.profileRoutingOverrides,
         )
         fetched.copy(
-            configJson = json.encodeToString(fetchedConfig.copy(profileRoutingOverrides = reconciled)),
+            configJson = json.encodeToString(fetchedConfig.copy(profileRoutingOverrides = reconciled, configurationEdited = false)),
             edited = true,
         )
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,11 +28,13 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +52,7 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +65,7 @@ import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.model.reorderedBy
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.ScrollFadeEdges
+import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.xray.ProviderGeoDataNotice
 
 internal fun routingSelectionKey(scope: RoutingRuleScope, id: String): String = "${scope.value}:$id"
@@ -82,6 +87,7 @@ internal fun RoutingRulesTab(
     subscriptionRules: List<RoutingRule>,
     profileRules: List<ProfileRoutingRule>,
     profileServerId: Long?,
+    canResetSubscriptionRules: Boolean,
     providerManaged: Boolean,
     providerName: String?,
     providerGeoDataNotice: ProviderGeoDataNotice?,
@@ -166,10 +172,11 @@ internal fun RoutingRulesTab(
                                 .onPlaced { drag.placed(headerKey, it.positionInParent().y, it.size.height) }
                                 .graphicsLayer { translationY = drag.offset(headerKey) }
                                 .combinedClickable(onClick = {}, onLongClick = { actions.onScopeLongClick(scope) })
-                                .padding(start = 4.dp, top = 12.dp, end = 16.dp, bottom = 6.dp),
+                                .padding(start = 4.dp, top = 12.dp, end = 4.dp, bottom = 6.dp),
                         ) {
                             Text(stringResource(scope.titleResource()), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                             if (selectionMode) RoutingDragHandle(headerKey, stringResource(R.string.routing_reorder_category), stringResource(R.string.routing_move_up), stringResource(R.string.routing_move_down), drag)
+                            RoutingScopeResetButton(scope, profileServerId, canResetSubscriptionRules, selectionMode, actions.onScopeReset)
                         }
                     }
                     val group = rows.getValue(scope)
@@ -195,6 +202,25 @@ internal fun RoutingRulesTab(
                 }
             }
             ScrollFadeEdges()
+        }
+    }
+}
+
+@Composable
+private fun RoutingScopeResetButton(scope: RoutingRuleScope, serverId: Long?, subscriptionAvailable: Boolean, selecting: Boolean, onReset: (RoutingRuleScope) -> Unit) {
+    if (scope == RoutingRuleScope.Custom) return
+    val label = stringResource(if (scope == RoutingRuleScope.Profile) R.string.routing_reset_server_rules else R.string.routing_reset_subscription_rules)
+    val available = if (scope == RoutingRuleScope.Profile) serverId != null else subscriptionAvailable
+    val iconSize = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.fontSize.toDp() }
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        TooltipIconButton(
+            tooltip = label,
+            enabled = !selecting && available,
+            onClick = { onReset(scope) },
+            // The symbol has 1/8 of its viewport inset at each edge.
+            modifier = Modifier.size(iconSize).offset(x = iconSize / 8),
+        ) {
+            Icon(painterResource(R.drawable.settings_backup_restore_24px), contentDescription = label, modifier = Modifier.size(iconSize))
         }
     }
 }

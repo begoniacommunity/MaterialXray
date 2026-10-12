@@ -27,7 +27,7 @@ data class ServerEntity(
     val configJson: String,
     val latencyMs: Int = -1,
     val sortOrder: Int = 0,
-    /** Set once the user has saved a local edit to [configJson]. Drives the pencil badge. */
+    /** Compatible local-edit flag; config and routing indicators are distinguished inside [configJson]. */
     val edited: Boolean = false,
     /** Kept verbatim across subscription refreshes instead of being replaced. Drives the shield badge. */
     val guarded: Boolean = false,

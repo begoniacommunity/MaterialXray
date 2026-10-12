@@ -3,7 +3,7 @@ title: Routing header
 description: Push routing rules to clients as Xray JSON or Happ routing links.
 ---
 
-The `routing` response header delivers routing rules with the subscription. They're applied when the user's **Routing policy** is *Subscription provider*, which is the default. They appear on the Routing tab as **Subscription-wide** rules, and stay up to date on each refresh until the user switches to manual mode.
+The `routing` response header delivers routing rules with the subscription. They're applied when the user's **Routing policy** is *Subscription provider*, which is the default. They appear on the Routing tab as **Subscription rules** rules, and stay up to date on each refresh until the user switches to manual mode.
 
 ## Formats
 
@@ -105,4 +105,4 @@ Send `routing-enable: 0` (or `false`, `off`, `no`) to stop the client from impor
 
 ## Routing inside JSON profiles
 
-Xray JSON servers can carry their own `routing` block. Those rules appear as **Profile-specific** rules and apply only while that server is selected.
+Xray JSON servers can carry their own `routing` block. Those rules appear as **Server-specific** rules and apply only while that server is selected.

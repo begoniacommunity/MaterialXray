@@ -11,7 +11,9 @@ import com.material.xray.core.data.repository.ProviderGeoDataManager
 import com.material.xray.core.data.repository.ProviderRoutingAvailability
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.data.repository.SubscriptionRoutingRepository
 import com.material.xray.core.data.repository.selectedProviderRoutingAvailability
+import com.material.xray.core.data.repository.toSubscriptionRouting
 import com.material.xray.core.database.dao.SubscriptionDao
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.ProfileRoutingOverride
@@ -40,12 +42,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koin.core.annotation.KoinViewModel
 
+internal data class RoutingSubscriptionSource(val id: Long, val name: String)
+
 @KoinViewModel
 class RoutingViewModel(
     private val settingsRepository: SettingsRepository,
     private val routingChangeManager: RoutingChangeManager,
     private val serverRepository: ServerRepository,
     private val subscriptionDao: SubscriptionDao,
+    private val subscriptionRoutingRepository: SubscriptionRoutingRepository,
     private val providerGeoDataManager: ProviderGeoDataManager,
     connectionStateCoordinator: ConnectionStateCoordinator,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -96,6 +101,11 @@ class RoutingViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val subscriptionRules: StateFlow<List<RoutingRule>> = settingsRepository.subscriptionRoutingRules
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    internal val subscriptionRoutingSourceId = settingsRepository.subscriptionRoutingState.map { it.subscriptionId }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    internal val subscriptionRoutingSources = subscriptionDao.observeAll().map { subscriptions ->
+        subscriptions.filter { it.toSubscriptionRouting() != null }.map { RoutingSubscriptionSource(it.id, it.name) }
+    }.flowOn(defaultDispatcher).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val providerGeoDataNotice: StateFlow<ProviderGeoDataNotice?> = combine(
         subscriptionRules,
         providerGeoDataManager.state,
@@ -185,20 +195,20 @@ class RoutingViewModel(
         enabled: Boolean,
     ) {
         if (rule.orphaned) return
+        val serverId = profileRouting.value?.serverId ?: return
         mutateRouting {
-            val serverId = settingsRepository.lastServerId.first()
-            val entity = serverRepository.getById(serverId) ?: return@mutateRouting
-            val config = runCatching { serverRepository.parseConfig(entity) }.getOrNull() ?: return@mutateRouting
-            val overrides = ProfileRoutingOverrideEngine.replace(
-                overrides = config.profileRoutingOverrides,
-                originalRuleJson = rule.originalRuleJson,
-                originalIndex = rule.originalIndex,
-                replacement = replacement,
-                enabled = enabled,
-            )
+            if (settingsRepository.lastServerId.first() != serverId) return@mutateRouting
             settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
-            serverRepository.saveEditedConfig(serverId, config.copy(profileRoutingOverrides = overrides))
-            routingChangeManager.markPendingChanges()
+            val changed = serverRepository.updateProfileRouting(serverId) { config ->
+                ProfileRoutingOverrideEngine.replace(
+                    overrides = config.profileRoutingOverrides,
+                    originalRuleJson = rule.originalRuleJson,
+                    originalIndex = rule.originalIndex,
+                    replacement = replacement,
+                    enabled = enabled,
+                )
+            }
+            if (changed) routingChangeManager.markPendingChanges(PendingRoutingChange.XRAY_CONFIG)
         }
     }
 
@@ -223,19 +233,41 @@ class RoutingViewModel(
     internal fun reorderProfileRules(serverId: Long, orderedRules: List<ProfileRoutingRule>) {
         mutateRouting {
             if (settingsRepository.lastServerId.first() != serverId) return@mutateRouting
-            val entity = serverRepository.getById(serverId) ?: return@mutateRouting
-            val config = runCatching { serverRepository.parseConfig(entity) }.getOrNull() ?: return@mutateRouting
-            val current = ProfileRoutingInspector.inspect(config)?.rules.orEmpty().filterNot { it.orphaned }
-            val order = orderedRules.map { it.originalRuleJson to it.originalIndex }
-            val ordered = current.reorderedBy(order) { it.originalRuleJson to it.originalIndex }
-            val overrides = ProfileRoutingOverrideEngine.reorder(
-                config.rawConfigJson,
-                config.profileRoutingOverrides,
-                ordered.map { ProfileRoutingOverride(it.originalRuleJson, it.originalIndex, enabled = it.enabled) },
-            )
             settingsRepository.setRoutingPolicyControl(RoutingPolicyControl.User)
-            serverRepository.saveEditedConfig(serverId, config.copy(profileRoutingOverrides = overrides))
-            routingChangeManager.markPendingChanges(PendingRoutingChange.XRAY_CONFIG)
+            val changed = serverRepository.updateProfileRouting(serverId) { config ->
+                val current = ProfileRoutingInspector.inspect(config)?.rules.orEmpty().filterNot { it.orphaned }
+                val order = orderedRules.map { it.originalRuleJson to it.originalIndex }
+                val ordered = current.reorderedBy(order) { it.originalRuleJson to it.originalIndex }
+                if (ordered == current) {
+                    config.profileRoutingOverrides
+                } else {
+                    ProfileRoutingOverrideEngine.reorder(
+                        config.rawConfigJson,
+                        config.profileRoutingOverrides,
+                        ordered.map { ProfileRoutingOverride(it.originalRuleJson, it.originalIndex, enabled = it.enabled) },
+                    )
+                }
+            }
+            if (changed) routingChangeManager.markPendingChanges(PendingRoutingChange.XRAY_CONFIG)
+        }
+    }
+
+    internal fun resetServerRules(serverId: Long) {
+        mutateRouting {
+            if (settingsRepository.lastServerId.first() != serverId) return@mutateRouting
+            if (serverRepository.updateProfileRouting(serverId) { emptyList() }) {
+                routingChangeManager.markPendingChanges(PendingRoutingChange.XRAY_CONFIG)
+                routingChangeManager.maybeReloadActiveConnection()
+            }
+        }
+    }
+
+    internal fun resetSubscriptionRules(subscriptionId: Long, expectedSourceId: Long?) {
+        mutateRouting {
+            if (subscriptionRoutingRepository.resetForSubscription(subscriptionId, expectedSourceId)) {
+                routingChangeManager.markPendingChanges(PendingRoutingChange.XRAY_ROUTING)
+                routingChangeManager.maybeReloadActiveConnection()
+            }
         }
     }
 

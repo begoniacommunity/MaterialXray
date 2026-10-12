@@ -233,13 +233,12 @@ class ConfigViewerViewModel(
             // A refresh between opening the viewer and saving deletes and re-inserts the row under
             // a new id, and the targeted updates below would then match nothing. Say so instead of
             // reporting a save that did not happen.
-            if (serverRepo.getById(entity.id) == null) {
+            if (!serverRepo.saveEditedConfig(entity.id, config)) {
                 _events.send(R.string.config_viewer_save_failed_gone)
                 request?.let(::load)
                 return@launch
             }
 
-            serverRepo.saveEditedConfig(entity.id, config)
             when (mode) {
                 ServerSaveMode.KEEP -> Unit
                 ServerSaveMode.DISABLE_AUTO_UPDATE -> subscriptionRepo.setAutoUpdateInterval(entity.subscriptionId, 0)

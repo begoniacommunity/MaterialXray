@@ -3,6 +3,7 @@ package com.material.xray.core.database.di
 import com.material.xray.core.database.AppDatabase
 import com.material.xray.core.database.dao.AppBypassDao
 import com.material.xray.core.database.dao.ServerDao
+import com.material.xray.core.database.dao.ServerEditsDao
 import com.material.xray.core.database.dao.SubscriptionDao
 import org.koin.core.annotation.ComponentScan
 import org.koin.core.annotation.Factory
@@ -18,6 +19,9 @@ class CoreDatabaseModule {
 
     @Factory
     fun serverDao(db: AppDatabase): ServerDao = db.serverDao()
+
+    @Factory
+    fun serverEditsDao(db: AppDatabase): ServerEditsDao = db.serverEditsDao()
 
     @Factory
     fun subscriptionDao(db: AppDatabase): SubscriptionDao = db.subscriptionDao()

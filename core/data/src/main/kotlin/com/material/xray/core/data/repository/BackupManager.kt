@@ -153,7 +153,10 @@ class BackupManager(
             bypassedApps = appRoutes
                 .filter { it.routeAssignment().mode == com.material.xray.core.database.entity.AppRouteMode.Bypass }
                 .map { appKey(it.profileId, it.packageName) },
-            settings = settings,
+            settings = settings.toMutableMap().apply {
+                val source = remove("provider_routing_source_id")?.toLongOrNull()?.let(subscriptionKeyById::get)
+                source?.let { put("provider_routing_source_id", it) }
+            },
             appRoutes = appRoutes.map { route ->
                 val assignment = route.routeAssignment()
                 BackupData.BackupAppRoute(
@@ -174,6 +177,7 @@ class BackupManager(
     private suspend fun applyPlan(plan: BackupImportPlan) {
         var selectedServerId = -1L
         var serverIdByKey = emptyMap<String, Long>()
+        var routingSourceId: Long? = null
         database.withWriteTransaction {
             appBypassDao.deleteAll()
             subscriptionDao.deleteAll()
@@ -198,6 +202,7 @@ class BackupManager(
                         .withSubscriptionRouting(planned.value.routing),
                 )
             }
+            routingSourceId = plan.source.settings["provider_routing_source_id"]?.let(subscriptionIdByKey::get)
             val serverEntities = plan.servers.map { planned ->
                 ServerEntity(
                     subscriptionId = subscriptionIdByKey.getValue(planned.subscriptionKey),
@@ -231,7 +236,11 @@ class BackupManager(
         }
 
         settingsRepository.restoreFromMap(
-            plan.source.settings + (LAST_SERVER_ID_SETTING to selectedServerId.toString()),
+            plan.source.settings.toMutableMap().apply {
+                put(LAST_SERVER_ID_SETTING, selectedServerId.toString())
+                remove("provider_routing_source_id")
+                routingSourceId?.let { put("provider_routing_source_id", it.toString()) }
+            },
             sourceBackupVersion = plan.source.version,
         )
         val configOverride = plan.source.activeConfigOverride

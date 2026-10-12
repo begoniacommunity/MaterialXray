@@ -11,6 +11,7 @@ import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.data.repository.providerRoutingAvailability
+import com.material.xray.core.data.repository.toSubscriptionRouting
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
 import com.material.xray.core.model.ServerConfig
@@ -70,7 +71,7 @@ class HomeDataState(
     // Only touched from the combine transform below, which runs sequentially for the single
     // stateIn collector, so no synchronization is needed. Rebuilt on every emission so entries
     // for servers that no longer exist do not accumulate for the lifetime of the process.
-    private var endpointSummaryCache = mapOf<String, String>()
+    private var endpointSummaryCache = mapOf<String, ServerPresentation>()
 
     // Routing JSON belongs in the background snapshot, including for collapsed cards. Rebuild
     // it only when subscriptions change, rather than on every server latency update or tab entry.
@@ -82,13 +83,16 @@ class HomeDataState(
         subscriptionsWithRouting,
         serverRepository.observeAll(),
         settingsRepository.lastServerId,
+        settingsRepository.subscriptionRoutingState,
         appLocaleChanges.onStart { emit(Unit) },
-    ) { (subscriptions, providerRouting), servers, selectedServerId, _ ->
+    ) { (subscriptions, providerRouting), servers, selectedServerId, subscriptionRouting, _ ->
         val selectedEntity = servers.find { it.id == selectedServerId }
+        val source = subscriptions.firstOrNull { it.id == subscriptionRouting.subscriptionId }
+        val modifiedSubscription = source?.takeIf { subscriptionRouting.routing != it.toSubscriptionRouting() }?.id
         HomeData(
             subscriptions = subscriptions,
             servers = servers,
-            serverItems = buildServerItems(servers),
+            serverItems = buildServerItems(servers, modifiedSubscription),
             selectedServerId = selectedServerId,
             selectedServer = selectedEntity?.let { entity ->
                 runCatching { serverRepository.parseConfig(entity) }.getOrNull()
@@ -102,25 +106,31 @@ class HomeDataState(
         .flowOn(defaultDispatcher)
         .stateIn(scope, SharingStarted.Eagerly, null)
 
-    private fun buildServerItems(servers: List<ServerEntity>): List<ServerListItem> {
+    private fun buildServerItems(servers: List<ServerEntity>, modifiedSubscription: Long?): List<ServerListItem> {
         val resources = context.forAppLanguage().resources
         val localeKey = resources.configuration.locales.toLanguageTags()
         val previousCache = endpointSummaryCache
-        val cache = HashMap<String, String>()
+        val cache = HashMap<String, ServerPresentation>()
         val items = servers.map { entity ->
-            val key = "$localeKey\u0000${entity.configJson}"
-            val summary = previousCache[key] ?: cache[key] ?: computeEndpointSummary(resources, entity)
-            cache[key] = summary
-            ServerListItem(entity = entity, endpointSummary = summary, latency = null)
+            val key = "$localeKey\u0000${entity.edited}\u0000${entity.configJson}"
+            val presentation = previousCache[key] ?: cache[key] ?: computeServerPresentation(resources, entity)
+            cache[key] = presentation
+            ServerListItem(
+                entity = entity,
+                endpointSummary = presentation.summary,
+                latency = null,
+                configurationEdited = presentation.configurationEdited,
+                routingEdited = presentation.routingEdited || entity.subscriptionId == modifiedSubscription,
+            )
         }
         endpointSummaryCache = cache
         return items
     }
 
-    private fun computeEndpointSummary(resources: Resources, entity: ServerEntity): String = runCatching {
+    private fun computeServerPresentation(resources: Resources, entity: ServerEntity): ServerPresentation = runCatching {
         val config = json.decodeFromString<ServerConfig>(entity.configJson)
         val outboundCount = config.proxyOutboundCount()
-        if (outboundCount == null) {
+        val summary = if (outboundCount == null) {
             config.endpointSummary()
         } else {
             resources.getQuantityString(
@@ -129,8 +139,11 @@ class HomeDataState(
                 outboundCount,
             )
         }
+        ServerPresentation(summary, config.configurationEdited ?: entity.edited, config.profileRoutingOverrides.isNotEmpty())
     }.getOrElse {
         val unknown = context.localizedString(R.string.home_server_endpoint_unknown)
-        "${entity.protocol.lowercase(Locale.ROOT)} • $unknown • $unknown"
+        ServerPresentation("${entity.protocol.lowercase(Locale.ROOT)} • $unknown • $unknown", entity.edited, false)
     }
+
+    private data class ServerPresentation(val summary: String, val configurationEdited: Boolean, val routingEdited: Boolean)
 }

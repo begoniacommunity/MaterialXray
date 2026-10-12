@@ -21,6 +21,8 @@ data class ServerConfig(
     val rawUri: String = "",
     val rawConfigJson: String = "",
     val profileRoutingOverrides: List<ProfileRoutingOverride> = emptyList(),
+    /** Null preserves the legacy edited flag until this config is next saved. */
+    val configurationEdited: Boolean? = null,
     @Transient val bootstrapDnsHosts: Map<String, List<String>> = emptyMap(),
 ) {
     @Serializable

@@ -135,6 +135,7 @@ class SettingsBackupRoundTripTest {
             "routing_domain_matcher" to "hybrid",
             "routing_fallback_outbound" to "direct",
             "provider_routing_rules" to "[]",
+            "provider_routing_source_id" to 7L,
             "provider_routing_rules_version" to 2,
             "provider_routing_domain_strategy" to "AsIs",
             "provider_routing_domain_matcher" to "linear",

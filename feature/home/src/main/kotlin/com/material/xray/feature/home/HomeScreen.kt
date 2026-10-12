@@ -2517,8 +2517,11 @@ private fun ServerRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (server.entity.edited) {
-                            ServerStateBadge(ImageVector.vectorResource(R.drawable.edit_24px), R.string.home_server_edited)
+                        if (server.configurationEdited) {
+                            ServerStateBadge(ImageVector.vectorResource(R.drawable.edit_filled_24px), R.string.home_server_edited)
+                        }
+                        if (server.routingEdited) {
+                            ServerStateBadge(ImageVector.vectorResource(R.drawable.ic_arrow_split_24), R.string.home_server_routing_edited)
                         }
                         if (server.entity.guarded) {
                             ServerStateBadge(ImageVector.vectorResource(R.drawable.lock_24px), R.string.home_server_guarded)

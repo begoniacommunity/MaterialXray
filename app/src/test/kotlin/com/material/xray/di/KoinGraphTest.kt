@@ -164,6 +164,7 @@ class KoinGraphTest {
         listOf(
             com.material.xray.core.database.AppDatabase::class,
             com.material.xray.core.database.dao.ServerDao::class,
+            com.material.xray.core.database.dao.ServerEditsDao::class,
             com.material.xray.core.database.dao.SubscriptionDao::class,
             com.material.xray.core.database.dao.AppBypassDao::class,
         ).forEach { type ->

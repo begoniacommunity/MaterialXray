@@ -116,6 +116,8 @@ fun RoutingScreen(
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val scopeOrder by viewModel.scopeOrder.collectAsStateWithLifecycle()
     val subscriptionRules by viewModel.subscriptionRules.collectAsStateWithLifecycle()
+    val subscriptionSourceId by viewModel.subscriptionRoutingSourceId.collectAsStateWithLifecycle()
+    val subscriptionSources by viewModel.subscriptionRoutingSources.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val profileRouting by viewModel.profileRouting.collectAsStateWithLifecycle()
@@ -127,6 +129,7 @@ fun RoutingScreen(
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
     var pendingProviderAction by remember { mutableStateOf<ProviderRoutingRuleAction?>(null) }
     var confirmResetToDefault by remember { mutableStateOf(false) }
+    var resetTarget by remember { mutableStateOf<RoutingResetTarget?>(null) }
     val selectionMode by remember { derivedStateOf { selectedRuleIds.isNotEmpty() } }
     val selectedTab = pagerState.currentPage
     val newRuleName = stringResource(R.string.routing_new_rule_name)
@@ -149,6 +152,7 @@ fun RoutingScreen(
     }
 
     LaunchedEffect(profileRouting?.serverId) { selectedRuleIds = emptySet() }
+    LaunchedEffect(profileRouting?.serverId, subscriptionSourceId) { resetTarget = null }
 
     fun applyRuleAction(action: RoutingRuleAction) {
         when (action) {
@@ -217,6 +221,7 @@ fun RoutingScreen(
             subscriptionRules = subscriptionRules,
             profileRules = profileRouting?.rules.orEmpty(),
             profileServerId = profileRouting?.serverId,
+            canResetSubscriptionRules = canResetSubscriptionRules(subscriptionSources, subscriptionSourceId),
             providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
             providerName = automaticRoutingProviderName,
             providerGeoDataNotice = providerGeoDataNotice,
@@ -274,6 +279,9 @@ fun RoutingScreen(
                 onRulesReordered = viewModel::reorderRules,
                 onProfileRulesReordered = { ordered -> profileRouting?.serverId?.let { viewModel.reorderProfileRules(it, ordered) } },
                 onScopesReordered = viewModel::reorderScopes,
+                onScopeReset = { scope ->
+                    resetTarget = routingResetTarget(scope, profileRouting?.serverId, subscriptionSourceId)
+                },
             ),
         )
     }
@@ -305,6 +313,14 @@ fun RoutingScreen(
             onSwitchToManual = viewModel::switchToManualRouting,
         )
     }
+
+    RoutingRulesResetDialog(
+        target = resetTarget,
+        sources = subscriptionSources,
+        onDismiss = { resetTarget = null },
+        onServerReset = viewModel::resetServerRules,
+        onSubscriptionReset = viewModel::resetSubscriptionRules,
+    )
 
     if (confirmResetToDefault) {
         AlertDialog(
@@ -626,6 +642,7 @@ internal data class RoutingRuleActions(
     val onRulesReordered: (RoutingRuleScope, List<String>) -> Unit,
     val onProfileRulesReordered: (List<ProfileRoutingRule>) -> Unit,
     val onScopesReordered: (List<RoutingRuleScope>) -> Unit,
+    val onScopeReset: (RoutingRuleScope) -> Unit,
 )
 
 @Composable

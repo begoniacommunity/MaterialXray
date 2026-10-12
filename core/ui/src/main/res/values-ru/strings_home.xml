@@ -225,7 +225,8 @@
         <item quantity="other">Осталось %1$d дня</item>
     </plurals>
     <string name="home_gigabytes">%1$s ГБ</string>
-    <string name="home_server_edited">Изменено локально</string>
+    <string name="home_server_edited">Конфигурация сервера изменена</string>
+    <string name="home_server_routing_edited">Маршрутизация сервера изменена</string>
     <string name="home_server_guarded">Конфигурация сервера заблокирована</string>
     <string name="home_discard_edited_config_title">Удалить изменения?</string>
     <string name="home_discard_edited_config_body">Вы изменили активную конфигурацию Xray. Выбор другого сервера удалит эти изменения.</string>

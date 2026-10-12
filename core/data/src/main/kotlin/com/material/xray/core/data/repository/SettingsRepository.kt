@@ -1,6 +1,7 @@
 package com.material.xray.core.data.repository
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -135,6 +136,7 @@ class SettingsRepository(
         val ROUTING_DOMAIN_MATCHER = stringPreferencesKey("routing_domain_matcher")
         val ROUTING_FALLBACK_OUTBOUND = stringPreferencesKey("routing_fallback_outbound")
         val PROVIDER_ROUTING_RULES = stringPreferencesKey("provider_routing_rules")
+        val PROVIDER_ROUTING_SOURCE_ID = longPreferencesKey("provider_routing_source_id")
         val PROVIDER_ROUTING_RULES_VERSION = intPreferencesKey("provider_routing_rules_version")
         val PROVIDER_ROUTING_DOMAIN_STRATEGY = stringPreferencesKey("provider_routing_domain_strategy")
         val PROVIDER_ROUTING_DOMAIN_MATCHER = stringPreferencesKey("provider_routing_domain_matcher")
@@ -263,6 +265,19 @@ class SettingsRepository(
     val subscriptionRoutingRules: Flow<List<RoutingRule>> = store.data.map { prefs ->
         decodeProviderRoutingRules(prefs[PROVIDER_ROUTING_RULES], prefs[PROVIDER_ROUTING_RULES_VERSION])
     }
+    val subscriptionRoutingState: Flow<SubscriptionRoutingState> = store.data.map { prefs ->
+        prefs.readSubscriptionRouting()
+    }
+
+    private fun Preferences.readSubscriptionRouting(): SubscriptionRoutingState = SubscriptionRoutingState(
+        subscriptionId = this[PROVIDER_ROUTING_SOURCE_ID],
+        routing = SubscriptionRouting(
+            rules = decodeProviderRoutingRules(this[PROVIDER_ROUTING_RULES], this[PROVIDER_ROUTING_RULES_VERSION]),
+            domainStrategy = SubscriptionRouting.normalizeDomainStrategy(this[PROVIDER_ROUTING_DOMAIN_STRATEGY]),
+            domainMatcher = SubscriptionRouting.normalizeDomainMatcher(this[PROVIDER_ROUTING_DOMAIN_MATCHER]),
+            fallbackOutboundTag = this[PROVIDER_ROUTING_FALLBACK_OUTBOUND],
+        ).normalized(),
+    )
 
     // Subscription rules apply in both modes; manual mode only stops refreshes from replacing them.
     val routingScopeOrder: Flow<List<RoutingRuleScope>> = store.data.map { RoutingRuleScope.decode(it[ROUTING_SCOPE_ORDER]) }
@@ -643,7 +658,25 @@ class SettingsRepository(
             ?: prefs.remove(ROUTING_FALLBACK_OUTBOUND)
     }
 
-    suspend fun setSubscriptionRouting(routing: SubscriptionRouting?) = store.edit { prefs ->
+    suspend fun setSubscriptionRouting(routing: SubscriptionRouting?, subscriptionId: Long? = null) = store.edit { prefs ->
+        prefs.writeSubscriptionRouting(routing, subscriptionId)
+    }
+
+    suspend fun resetSubscriptionRouting(routing: SubscriptionRouting, subscriptionId: Long, expectedSourceId: Long?): Boolean {
+        var changed = false
+        store.edit { prefs ->
+            val current = prefs.readSubscriptionRouting()
+            if (current.subscriptionId != expectedSourceId) return@edit
+            if (current == SubscriptionRoutingState(subscriptionId, routing.normalized())) return@edit
+            prefs.writeSubscriptionRouting(routing, subscriptionId)
+            changed = true
+        }
+        return changed
+    }
+
+    private fun MutablePreferences.writeSubscriptionRouting(routing: SubscriptionRouting?, subscriptionId: Long?) {
+        val prefs = this
+        subscriptionId?.let { prefs[PROVIDER_ROUTING_SOURCE_ID] = it } ?: prefs.remove(PROVIDER_ROUTING_SOURCE_ID)
         val normalized = routing?.normalized()
         val rules = normalized?.rules.orEmpty()
         prefs[PROVIDER_ROUTING_RULES] = encodeRoutingRules(rules)
@@ -790,6 +823,7 @@ class SettingsRepository(
                 ?.let(SubscriptionRouting::normalizeFallbackOutboundTag)
                 ?.let { prefs[ROUTING_FALLBACK_OUTBOUND] = it }
             map["provider_routing_rules"]?.takeIf { it.isNotBlank() }?.let { prefs[PROVIDER_ROUTING_RULES] = it }
+            map["provider_routing_source_id"]?.toLongOrNull()?.let { prefs[PROVIDER_ROUTING_SOURCE_ID] = it }
             map["provider_routing_rules_version"]
                 ?.toIntOrNull()
                 ?.let { prefs[PROVIDER_ROUTING_RULES_VERSION] = it }

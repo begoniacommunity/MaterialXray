@@ -38,6 +38,8 @@ Each subscription has its own settings, set when you add it manually or later by
 To keep a server from being replaced on the next refresh, use **Lock configuration** in its viewer. A closed lock and a red **Server configuration is locked** banner show that subscription updates cannot replace it. Use **Unlock configuration** to allow updates again.
 :::
 
+Server rows show a filled pencil for an edited configuration and a routing icon for edited server or subscription rules. When both are changed, the pencil comes first. Resetting routing clears its icon while retaining the configuration edit.
+
 ## Hardware ID
 
 Some providers require a device identifier (HWID). Material Xray sends one by default. You can turn it off under **Settings → Send hardware ID (HWID)**. If a subscription [requires HWID](/docs/providers/response-headers/#subscription-always-hwid-enable) while sending is off, the app asks before adding it. **Cancel** leaves it unadded. **Proceed** permits HWID for that subscription and fetches it again with HWID; your global choice stays unchanged. The warning explains that HWID can help link traffic to your device and reduce anonymity. Selecting a subscription that requires HWID forces the Settings switch on and locks it. Switching to another subscription restores your saved choice.

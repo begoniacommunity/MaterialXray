@@ -73,6 +73,8 @@ data class ServerListItem(
     val entity: ServerEntity,
     val endpointSummary: String,
     val latency: ServerLatencyState?,
+    val configurationEdited: Boolean = entity.edited,
+    val routingEdited: Boolean = false,
 )
 
 data class ServerLatencyState(
