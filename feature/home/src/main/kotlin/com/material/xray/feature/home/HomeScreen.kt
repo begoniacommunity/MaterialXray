@@ -20,6 +20,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -55,10 +56,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -108,11 +109,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -134,6 +134,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -145,8 +146,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -165,7 +169,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -272,19 +275,14 @@ fun HomeScreen(
         viewModel.deleteSubscription(subscription)
     }
     val listState = rememberLazyListState()
-    val hapticFeedback = LocalHapticFeedback.current
-    var draggingSubscriptionId by remember { mutableStateOf<Long?>(null) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    val subscriptionSpacingPx = with(LocalDensity.current) { 10.dp.toPx() }
-    val finishSubscriptionDrag = {
-        persistSubscriptionOrderIfChanged(
-            draggingSubscriptionId,
-            subscriptionOrder,
-            uiState.subscriptions.orEmpty(),
-            viewModel::reorderSubscriptions,
-        )
-        draggingSubscriptionId = null
-        dragOffsetY = 0f
+    val coroutineScope = rememberCoroutineScope()
+    val reorderEdgeSize = with(LocalDensity.current) { 56.dp.toPx() }
+    val subscriptionReorder = remember(listState, subscriptionOrder, coroutineScope, reorderEdgeSize) {
+        SubscriptionReorderState(listState, subscriptionOrder, coroutineScope, reorderEdgeSize)
+    }
+    subscriptionReorder.onFinish = viewModel::reorderSubscriptions
+    DisposableEffect(subscriptionReorder) {
+        onDispose { subscriptionReorder.finish(cancelled = true) }
     }
     LaunchedEffect(uiState.subscriptions) {
         val currentIds = uiState.subscriptions?.mapTo(mutableSetOf()) { it.id } ?: return@LaunchedEffect
@@ -423,11 +421,7 @@ fun HomeScreen(
                         selectedProvider = uiState.providerRoutingAvailability,
                     )
                     SubscriptionCard(
-                        modifier = Modifier.subscriptionDragVisual(
-                            subscription.id,
-                            draggingSubscriptionId,
-                            dragOffsetY,
-                        ),
+                        modifier = subscriptionReorderModifier(subscription.id, subscriptionReorder),
                         subscription = subscription,
                         isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
                         servers = servers,
@@ -438,24 +432,9 @@ fun HomeScreen(
                         canCollapse = subscriptions.size > 1,
                         expanded = subscription.id !in collapsedSubscriptionIds,
                         canReorder = subscriptions.size > 1,
+                        reorderState = subscriptionReorder,
                         focusRequester = subscriptionFocus.forSubscription(subscription.id),
                         actions = SubscriptionCardActions(
-                            onDragStart = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                draggingSubscriptionId = subscription.id
-                                dragOffsetY = 0f
-                            },
-                            onDrag = { delta ->
-                                dragOffsetY = reorderSubscriptionDuringDrag(
-                                    subscriptionOrder,
-                                    listState,
-                                    subscription.id,
-                                    delta,
-                                    dragOffsetY,
-                                    subscriptionSpacingPx,
-                                )
-                            },
-                            onDragFinished = finishSubscriptionDrag,
                             onExpandedChange = { expanded ->
                                 context.setSubscriptionExpanded(
                                     collapsedSubscriptionIds,
@@ -1802,9 +1781,6 @@ private fun AddSubscriptionActionButton(
 
 /** Everything a subscription card and its header menu can trigger. */
 private data class SubscriptionCardActions(
-    val onDragStart: () -> Unit,
-    val onDrag: (Float) -> Unit,
-    val onDragFinished: () -> Unit,
     val onExpandedChange: (Boolean) -> Unit,
     val onDelete: () -> Unit,
     val onEdit: () -> Unit,
@@ -1832,12 +1808,14 @@ private fun SubscriptionCard(
     canCollapse: Boolean,
     expanded: Boolean,
     canReorder: Boolean,
+    reorderState: SubscriptionReorderState,
     focusRequester: FocusRequester,
     actions: SubscriptionCardActions,
 ) {
-    val currentOnDragStart by rememberUpdatedState(actions.onDragStart)
-    val currentOnDrag by rememberUpdatedState(actions.onDrag)
-    val currentOnDragFinished by rememberUpdatedState(actions.onDragFinished)
+    val container = LocalPinnableContainer.current
+    val hapticFeedback = LocalHapticFeedback.current
+    val moveUp = stringResource(R.string.home_subscription_move_up)
+    val moveDown = stringResource(R.string.home_subscription_move_down)
     val resources = LocalResources.current
     val locale = resources.configuration.locales[0]
     val metadata = remember(
@@ -1852,15 +1830,23 @@ private fun SubscriptionCard(
         buildSubscriptionMetadataUiState(subscription, resources)
     }
 
-    val reorderModifier = if (canReorder && !expanded) {
-        Modifier.pointerInput(subscription.id) {
+    val reorderModifier = if (canReorder) {
+        Modifier.semantics {
+            customActions = listOf(
+                CustomAccessibilityAction(moveUp) { reorderState.moveAccessible(subscription.id, -1) },
+                CustomAccessibilityAction(moveDown) { reorderState.moveAccessible(subscription.id, 1) },
+            )
+        }.pointerInput(subscription.id, reorderState) {
             detectDragGesturesAfterLongPress(
-                onDragStart = { currentOnDragStart() },
-                onDragEnd = { currentOnDragFinished() },
-                onDragCancel = { currentOnDragFinished() },
+                onDragStart = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    reorderState.start(subscription.id, it.y + 6.dp.toPx(), container)
+                },
+                onDragEnd = { reorderState.finish() },
+                onDragCancel = { reorderState.finish(cancelled = true) },
                 onDrag = { change, amount ->
                     change.consume()
-                    currentOnDrag(amount.y)
+                    reorderState.drag(amount.y)
                 },
             )
         }
@@ -1894,6 +1880,7 @@ private fun SubscriptionCard(
                 canCollapse = canCollapse,
                 expanded = expanded,
                 reorderModifier = reorderModifier,
+                reordering = reorderState.draggingId != null,
                 canApplyRouting = canApplyRouting,
                 actions = actions,
             )
@@ -1933,7 +1920,12 @@ private fun SubscriptionCard(
                             Column(modifier = if (serversShown) Modifier.focusRequester(focusRequester) else Modifier) {
                                 servers.forEachIndexed { index, server ->
                                     key(server.entity.id) {
-                                        Column(modifier = Modifier.animateBounds(this@LookaheadScope)) {
+                                        Column(
+                                            modifier = Modifier.animateBounds(
+                                                this@LookaheadScope,
+                                                boundsTransform = { _, _ -> tween(SUBSCRIPTION_EXPANSION_MS) },
+                                            ),
+                                        ) {
                                             if (index > 0) {
                                                 HorizontalDivider(
                                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
@@ -2078,6 +2070,7 @@ private fun SubscriptionHeader(
     canCollapse: Boolean,
     expanded: Boolean,
     reorderModifier: Modifier,
+    reordering: Boolean,
     canApplyRouting: Boolean,
     actions: SubscriptionCardActions,
 ) {
@@ -2087,7 +2080,10 @@ private fun SubscriptionHeader(
     val uriHandler = LocalUriHandler.current
     val supportUrl = subscription.supportUrl?.trim().orEmpty()
     val hasDescription = subscription.announce?.trim()?.isNotEmpty() == true
-    val headerDetailText = metadata.headerDetailText(resources)
+    val usedTrafficText = metadata.traffic?.downloadText
+    val headerExtraText = metadata.headerDetailText(resources)
+        ?.removePrefix(usedTrafficText.orEmpty())
+        ?.trimStart()
     val expiredStatusText = stringResource(R.string.home_subscription_expired_inline)
     val expansionActionDescription = if (canCollapse) {
         stringResource(
@@ -2098,207 +2094,252 @@ private fun SubscriptionHeader(
         null
     }
     val arrowInteractionSource = remember { MutableInteractionSource() }
+    val reorderProgress by animateFloatAsState(
+        targetValue = if (reordering) 1f else 0f,
+        animationSpec = tween(SUBSCRIPTION_EXPANSION_MS),
+        label = "subscriptionReorderHeader",
+    )
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = if (canCollapse) 0.dp else 16.dp, top = 6.dp, end = 8.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        if (canCollapse) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clickable(
-                        interactionSource = arrowInteractionSource,
-                        indication = null,
-                        role = Role.Button,
-                        onClickLabel = expansionActionDescription,
-                    ) { actions.onExpandedChange(!expanded) },
-                contentAlignment = Alignment.Center,
-            ) {
+    val controlsModifier = Modifier
+        .graphicsLayer { alpha = 1f - reorderProgress }
+        .then(if (reordering) Modifier.clearAndSetSemantics {} else Modifier)
+    val (titleStartPadding, headerStartPadding) = if (canCollapse) 48.dp to 0.dp else 16.dp to 16.dp
+
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // Reserve the centered handle's space in both states so the text never moves or overlaps it.
+        val titleModifier = Modifier.widthIn(
+            max = (maxWidth / 2 - titleStartPadding - 24.dp).coerceAtLeast(0.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = headerStartPadding, top = 6.dp, end = 8.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            if (canCollapse) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .indication(arrowInteractionSource, LocalIndication.current),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ExpansionArrow(
-                        expanded = expanded,
-                        contentDescription = expansionActionDescription,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        }
-        val titleInteractionSource = remember { MutableInteractionSource() }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp)
-                .then(reorderModifier)
-                .then(
-                    if (canCollapse) {
-                        // The arrow already offers this to a remote, with a visible focus ring.
-                        Modifier.focusProperties { canFocus = false }.clickable(
-                            interactionSource = titleInteractionSource,
+                        .size(48.dp)
+                        .then(controlsModifier)
+                        .clickable(
+                            interactionSource = arrowInteractionSource,
                             indication = null,
                             role = Role.Button,
+                            enabled = !reordering,
                             onClickLabel = expansionActionDescription,
-                        ) { actions.onExpandedChange(!expanded) }
-                    } else {
-                        Modifier
-                    },
-                ),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = subscription.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!headerDetailText.isNullOrBlank()) {
+                        ) { actions.onExpandedChange(!expanded) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .indication(arrowInteractionSource, LocalIndication.current),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ExpansionArrow(
+                            expanded = expanded,
+                            contentDescription = expansionActionDescription,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
+            }
+            val titleInteractionSource = remember { MutableInteractionSource() }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .then(reorderModifier)
+                    .then(
+                        if (canCollapse) {
+                            // The arrow already offers this to a remote, with a visible focus ring.
+                            Modifier.focusProperties { canFocus = false }.clickable(
+                                interactionSource = titleInteractionSource,
+                                indication = null,
+                                role = Role.Button,
+                                enabled = !reordering,
+                                onClickLabel = expansionActionDescription,
+                            ) { actions.onExpandedChange(!expanded) }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text(
-                    text = remember(headerDetailText, expiredStatusText) {
-                        headerDetailText.withMetadataEmphasis(expiredStatusText)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = subscription.name,
+                    modifier = titleModifier,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!usedTrafficText.isNullOrBlank()) {
+                    Text(
+                        text = usedTrafficText,
+                        modifier = titleModifier,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (!headerExtraText.isNullOrBlank()) {
+                    Text(
+                        text = remember(headerExtraText, expiredStatusText) {
+                            headerExtraText.withMetadataEmphasis(expiredStatusText)
+                        },
+                        modifier = titleModifier.then(controlsModifier),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        }
-        TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = actions.onRefresh, enabled = !isRefreshing) {
-            if (isRefreshing) {
-                val updatingDescription = stringResource(
-                    R.string.home_subscription_updating_content_description,
-                    subscription.name,
-                )
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .semantics { contentDescription = updatingDescription },
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = stringResource(
-                        R.string.home_subscription_refresh_content_description,
+            TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = actions.onRefresh, modifier = controlsModifier, enabled = !isRefreshing && !reordering) {
+                if (isRefreshing) {
+                    val updatingDescription = stringResource(
+                        R.string.home_subscription_updating_content_description,
                         subscription.name,
+                    )
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .semantics { contentDescription = updatingDescription },
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = stringResource(
+                            R.string.home_subscription_refresh_content_description,
+                            subscription.name,
+                        ),
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .then(controlsModifier)
+                    .clip(CircleShape)
+                    .combinedClickable(
+                        role = Role.Button,
+                        enabled = !reordering,
+                        onClick = actions.onTestAll,
+                        onLongClick = { showPingMethodDialog = true },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Speed,
+                    contentDescription = stringResource(
+                        R.string.home_subscription_test_content_description,
+                        subscription.name,
+                        defaultPingMethod.value,
                     ),
                 )
             }
+            Box(modifier = controlsModifier) {
+                TooltipIconButton(tooltip = stringResource(R.string.home_subscription_menu_content_description), onClick = { showMenu = true }, enabled = !reordering) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.home_subscription_menu_content_description),
+                    )
+                }
+                AnimatedDropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.home_action_edit)) },
+                        leadingIcon = {
+                            Icon(painterResource(R.drawable.edit_24px), contentDescription = null)
+                        },
+                        onClick = {
+                            showMenu = false
+                            actions.onEdit()
+                        },
+                    )
+                    if (supportUrl.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.home_action_support)) },
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.support_24px), contentDescription = null)
+                            },
+                            onClick = {
+                                showMenu = false
+                                uriHandler.openUri(supportUrl)
+                            },
+                        )
+                    }
+                    if (hasDescription) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (subscription.descriptionHidden) {
+                                            R.string.home_subscription_show_description
+                                        } else {
+                                            R.string.home_subscription_hide_description
+                                        },
+                                    ),
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    painterResource(
+                                        if (subscription.descriptionHidden) {
+                                            R.drawable.visibility_24px
+                                        } else {
+                                            R.drawable.visibility_off_24px
+                                        },
+                                    ),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                actions.onDescriptionHiddenChange(!subscription.descriptionHidden)
+                            },
+                        )
+                    }
+                    if (canApplyRouting) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.home_subscription_apply_routing)) },
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null)
+                            },
+                            onClick = {
+                                showMenu = false
+                                actions.onApplyRouting()
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.home_action_remove)) },
+                        leadingIcon = {
+                            Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null)
+                        },
+                        onClick = {
+                            showMenu = false
+                            actions.onDelete()
+                        },
+                    )
+                }
+            }
         }
         Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .combinedClickable(
-                    role = Role.Button,
-                    onClick = actions.onTestAll,
-                    onLongClick = { showPingMethodDialog = true },
-                ),
-            contentAlignment = Alignment.Center,
+            modifier = Modifier.matchParentSize()
+                .then(if (reordering) reorderModifier else Modifier)
+                .graphicsLayer { alpha = reorderProgress }
+                .then(if (reordering) Modifier else Modifier.clearAndSetSemantics {}),
         ) {
             Icon(
-                Icons.Default.Speed,
-                contentDescription = stringResource(
-                    R.string.home_subscription_test_content_description,
-                    subscription.name,
-                    defaultPingMethod.value,
-                ),
+                painterResource(R.drawable.drag_handle_24px),
+                contentDescription = stringResource(R.string.home_subscription_reorder),
+                modifier = Modifier.align(Alignment.Center).size(24.dp),
             )
-        }
-        Box {
-            TooltipIconButton(tooltip = stringResource(R.string.home_subscription_menu_content_description), onClick = { showMenu = true }) {
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = stringResource(R.string.home_subscription_menu_content_description),
-                )
-            }
-            AnimatedDropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_action_edit)) },
-                    leadingIcon = {
-                        Icon(painterResource(R.drawable.edit_24px), contentDescription = null)
-                    },
-                    onClick = {
-                        showMenu = false
-                        actions.onEdit()
-                    },
-                )
-                if (supportUrl.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_action_support)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.support_24px), contentDescription = null)
-                        },
-                        onClick = {
-                            showMenu = false
-                            uriHandler.openUri(supportUrl)
-                        },
-                    )
-                }
-                if (hasDescription) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (subscription.descriptionHidden) {
-                                        R.string.home_subscription_show_description
-                                    } else {
-                                        R.string.home_subscription_hide_description
-                                    },
-                                ),
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painterResource(
-                                    if (subscription.descriptionHidden) {
-                                        R.drawable.visibility_24px
-                                    } else {
-                                        R.drawable.visibility_off_24px
-                                    },
-                                ),
-                                contentDescription = null,
-                            )
-                        },
-                        onClick = {
-                            showMenu = false
-                            actions.onDescriptionHiddenChange(!subscription.descriptionHidden)
-                        },
-                    )
-                }
-                if (canApplyRouting) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_subscription_apply_routing)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null)
-                        },
-                        onClick = {
-                            showMenu = false
-                            actions.onApplyRouting()
-                        },
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_action_remove)) },
-                    leadingIcon = {
-                        Icon(painterResource(R.drawable.delete_forever_24px), contentDescription = null)
-                    },
-                    onClick = {
-                        showMenu = false
-                        actions.onDelete()
-                    },
-                )
-            }
         }
     }
 
@@ -2782,42 +2823,6 @@ private const val CORE_UPTIME_REFRESH_INTERVAL_MS = 1_000L
 private const val CAMERA_PERMISSION_PREFS = "camera_permission"
 private const val CAMERA_PERMISSION_REQUESTED = "requested"
 private const val HOME_UI_PREFS = "home_ui"
-private fun Modifier.subscriptionDragVisual(id: Long, draggingId: Long?, offset: Float): Modifier = zIndex(if (id == draggingId) 1f else 0f).graphicsLayer {
-    translationY = if (id == draggingId) offset else 0f
-}
-
-private fun persistSubscriptionOrderIfChanged(
-    draggingId: Long?,
-    order: List<Long>,
-    subscriptions: List<SubscriptionEntity>,
-    persist: (List<Long>) -> Unit,
-) {
-    if (draggingId != null && order != subscriptions.map { it.id }) persist(order.toList())
-}
-
-private fun reorderSubscriptionDuringDrag(
-    order: SnapshotStateList<Long>,
-    listState: LazyListState,
-    subscriptionId: Long,
-    delta: Float,
-    currentOffset: Float,
-    spacingPx: Float,
-): Float {
-    val offset = currentOffset + delta
-    val current = order.indexOf(subscriptionId)
-    if (current < 0) return offset
-    val next = current + if (delta > 0f) 1 else -1
-    if (next !in order.indices) return offset
-
-    val neighbor = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == order[next] } ?: return offset
-    val movingDown = delta > 0f
-    val crossedMidpoint = if (movingDown) offset > neighbor.size / 2f else -offset > neighbor.size / 2f
-    if (!crossedMidpoint) return offset
-
-    order.add(next, order.removeAt(current))
-    return offset + if (movingDown) -(neighbor.size + spacingPx) else neighbor.size + spacingPx
-}
-
 private const val COLLAPSED_SUBSCRIPTION_IDS = "collapsed_subscription_ids"
 
 private fun Context.clipboardText(): String? {
