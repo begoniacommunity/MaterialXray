@@ -1,6 +1,5 @@
 package com.material.xray.feature.home
 
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -11,7 +10,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -24,6 +22,8 @@ import androidx.compose.ui.layout.PinnableContainer
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.zIndex
+import com.material.xray.core.ui.components.REORDER_MOVE_MS
+import com.material.xray.core.ui.components.ReorderPlacement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -135,31 +135,7 @@ internal class SubscriptionReorderState(
     }
 }
 
-@Stable
-internal class SubscriptionPlacement(private val coroutineScope: CoroutineScope) {
-    var offset by mutableFloatStateOf(0f)
-        private set
-    private var index by mutableIntStateOf(-1)
-    private var position = 0f
-    private var animation: Job? = null
-
-    fun changingIndex(newIndex: Int): Boolean = index >= 0 && newIndex != index
-
-    fun placed(newIndex: Int, newPosition: Float, dragging: Boolean) {
-        if (index >= 0 && newIndex != index && !dragging) {
-            animation?.cancel()
-            offset += position - newPosition
-            animation = coroutineScope.launch {
-                animate(offset, 0f, animationSpec = tween(SUBSCRIPTION_MOVE_MS)) { value, _ -> offset = value }
-            }
-        } else if (dragging) {
-            animation?.cancel()
-            offset = 0f
-        }
-        index = newIndex
-        position = newPosition
-    }
-}
+internal typealias SubscriptionPlacement = ReorderPlacement
 
 @Composable
 internal fun subscriptionReorderModifier(id: Long, state: SubscriptionReorderState): Modifier {
@@ -169,7 +145,7 @@ internal fun subscriptionReorderModifier(id: Long, state: SubscriptionReorderSta
     val dragging = state.draggingId == id
     val dragOffset by animateFloatAsState(
         targetValue = state.offset(id),
-        animationSpec = if (dragging) snap() else tween(SUBSCRIPTION_MOVE_MS),
+        animationSpec = if (dragging) snap() else tween(REORDER_MOVE_MS),
         label = "subscriptionDrop",
     )
     val floating = dragging || dragOffset != 0f
@@ -191,5 +167,3 @@ internal fun subscriptionReorderModifier(id: Long, state: SubscriptionReorderSta
             translationY = if (dragging) state.offset(id) else dragOffset + placement.offset
         }
 }
-
-private const val SUBSCRIPTION_MOVE_MS = 180

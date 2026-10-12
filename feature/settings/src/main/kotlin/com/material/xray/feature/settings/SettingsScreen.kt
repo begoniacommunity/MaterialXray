@@ -15,12 +15,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +54,6 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -78,6 +79,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -90,10 +92,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -152,7 +157,9 @@ import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
+import com.material.xray.core.ui.components.REORDER_MOVE_MS
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
+import com.material.xray.core.ui.components.ReorderPlacement
 import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsItemSpacing
@@ -2324,17 +2331,28 @@ private fun ReorderableFieldList(
     var draggingField by remember { mutableStateOf<NotificationField?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<NotificationField, Int>() }
+    val coroutineScope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     Column(modifier = Modifier.fillMaxWidth()) {
         order.forEach { field ->
             key(field) {
                 val dragging = field == draggingField
+                val placement = remember { ReorderPlacement(coroutineScope) }
+                val dragOffset by animateFloatAsState(
+                    targetValue = if (dragging) dragOffsetY else 0f,
+                    animationSpec = if (dragging) snap() else tween(REORDER_MOVE_MS),
+                    label = "notificationFieldDrop",
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .onGloballyPositioned { heights[field] = it.size.height }
-                        .zIndex(if (dragging) 1f else 0f)
-                        .graphicsLayer { translationY = if (dragging) dragOffsetY else 0f }
+                        .onPlaced {
+                            heights[field] = it.size.height
+                            placement.placed(order.indexOf(field), it.positionInParent().y, dragging)
+                        }
+                        .zIndex(if (dragging || dragOffset != 0f) 1f else 0f)
+                        .graphicsLayer { translationY = if (dragging) dragOffsetY else dragOffset + placement.offset }
                         .padding(vertical = 4.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
@@ -2355,14 +2373,15 @@ private fun ReorderableFieldList(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.DragIndicator,
+                        painter = painterResource(R.drawable.drag_handle_24px),
                         contentDescription = stringResource(R.string.settings_drag_to_reorder),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .padding(end = 4.dp)
                             .pointerInput(field) {
-                                detectDragGestures(
+                                detectDragGesturesAfterLongPress(
                                     onDragStart = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         draggingField = field
                                         dragOffsetY = 0f
                                     },
@@ -2385,6 +2404,7 @@ private fun ReorderableFieldList(
                                             if (-dragOffsetY > threshold) {
                                                 order.add(current - 1, order.removeAt(current))
                                                 dragOffsetY += (heights[above] ?: 0)
+                                                haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
                                             }
                                         } else if (dragAmount.y > 0 && current < order.lastIndex) {
                                             val below = order[current + 1]
@@ -2392,6 +2412,7 @@ private fun ReorderableFieldList(
                                             if (dragOffsetY > threshold) {
                                                 order.add(current + 1, order.removeAt(current))
                                                 dragOffsetY -= (heights[below] ?: 0)
+                                                haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
                                             }
                                         }
                                     },
