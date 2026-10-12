@@ -371,6 +371,7 @@ private fun LogsTopBar(
     val selecting = header.selecting
     val searching = header.searching
     val emptyQuery = header.emptyQuery
+    val searchHasResults = !emptyQuery && header.resultCount > 0
     val entries = header.selectedEntries
     TopAppBar(
         title = { LogsTitle(showLogo, header) },
@@ -388,7 +389,7 @@ private fun LogsTopBar(
         expandedHeight = AppTopBarHeight,
         windowInsets = TopAppBarDefaults.windowInsets,
         actions = {
-            if (selecting || !(searching && emptyQuery)) {
+            if (selecting || !searching || searchHasResults) {
                 if (selecting && header.resultCount > 1) {
                     LogSelectionButton(header.allSelected, actions)
                 }
