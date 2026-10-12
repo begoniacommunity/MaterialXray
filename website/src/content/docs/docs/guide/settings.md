@@ -42,6 +42,8 @@ Dependent controls expand and collapse smoothly when their parent option changes
 
 Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, and geodata URLs and update interval.
 
+Geodata downloads, subscription refreshes, app update checks and Xray version-list refreshes use a quick shrinking and growing icon transition. A completed operation shows **Check** for about two seconds; a failed operation shows **Error** for the same time. The original download or refresh icon then returns with the same transition. Core downloads and file installations use the same result indicators. Cancelling an operation does not show an error.
+
 ## Appearance and notifications
 
 The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. The active tab label smoothly changes to semibold weight. Detail screens, including DNS and Xray-core settings, use the same directional fade-and-slide as the tabs, moving both the outgoing page and the incoming page. Predictive Back follows the same motion and can be cancelled; on wide windows, the detail sheet uses that transition and dims the controls beneath it.

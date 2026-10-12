@@ -77,6 +77,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.ActionFeedback
+import com.material.xray.core.ui.components.AnimatedActionIcon
 import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.ReadOnlyDropdownField
@@ -119,6 +121,10 @@ fun XrayCoreScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val releases by viewModel.releases.collectAsStateWithLifecycle()
+    val releasesFeedback by viewModel.releasesFeedback.collectAsStateWithLifecycle()
+    val moreReleasesFeedback by viewModel.moreReleasesFeedback.collectAsStateWithLifecycle()
+    val fileInstallFeedback by viewModel.fileInstallFeedback.collectAsStateWithLifecycle()
+    val installFeedback by viewModel.installFeedback.collectAsStateWithLifecycle()
     val result by viewModel.result.collectAsStateWithLifecycle()
     val updateSettings by viewModel.updateSettings.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -195,6 +201,7 @@ fun XrayCoreScreen(
                 VersionsHeader(
                     loading = viewModel.canDownload && (releases == XrayCoreReleasesState.Loading || loaded?.refreshing == true),
                     canRefresh = viewModel.canDownload,
+                    feedback = releasesFeedback,
                     onRefresh = viewModel::loadReleases,
                 )
             }
@@ -204,6 +211,7 @@ fun XrayCoreScreen(
                 CoreEntryRow(
                     entry = entry,
                     state = state,
+                    feedback = entry.version?.let { installFeedback[normalizeXrayVersion(it)] },
                     onSelect = viewModel::select,
                     onDelete = viewModel::delete,
                     onInstall = viewModel::install,
@@ -224,9 +232,11 @@ fun XrayCoreScreen(
                             },
                             modifier = Modifier.onFocusChanged { showMoreFocused = it.isFocused },
                         ) {
-                            if (loaded.loadingMore) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
+                            AnimatedActionIcon(
+                                loading = loaded.loadingMore,
+                                feedback = moreReleasesFeedback,
+                                modifier = Modifier.size(18.dp),
+                            ) {
                                 Icon(Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
                             }
                             Spacer(Modifier.width(8.dp))
@@ -241,6 +251,7 @@ fun XrayCoreScreen(
             item(key = "install_file") {
                 InstallFileRow(
                     verifying = state.operation == XrayCoreOperation.Verifying(null),
+                    feedback = fileInstallFeedback,
                     enabled = !state.isBusy,
                     onClick = { showFileWarning = true },
                 )
@@ -414,7 +425,7 @@ private fun releasesNote(canDownload: Boolean, releases: XrayCoreReleasesState):
 }
 
 @Composable
-private fun VersionsHeader(loading: Boolean, canRefresh: Boolean, onRefresh: () -> Unit) {
+private fun VersionsHeader(loading: Boolean, canRefresh: Boolean, feedback: ActionFeedback?, onRefresh: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -428,13 +439,10 @@ private fun VersionsHeader(loading: Boolean, canRefresh: Boolean, onRefresh: () 
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        when {
-            loading -> Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            }
-            canRefresh -> {
-                val label = stringResource(R.string.settings_xray_core_releases_retry)
-                TooltipIconButton(tooltip = label, onClick = onRefresh) {
+        if (canRefresh) {
+            val label = stringResource(R.string.settings_xray_core_releases_retry)
+            TooltipIconButton(tooltip = label, onClick = onRefresh, enabled = !loading) {
+                AnimatedActionIcon(loading = loading, feedback = feedback) {
                     Icon(Icons.Filled.Refresh, contentDescription = label)
                 }
             }
@@ -446,6 +454,7 @@ private fun VersionsHeader(loading: Boolean, canRefresh: Boolean, onRefresh: () 
 private fun CoreEntryRow(
     entry: CoreEntry,
     state: XrayCoreState,
+    feedback: ActionFeedback?,
     onSelect: (String?) -> Unit,
     onDelete: (String) -> Unit,
     onInstall: (XrayCoreRelease) -> Unit,
@@ -484,18 +493,26 @@ private fun CoreEntryRow(
             )
             EntryStatus(entry)
         }
-        when {
-            inProgress -> DownloadProgressButton(operation, onCancel)
-            installed != null && !selected -> {
-                val label = stringResource(R.string.settings_xray_core_delete, versionLabel(installed.version))
-                TooltipIconButton(tooltip = label, onClick = { onDelete(installed.id) }) {
-                    Icon(Icons.Filled.Delete, contentDescription = label)
-                }
-            }
-            release != null && installed == null -> {
-                val label = stringResource(R.string.settings_xray_core_release_install, versionLabel(release.tag))
-                TooltipIconButton(tooltip = label, onClick = { onInstall(release) }, enabled = !state.isBusy) {
-                    Icon(Icons.Filled.Download, contentDescription = label)
+        if (!entry.builtIn) {
+            AnimatedActionIcon(
+                loading = inProgress,
+                feedback = feedback,
+                modifier = Modifier.size(48.dp),
+                loadingContent = { DownloadProgressButton(operation, onCancel) },
+            ) {
+                when {
+                    installed != null && !selected -> {
+                        val label = stringResource(R.string.settings_xray_core_delete, versionLabel(installed.version))
+                        TooltipIconButton(tooltip = label, onClick = { onDelete(installed.id) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = label)
+                        }
+                    }
+                    release != null && installed == null -> {
+                        val label = stringResource(R.string.settings_xray_core_release_install, versionLabel(release.tag))
+                        TooltipIconButton(tooltip = label, onClick = { onInstall(release) }, enabled = !state.isBusy) {
+                            Icon(Icons.Filled.Download, contentDescription = label)
+                        }
+                    }
                 }
             }
         }
@@ -599,7 +616,7 @@ private fun StatusChip(text: String, color: Color, contentColor: Color) {
 }
 
 @Composable
-private fun InstallFileRow(verifying: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun InstallFileRow(verifying: Boolean, feedback: ActionFeedback?, enabled: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -609,9 +626,7 @@ private fun InstallFileRow(verifying: Boolean, enabled: Boolean, onClick: () -> 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (verifying) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        } else {
+        AnimatedActionIcon(loading = verifying, feedback = feedback, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary) {
             Icon(Icons.Outlined.UploadFile, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Text(stringResource(R.string.settings_xray_core_install_file), color = MaterialTheme.colorScheme.primary)

@@ -33,6 +33,7 @@ import com.material.xray.core.runtime.ConnectionRuntimeManager
 import com.material.xray.core.runtime.GeoDataManager
 import com.material.xray.core.runtime.combinedGeoDataDownloadProgress
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.service.XrayService
 import java.io.IOException
 import java.net.ConnectException
@@ -291,6 +292,8 @@ class HomeViewModel(
     private fun liveReadingSharing() = SharingStarted.WhileSubscribed(LIVE_READING_GRACE_MILLIS)
 
     val refreshingSubscriptionIds = subscriptionOperations.refreshingSubscriptionIds
+    private val _subscriptionRefreshFeedback = MutableStateFlow<Map<Long, ActionFeedback>>(emptyMap())
+    val subscriptionRefreshFeedback = _subscriptionRefreshFeedback.asStateFlow()
     private val _pendingSubscriptionRouting = MutableStateFlow<SubscriptionRoutingData?>(null)
     val pendingSubscriptionRouting: StateFlow<SubscriptionRoutingData?> = _pendingSubscriptionRouting.asStateFlow()
 
@@ -484,7 +487,9 @@ class HomeViewModel(
     fun refreshAll() {
         viewModelScope.launch {
             runSubscriptionOperation {
-                val result = subscriptionOperations.refreshAll()
+                val result = subscriptionOperations.refreshAll { id, successful ->
+                    _subscriptionRefreshFeedback.update { it + (id to ActionFeedback(successful)) }
+                }
                 reportBatchRefreshFailures(result.failures)
             }
         }
@@ -492,7 +497,15 @@ class HomeViewModel(
 
     fun refreshSubscription(sub: SubscriptionEntity) {
         viewModelScope.launch {
-            runSubscriptionOperation { subscriptionOperations.refresh(sub) }
+            runSubscriptionOperation {
+                try {
+                    subscriptionOperations.refresh(sub)
+                    _subscriptionRefreshFeedback.update { it + (sub.id to ActionFeedback(successful = true)) }
+                } catch (error: IOException) {
+                    _subscriptionRefreshFeedback.update { it + (sub.id to ActionFeedback(successful = false)) }
+                    throw error
+                }
+            }
         }
     }
 

@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,7 +42,7 @@ internal fun OtherVpnModeSetting(mode: OtherVpnMode, onModeChange: (OtherVpnMode
         } else {
             {
                 TooltipIconButton(tooltip = helpLabel, onClick = { explanationMode = mode }) {
-                    Icon(Icons.AutoMirrored.Outlined.HelpOutline, contentDescription = helpLabel)
+                    Icon(Icons.AutoMirrored.Outlined.HelpOutline, contentDescription = helpLabel, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },

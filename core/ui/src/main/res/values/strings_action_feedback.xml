@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_completed">Completed</string>
+    <string name="action_failed">Error</string>
+</resources>

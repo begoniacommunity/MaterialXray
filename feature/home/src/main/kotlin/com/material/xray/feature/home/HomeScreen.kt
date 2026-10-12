@@ -193,6 +193,8 @@ import com.material.xray.core.runtime.AppUpdateInstallStage
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.SinglePaneMaxWidth
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
+import com.material.xray.core.ui.components.ActionFeedback
+import com.material.xray.core.ui.components.AnimatedActionIcon
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
@@ -424,6 +426,7 @@ fun HomeScreen(
                         modifier = subscriptionReorderModifier(subscription.id, subscriptionReorder),
                         subscription = subscription,
                         isRefreshing = subscription.id in uiState.refreshingSubscriptionIds,
+                        refreshFeedback = uiState.subscriptionRefreshFeedback[subscription.id],
                         servers = servers,
                         selectedServerId = uiState.selectedServerId,
                         defaultPingMethod = uiState.defaultPingMethod,
@@ -1008,6 +1011,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val serversBySubscription by viewModel.serversBySubscription.collectAsStateWithLifecycle()
     val refreshingSubscriptionIds by viewModel.refreshingSubscriptionIds.collectAsStateWithLifecycle()
+    val subscriptionRefreshFeedback by viewModel.subscriptionRefreshFeedback.collectAsStateWithLifecycle()
     val defaultPingMethod by viewModel.defaultPingMethod.collectAsStateWithLifecycle()
     val showBothLatencyResults by viewModel.showBothLatencyResults.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
@@ -1033,6 +1037,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
         subscriptions = subscriptions,
         serversBySubscription = serversBySubscription,
         refreshingSubscriptionIds = refreshingSubscriptionIds,
+        subscriptionRefreshFeedback = subscriptionRefreshFeedback,
         defaultPingMethod = defaultPingMethod,
         showBothLatencyResults = showBothLatencyResults,
         routingPolicyControl = routingPolicyControl,
@@ -1099,6 +1104,7 @@ private data class HomeUiState(
     val subscriptions: List<SubscriptionEntity>?,
     val serversBySubscription: Map<Long, List<ServerListItem>>,
     val refreshingSubscriptionIds: Set<Long>,
+    val subscriptionRefreshFeedback: Map<Long, ActionFeedback>,
     val defaultPingMethod: PingMethod,
     val showBothLatencyResults: Boolean,
     val routingPolicyControl: RoutingPolicyControl,
@@ -1800,6 +1806,7 @@ private fun SubscriptionCard(
     modifier: Modifier = Modifier,
     subscription: SubscriptionEntity,
     isRefreshing: Boolean,
+    refreshFeedback: ActionFeedback?,
     servers: List<ServerListItem>,
     selectedServerId: Long,
     defaultPingMethod: PingMethod,
@@ -1874,6 +1881,7 @@ private fun SubscriptionCard(
             SubscriptionHeader(
                 subscription = subscription,
                 isRefreshing = isRefreshing,
+                refreshFeedback = refreshFeedback,
                 metadata = metadata,
                 defaultPingMethod = defaultPingMethod,
                 showBothLatencyResults = showBothLatencyResults,
@@ -2064,6 +2072,7 @@ private fun SubscriptionTrafficUsage(
 private fun SubscriptionHeader(
     subscription: SubscriptionEntity,
     isRefreshing: Boolean,
+    refreshFeedback: ActionFeedback?,
     metadata: SubscriptionMetadataUiState,
     defaultPingMethod: PingMethod,
     showBothLatencyResults: Boolean,
@@ -2200,18 +2209,22 @@ private fun SubscriptionHeader(
                 }
             }
             TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = actions.onRefresh, modifier = controlsModifier, enabled = !isRefreshing && !reordering) {
-                if (isRefreshing) {
-                    val updatingDescription = stringResource(
-                        R.string.home_subscription_updating_content_description,
-                        subscription.name,
-                    )
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .semantics { contentDescription = updatingDescription },
-                        strokeWidth = 2.dp,
-                    )
-                } else {
+                AnimatedActionIcon(
+                    loading = isRefreshing,
+                    feedback = refreshFeedback,
+                    loadingContent = {
+                        val updatingDescription = stringResource(
+                            R.string.home_subscription_updating_content_description,
+                            subscription.name,
+                        )
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .semantics { contentDescription = updatingDescription },
+                            strokeWidth = 2.dp,
+                        )
+                    },
+                ) {
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = stringResource(

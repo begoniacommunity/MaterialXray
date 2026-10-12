@@ -35,6 +35,7 @@ import com.material.xray.core.runtime.OemAutostartManager
 import com.material.xray.core.runtime.SettingsRuntimeManager
 import com.material.xray.core.runtime.XrayCoreVersion
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.xray.TproxyCompatibility
 import com.material.xray.service.XrayService
 import kotlinx.coroutines.CancellationException
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.annotation.KoinViewModel
@@ -99,6 +101,8 @@ class SettingsViewModel(
     private val _backupImportSummary = MutableStateFlow<BackupSummary?>(null)
     private val _backupEvents = Channel<BackupOperationMessage>(Channel.BUFFERED)
     private val _appUpdateCheckStatus = MutableStateFlow<AppUpdateCheckStatus?>(null)
+    private val _appUpdateFeedback = MutableStateFlow<ActionFeedback?>(null)
+    private val _geoDataUpdateFeedback = MutableStateFlow<Map<GeoDataAsset, ActionFeedback>>(emptyMap())
     private var preparedBackupImport: PreparedBackupImport? = null
     private var rootModeJob: Job? = null
     private var rootAccessJob: Job? = null
@@ -125,6 +129,8 @@ class SettingsViewModel(
     val tproxyCompatibility: StateFlow<TproxyCompatibility> = settingsRuntimeManager.tproxyCompatibility
     val xrayCoreVersion: StateFlow<XrayCoreVersion> = settingsRuntimeManager.xrayCoreVersion
     val appUpdateCheckStatus: StateFlow<AppUpdateCheckStatus?> = _appUpdateCheckStatus.asStateFlow()
+    val appUpdateFeedback = _appUpdateFeedback.asStateFlow()
+    val geoDataUpdateFeedback = _geoDataUpdateFeedback.asStateFlow()
     val oemAutostartGuidance = oemAutostartManager.guidance
 
     init {
@@ -378,11 +384,13 @@ class SettingsViewModel(
                         AppUpdateCheckStatus.UpdateAvailable(it.tagName)
                     } ?: AppUpdateCheckStatus.UpToDate,
                 )
+                _appUpdateFeedback.value = ActionFeedback(successful = true)
             } catch (error: CancellationException) {
                 _appUpdateCheckStatus.value = null
                 throw error
             } catch (_: Exception) {
                 showStatus(AppUpdateCheckStatus.Failed)
+                _appUpdateFeedback.value = ActionFeedback(successful = false)
             }
         }
     }
@@ -565,9 +573,11 @@ class SettingsViewModel(
                 runCatching {
                     settingsRuntimeManager.updateGeoDataAsset(asset, url)
                 }.onSuccess {
+                    _geoDataUpdateFeedback.update { it + (asset to ActionFeedback(successful = true)) }
                     _assetUpdateEvents.send(AssetUpdateMessage(successMessageResId))
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
+                    _geoDataUpdateFeedback.update { it + (asset to ActionFeedback(successful = false)) }
                     _assetUpdateEvents.send(
                         error.message?.let { detail ->
                             AssetUpdateMessage(R.string.settings_asset_update_failed_with_detail, detail)

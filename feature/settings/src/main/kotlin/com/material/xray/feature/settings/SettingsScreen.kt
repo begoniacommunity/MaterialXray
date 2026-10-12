@@ -147,6 +147,8 @@ import com.material.xray.core.runtime.GeoDataDownloadProgress
 import com.material.xray.core.runtime.OemAutostartGuidance
 import com.material.xray.core.runtime.XrayCoreVersion
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.ActionFeedback
+import com.material.xray.core.ui.components.AnimatedActionIcon
 import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.DropdownOption
 import com.material.xray.core.ui.components.FadingOutlinedTextField as OutlinedTextField
@@ -210,6 +212,7 @@ private fun SettingsScreenContent(
     val geoipUpdating by viewModel.geoipUpdating.collectAsStateWithLifecycle()
     val geositeUpdating by viewModel.geositeUpdating.collectAsStateWithLifecycle()
     val geoDataClearing by viewModel.geoDataClearing.collectAsStateWithLifecycle()
+    val geoDataUpdateFeedback by viewModel.geoDataUpdateFeedback.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val ipv6SessionState by viewModel.ipv6SessionState.collectAsStateWithLifecycle()
     val geoDataDownloadProgress by viewModel.geoDataDownloadProgress.collectAsStateWithLifecycle()
@@ -219,6 +222,7 @@ private fun SettingsScreenContent(
     val backupBusy by viewModel.backupBusy.collectAsStateWithLifecycle()
     val backupImportSummary by viewModel.backupImportSummary.collectAsStateWithLifecycle()
     val appUpdateCheckStatus by viewModel.appUpdateCheckStatus.collectAsStateWithLifecycle()
+    val appUpdateFeedback by viewModel.appUpdateFeedback.collectAsStateWithLifecycle()
     val oemAutostartGuidance by viewModel.oemAutostartGuidance.collectAsStateWithLifecycle()
     val tunName = settings.tunName
     val dnsServers = settings.dnsServers
@@ -774,13 +778,16 @@ private fun SettingsScreenContent(
                                     onClick = { viewModel.updateGeoipAsset(editingGeoipUrl.text.toString()) },
                                     enabled = !geoipUpdating && !geoDataClearing,
                                 ) {
-                                    if (geoipUpdating) {
-                                        val description = stringResource(R.string.settings_geoip_updating)
-                                        GeoDataCircularProgress(
-                                            progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
-                                            description = description,
-                                        )
-                                    } else {
+                                    AnimatedActionIcon(
+                                        loading = geoipUpdating,
+                                        feedback = geoDataUpdateFeedback[GeoDataAsset.GEOIP],
+                                        loadingContent = {
+                                            GeoDataCircularProgress(
+                                                progress = geoDataDownloadProgress[GeoDataAsset.GEOIP],
+                                                description = stringResource(R.string.settings_geoip_updating),
+                                            )
+                                        },
+                                    ) {
                                         Icon(
                                             painterResource(R.drawable.download_24px),
                                             contentDescription = stringResource(R.string.settings_update_geoip),
@@ -828,13 +835,16 @@ private fun SettingsScreenContent(
                                     onClick = { viewModel.updateGeositeAsset(editingGeositeUrl.text.toString()) },
                                     enabled = !geositeUpdating && !geoDataClearing,
                                 ) {
-                                    if (geositeUpdating) {
-                                        val description = stringResource(R.string.settings_geosite_updating)
-                                        GeoDataCircularProgress(
-                                            progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
-                                            description = description,
-                                        )
-                                    } else {
+                                    AnimatedActionIcon(
+                                        loading = geositeUpdating,
+                                        feedback = geoDataUpdateFeedback[GeoDataAsset.GEOSITE],
+                                        loadingContent = {
+                                            GeoDataCircularProgress(
+                                                progress = geoDataDownloadProgress[GeoDataAsset.GEOSITE],
+                                                description = stringResource(R.string.settings_geosite_updating),
+                                            )
+                                        },
+                                    ) {
                                         Icon(
                                             painterResource(R.drawable.download_24px),
                                             contentDescription = stringResource(R.string.settings_update_geosite),
@@ -992,6 +1002,8 @@ private fun SettingsScreenContent(
                     subtitle = appUpdateCheckDescription,
                     enabled = !appUpdateCheckInProgress,
                     inProgress = appUpdateCheckInProgress,
+                    feedback = appUpdateFeedback,
+                    hasProgressIcon = true,
                     onClick = viewModel::checkForAppUpdate,
                 )
             }
@@ -1183,9 +1195,7 @@ private fun SettingsServiceSection(
                     onClick = actions.onRetryRootAccess,
                     enabled = !rootAccessChecking,
                 ) {
-                    if (rootAccessChecking) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
+                    AnimatedActionIcon(loading = rootAccessChecking, modifier = Modifier.size(20.dp)) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.settings_retry_root_access))
                     }
                 }
@@ -1957,6 +1967,8 @@ private fun SettingsActionRow(
     onClick: () -> Unit,
     enabled: Boolean = true,
     inProgress: Boolean = false,
+    feedback: ActionFeedback? = null,
+    hasProgressIcon: Boolean = false,
     navigates: Boolean = false,
 ) {
     val contentEnabled = enabled || inProgress
@@ -1988,7 +2000,11 @@ private fun SettingsActionRow(
                 )
             }
         }
-        if (inProgress) {
+        if (hasProgressIcon) {
+            AnimatedActionIcon(loading = inProgress, feedback = feedback, tint = subtitleColor) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = subtitleColor)
+            }
+        } else if (inProgress) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
                 strokeWidth = 2.dp,

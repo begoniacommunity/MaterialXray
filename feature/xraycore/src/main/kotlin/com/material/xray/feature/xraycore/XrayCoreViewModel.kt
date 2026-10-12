@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.xraycore.XrayCoreException
 import com.material.xray.core.xraycore.XrayCoreFailure
 import com.material.xray.core.xraycore.XrayCoreManager
@@ -15,6 +16,7 @@ import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettings
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import com.material.xray.core.xraycore.newestReleaseFirst
+import com.material.xray.core.xraycore.normalizeXrayVersion
 import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.core.annotation.KoinViewModel
 
@@ -65,9 +68,19 @@ class XrayCoreViewModel(
     private var releasesRequested = cachedPages.isNotEmpty()
     private var loadedPages = cachedPages.size
     private var releasesJob: Job? = null
+    private var installingFile = false
+    private var installingReleaseTag: String? = null
+    private val _installFeedback = MutableStateFlow<Map<String, ActionFeedback>>(emptyMap())
+    private val _releasesFeedback = MutableStateFlow<ActionFeedback?>(null)
+    private val _moreReleasesFeedback = MutableStateFlow<ActionFeedback?>(null)
+    private val _fileInstallFeedback = MutableStateFlow<ActionFeedback?>(null)
 
     val state: StateFlow<XrayCoreState> = manager.state
     val releases: StateFlow<XrayCoreReleasesState> = _releases.asStateFlow()
+    val releasesFeedback = _releasesFeedback.asStateFlow()
+    val moreReleasesFeedback = _moreReleasesFeedback.asStateFlow()
+    val fileInstallFeedback = _fileInstallFeedback.asStateFlow()
+    val installFeedback = _installFeedback.asStateFlow()
     val canDownload: Boolean = manager.canDownload
     val updateSettings: StateFlow<XrayCoreUpdateSettings> = updateSettingsStore.settings
 
@@ -86,6 +99,17 @@ class XrayCoreViewModel(
     init {
         viewModelScope.launch {
             manager.state.collect { core ->
+                val releaseTag = installingReleaseTag
+                if (releaseTag != null && (core.operation is XrayCoreOperation.Installed || core.operation is XrayCoreOperation.Failed)) {
+                    _installFeedback.update {
+                        it + (releaseTag to ActionFeedback(successful = core.operation is XrayCoreOperation.Installed))
+                    }
+                    installingReleaseTag = null
+                }
+                if (installingFile && (core.operation is XrayCoreOperation.Installed || core.operation is XrayCoreOperation.Failed)) {
+                    _fileInstallFeedback.value = ActionFeedback(successful = core.operation is XrayCoreOperation.Installed)
+                    installingFile = false
+                }
                 when (val operation = core.operation) {
                     is XrayCoreOperation.Installed -> if (autoSelecting.value) {
                         // Cleared before auto-selection ends, so [result] never offers this core.
@@ -117,9 +141,11 @@ class XrayCoreViewModel(
             _releases.value = try {
                 val page = manager.releases(page = 1)
                 loadedPages = 1
+                _releasesFeedback.value = ActionFeedback(successful = true)
                 XrayCoreReleasesState.Loaded(page.releases, page.hasMore)
             } catch (error: XrayCoreException) {
                 currentCoroutineContext().ensureActive()
+                _releasesFeedback.value = ActionFeedback(successful = false)
                 previous?.copy(failure = error.failure) ?: XrayCoreReleasesState.Failed(error.failure)
             }
         }
@@ -134,26 +160,32 @@ class XrayCoreViewModel(
             _releases.value = try {
                 val page = manager.releases(page = loadedPages + 1)
                 loadedPages++
+                _moreReleasesFeedback.value = ActionFeedback(successful = true)
                 loaded.copy(
                     releases = (loaded.releases + page.releases).distinctBy { it.tag }.sortedWith(newestReleaseFirst),
                     hasMore = page.hasMore,
                 )
             } catch (error: XrayCoreException) {
                 currentCoroutineContext().ensureActive()
+                _moreReleasesFeedback.value = ActionFeedback(successful = false)
                 loaded.copy(failure = error.failure)
             }
         }
     }
 
     fun install(release: XrayCoreRelease) {
-        if (manager.install(release) != null) autoSelecting.value = true
+        if (state.value.isBusy) return
+        installingReleaseTag = normalizeXrayVersion(release.tag)
+        if (manager.install(release) != null) autoSelecting.value = true else installingReleaseTag = null
     }
 
     fun installFromFile(uri: Uri) {
+        if (state.value.isBusy) return
+        installingFile = true
         val job = manager.installFromFile {
             context.contentResolver.openInputStream(uri) ?: throw IOException("Could not open $uri")
         }
-        if (job != null) autoSelecting.value = true
+        if (job != null) autoSelecting.value = true else installingFile = false
     }
 
     /** The user left the page, so a core still installing is only offered once they are back. */
@@ -162,6 +194,8 @@ class XrayCoreViewModel(
     }
 
     fun cancel() {
+        installingFile = false
+        installingReleaseTag = null
         autoSelecting.value = false
         manager.cancel()
     }

@@ -104,7 +104,9 @@ class SubscriptionOperations(
         }
     }
 
-    suspend fun refreshAll(): SubscriptionRepository.RefreshBatchResult = subscriptionRefreshCoordinator.refreshAll()
+    suspend fun refreshAll(
+        onCompleted: (Long, Boolean) -> Unit = { _, _ -> },
+    ): SubscriptionRepository.RefreshBatchResult = subscriptionRefreshCoordinator.refreshAll(onCompleted)
 
     suspend fun refresh(sub: SubscriptionEntity) {
         subscriptionRefreshCoordinator.refreshSubscription(sub.id, sub.url)
