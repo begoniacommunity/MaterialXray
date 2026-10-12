@@ -6,6 +6,7 @@
     <string name="config_viewer_copied">Copied to clipboard</string>
     <string name="config_viewer_clipboard_label" translatable="false">Material Xray server config</string>
     <string name="config_viewer_not_found">This server is no longer available.</string>
+    <string name="config_viewer_locked_banner_title">Server configuration is locked</string>
     <string name="config_viewer_banner_title">Not the final config</string>
     <string name="config_viewer_banner_body">Material Xray rewrites inbounds, DNS and routing for compatibility. To see what actually runs, connect to this server and long-press the start button.</string>
     <string name="config_viewer_section_connection">Connection</string>
@@ -36,10 +37,10 @@
     <string name="config_viewer_cancel_edit">Cancel</string>
     <string name="config_viewer_save">Save</string>
     <string name="config_viewer_saved">Saved</string>
-    <string name="config_viewer_guard">Guard against updates</string>
-    <string name="config_viewer_unguard">Stop guarding</string>
-    <string name="config_viewer_guarded">Guarded. Updates to this server will be ignored.</string>
-    <string name="config_viewer_unguarded">No longer guarded.</string>
+    <string name="config_viewer_guard">Lock configuration</string>
+    <string name="config_viewer_unguard">Unlock configuration</string>
+    <string name="config_viewer_guarded">Server configuration is locked. Updates to this server will be ignored.</string>
+    <string name="config_viewer_unguarded">Server configuration is unlocked.</string>
     <string name="config_viewer_error_invalid_json">This is not valid JSON.</string>
     <string name="config_viewer_error_invalid_port">Port must be a number between 1 and 65535.</string>
     <string name="config_viewer_error_missing_address">Address cannot be empty.</string>
@@ -52,8 +53,8 @@
     <string name="config_viewer_save_mode_keep_body">The next subscription update replaces it.</string>
     <string name="config_viewer_save_mode_disable_autoupdate">Stop auto-updating</string>
     <string name="config_viewer_save_mode_disable_autoupdate_body">This subscription will only update when you refresh it by hand.</string>
-    <string name="config_viewer_save_mode_guard">Guard this server</string>
-    <string name="config_viewer_save_mode_guard_body">Updates to this one server are ignored from now on.</string>
+    <string name="config_viewer_save_mode_guard">Lock this server configuration</string>
+    <string name="config_viewer_save_mode_guard_body">Subscription updates will not replace this configuration.</string>
     <string name="config_viewer_save_failed">Could not save the config.</string>
     <string name="config_viewer_save_failed_gone">This server was replaced by a subscription update. Your changes were not saved.</string>
     <string name="config_viewer_override_discarded">Your edited active config was discarded in favour of this change.</string>

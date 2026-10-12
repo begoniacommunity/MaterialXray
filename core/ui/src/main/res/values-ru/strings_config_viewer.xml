@@ -5,6 +5,7 @@
     <string name="config_viewer_copy">Копировать</string>
     <string name="config_viewer_copied">Скопировано в буфер обмена</string>
     <string name="config_viewer_not_found">Этот сервер больше не доступен.</string>
+    <string name="config_viewer_locked_banner_title">Конфигурация сервера заблокирована</string>
     <string name="config_viewer_banner_title">Это не итоговая конфигурация</string>
     <string name="config_viewer_banner_body">Material Xray переписывает inbounds, DNS и маршрутизацию для совместимости. Чтобы увидеть, что запускается на самом деле, подключитесь к этому серверу и удерживайте кнопку запуска.</string>
     <string name="config_viewer_section_connection">Подключение</string>
@@ -35,10 +36,10 @@
     <string name="config_viewer_cancel_edit">Отмена</string>
     <string name="config_viewer_save">Сохранить</string>
     <string name="config_viewer_saved">Сохранено</string>
-    <string name="config_viewer_guard">Защитить от обновлений</string>
-    <string name="config_viewer_unguard">Снять защиту</string>
-    <string name="config_viewer_guarded">Защищено. Обновления этого сервера будут игнорироваться.</string>
-    <string name="config_viewer_unguarded">Защита снята.</string>
+    <string name="config_viewer_guard">Заблокировать конфигурацию</string>
+    <string name="config_viewer_unguard">Разблокировать конфигурацию</string>
+    <string name="config_viewer_guarded">Конфигурация сервера заблокирована. Обновления этого сервера будут игнорироваться.</string>
+    <string name="config_viewer_unguarded">Конфигурация сервера разблокирована.</string>
     <string name="config_viewer_error_invalid_json">Это некорректный JSON.</string>
     <string name="config_viewer_error_invalid_port">Порт должен быть числом от 1 до 65535.</string>
     <string name="config_viewer_error_missing_address">Адрес не может быть пустым.</string>
@@ -51,8 +52,8 @@
     <string name="config_viewer_save_mode_keep_body">Следующее обновление подписки их заменит.</string>
     <string name="config_viewer_save_mode_disable_autoupdate">Отключить автообновление</string>
     <string name="config_viewer_save_mode_disable_autoupdate_body">Эта подписка будет обновляться только вручную.</string>
-    <string name="config_viewer_save_mode_guard">Защитить этот сервер</string>
-    <string name="config_viewer_save_mode_guard_body">Обновления этого сервера будут игнорироваться.</string>
+    <string name="config_viewer_save_mode_guard">Заблокировать конфигурацию этого сервера</string>
+    <string name="config_viewer_save_mode_guard_body">Обновления подписки не будут заменять эту конфигурацию.</string>
     <string name="config_viewer_save_failed">Не удалось сохранить конфигурацию.</string>
     <string name="config_viewer_save_failed_gone">Этот сервер был заменён обновлением подписки. Изменения не сохранены.</string>
     <string name="config_viewer_override_discarded">Изменённая активная конфигурация удалена в пользу этого изменения.</string>

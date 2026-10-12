@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -96,6 +97,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.ui.R
+import com.material.xray.core.ui.components.AnimatedOptionContent
 import com.material.xray.core.ui.components.ExpansionArrow
 import com.material.xray.core.ui.components.FadingOutlinedTextField
 import com.material.xray.core.ui.components.MaskOutputTransformation
@@ -190,13 +192,14 @@ fun ConfigViewerScreen(
                                 contentDescription = stringResource(
                                     if (editing) R.string.config_viewer_cancel_edit else R.string.config_viewer_back,
                                 ),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     },
                     actions = {
                         if (editing) {
                             TooltipIconButton(tooltip = stringResource(R.string.config_viewer_save), onClick = onSave) {
-                                Icon(painterResource(R.drawable.save_24px), contentDescription = stringResource(R.string.config_viewer_save))
+                                Icon(painterResource(R.drawable.save_24px), contentDescription = stringResource(R.string.config_viewer_save), modifier = Modifier.size(24.dp))
                             }
                         } else {
                             if (copyable != null) {
@@ -210,22 +213,24 @@ fun ConfigViewerScreen(
                                     Icon(
                                         Icons.Default.ContentCopy,
                                         contentDescription = stringResource(R.string.config_viewer_copy),
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 }
                             }
                             guarded?.let { isGuarded ->
                                 TooltipIconButton(tooltip = stringResource(if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard), onClick = viewModel::toggleGuard) {
                                     Icon(
-                                        painter = painterResource(if (isGuarded) R.drawable.lock_open_24px else R.drawable.lock_24px),
+                                        painter = painterResource(if (isGuarded) R.drawable.lock_24px else R.drawable.lock_open_24px),
                                         contentDescription = stringResource(
                                             if (isGuarded) R.string.config_viewer_unguard else R.string.config_viewer_guard,
                                         ),
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 }
                             }
                             if (content.state.isEditable()) {
                                 TooltipIconButton(tooltip = stringResource(R.string.config_viewer_edit), onClick = viewModel::beginEdit) {
-                                    Icon(painterResource(R.drawable.edit_24px), contentDescription = stringResource(R.string.config_viewer_edit))
+                                    Icon(painterResource(R.drawable.edit_24px), contentDescription = stringResource(R.string.config_viewer_edit), modifier = Modifier.size(24.dp))
                                 }
                             }
                         }
@@ -256,9 +261,9 @@ fun ConfigViewerScreen(
                             .padding(32.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state, padding.calculateBottomPadding())
+                    is ConfigViewerUiState.JsonDocument -> JsonDocumentContent(state, padding.calculateBottomPadding(), locked = guarded == true)
                     is ConfigViewerUiState.JsonEditor -> JsonEditorContent(state = state, text = content.jsonDraft)
-                    is ConfigViewerUiState.Params -> ParamsList(state, padding.calculateBottomPadding())
+                    is ConfigViewerUiState.Params -> ParamsList(state, padding.calculateBottomPadding(), locked = guarded == true)
                     is ConfigViewerUiState.ParamsEditor -> ParamsEditorList(
                         state = state,
                         drafts = content.paramsDraft,
@@ -300,7 +305,7 @@ private fun ConfigViewerUiState.isEditing(): Boolean = this is ConfigViewerUiSta
 private fun ConfigViewerUiState.isEditable(): Boolean = this is ConfigViewerUiState.JsonDocument || this is ConfigViewerUiState.Params
 
 @Composable
-private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument, bottomInset: Dp) {
+private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument, bottomInset: Dp, locked: Boolean) {
     val colors = rememberJsonSyntaxColors()
     val codeBackground = MaterialTheme.colorScheme.surfaceContainerLow
 
@@ -313,6 +318,12 @@ private fun JsonDocumentContent(state: ConfigViewerUiState.JsonDocument, bottomI
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp + bottomInset),
         ) {
+            item(key = "lockedBanner", contentType = "lockedBanner") {
+                AnimatedOptionContent(visible = locked) {
+                    LockedConfigBanner()
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+            }
             if (state.showDisclaimer) {
                 item(contentType = "banner") {
                     NoticeBanner(
@@ -420,19 +431,22 @@ private fun CodeBlockEdge(color: Color, shape: RoundedCornerShape) {
 private fun NoticeBanner(
     @StringRes titleRes: Int,
     @StringRes bodyRes: Int,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    icon: @Composable () -> Unit = { Icon(Icons.Default.Info, contentDescription = null) },
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = containerColor,
+        contentColor = contentColor,
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Info, contentDescription = null)
+            icon()
             Column {
                 Text(
                     text = stringResource(titleRes),
@@ -449,18 +463,40 @@ private fun NoticeBanner(
 }
 
 @Composable
-private fun ParamsList(state: ConfigViewerUiState.Params, bottomInset: Dp) {
+private fun LockedConfigBanner() {
+    NoticeBanner(
+        titleRes = R.string.config_viewer_locked_banner_title,
+        bodyRes = R.string.config_viewer_save_mode_guard_body,
+        containerColor = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        icon = { Icon(painterResource(R.drawable.lock_filled_24px), contentDescription = null) },
+    )
+}
+
+@Composable
+private fun ParamsList(state: ConfigViewerUiState.Params, bottomInset: Dp, locked: Boolean) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 24.dp + bottomInset),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        items(state.sections, contentType = { "section" }) { section ->
-            ParamSectionCard(section)
+        item(key = "lockedBanner", contentType = "lockedBanner") {
+            AnimatedOptionContent(visible = locked) {
+                LockedConfigBanner()
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+        }
+        itemsIndexed(state.sections, contentType = { _, _ -> "section" }) { index, section ->
+            Column {
+                if (index > 0) Spacer(modifier = Modifier.height(14.dp))
+                ParamSectionCard(section)
+            }
         }
         if (state.rawLink.isNotBlank()) {
             item(contentType = "rawLink") {
-                RawLinkCard(state.rawLink, stale = state.edited)
+                Column {
+                    if (state.sections.isNotEmpty()) Spacer(modifier = Modifier.height(14.dp))
+                    RawLinkCard(state.rawLink, stale = state.edited)
+                }
             }
         }
     }

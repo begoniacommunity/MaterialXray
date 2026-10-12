@@ -33,7 +33,7 @@ Each subscription has its own settings, set when you add it manually or later by
 | **User-Agent** | **Auto** identifies as Material Xray, **Happ** uses a Happ-compatible User-Agent, **Custom** lets you set the User-Agent and extra headers. See [request headers](/docs/providers/request-headers/). |
 
 :::tip
-To keep a server from being replaced on the next refresh, mark it **Guarded against updates**.
+To keep a server from being replaced on the next refresh, use **Lock configuration** in its viewer. A closed lock and a red **Server configuration is locked** banner show that subscription updates cannot replace it. Use **Unlock configuration** to allow updates again.
 :::
 
 ## Hardware ID
