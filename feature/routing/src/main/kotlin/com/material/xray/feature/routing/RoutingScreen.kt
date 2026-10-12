@@ -1,22 +1,13 @@
 package com.material.xray.feature.routing
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,25 +17,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,7 +39,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -71,14 +56,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.data.parser.ProfileRoutingRule
@@ -86,12 +68,12 @@ import com.material.xray.core.data.parser.ProfileRoutingTarget
 import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.RoutingRuleCatalog
+import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AppBarTitle
 import com.material.xray.core.ui.components.AppTopBarHeight
-import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SegmentedTabRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.xray.ProviderGeoDataNotice
@@ -132,6 +114,7 @@ fun RoutingScreen(
     viewModel: RoutingViewModel = koinViewModel(),
 ) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
+    val scopeOrder by viewModel.scopeOrder.collectAsStateWithLifecycle()
     val subscriptionRules by viewModel.subscriptionRules.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
@@ -147,6 +130,25 @@ fun RoutingScreen(
     val selectionMode by remember { derivedStateOf { selectedRuleIds.isNotEmpty() } }
     val selectedTab = pagerState.currentPage
     val newRuleName = stringResource(R.string.routing_new_rule_name)
+    var wasSelecting by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectionMode) {
+        if (wasSelecting && !selectionMode) viewModel.applyPendingChangesIfNeeded()
+        wasSelecting = selectionMode
+    }
+
+    BackHandler(enabled = selectionMode) {
+        selectedRuleIds = emptySet()
+    }
+
+    LaunchedEffect(rules, subscriptionRules, profileRouting) {
+        val available = rules.map { routingSelectionKey(RoutingRuleScope.Custom, it.id) } +
+            subscriptionRules.map { routingSelectionKey(RoutingRuleScope.Subscription, it.id) } +
+            profileRouting?.rules.orEmpty().map { it.selectionKey() }
+        selectedRuleIds = selectedRuleIds.intersect(available.toSet())
+    }
+
+    LaunchedEffect(profileRouting?.serverId) { selectedRuleIds = emptySet() }
 
     fun applyRuleAction(action: RoutingRuleAction) {
         when (action) {
@@ -210,9 +212,11 @@ fun RoutingScreen(
     val rulesTab: @Composable () -> Unit = {
         RoutingRulesTab(
             searchQuery = rulesSearchQuery,
+            scopeOrder = scopeOrder,
             customRules = rules,
             subscriptionRules = subscriptionRules,
             profileRules = profileRouting?.rules.orEmpty(),
+            profileServerId = profileRouting?.serverId,
             providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
             providerName = automaticRoutingProviderName,
             providerGeoDataNotice = providerGeoDataNotice,
@@ -223,23 +227,30 @@ fun RoutingScreen(
                 onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
                 onRuleClick = { rule ->
                     if (selectionMode) {
-                        selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                        selectedRuleIds = selectedRuleIds.toggle(routingSelectionKey(RoutingRuleScope.Custom, rule.id))
                     } else {
                         applyRuleAction(RoutingRuleAction.Edit(rule))
                     }
                 },
                 onRuleLongClick = { rule ->
-                    selectedRuleIds = selectedRuleIds.toggle(rule.id)
+                    selectedRuleIds = selectedRuleIds + routingSelectionKey(RoutingRuleScope.Custom, rule.id)
                 },
                 onSubscriptionRuleClick = { rule ->
-                    onEditRule(EditableRoutingRule(rule = rule, isNew = false, subscriptionWide = true))
+                    if (selectionMode) {
+                        selectedRuleIds = selectedRuleIds.toggle(routingSelectionKey(RoutingRuleScope.Subscription, rule.id))
+                    } else {
+                        onEditRule(EditableRoutingRule(rule = rule, isNew = false, subscriptionWide = true))
+                    }
                 },
+                onSubscriptionRuleLongClick = { rule -> selectedRuleIds = selectedRuleIds + routingSelectionKey(RoutingRuleScope.Subscription, rule.id) },
                 onSubscriptionRuleToggled = { rule, enabled ->
                     requestProviderRuleAction(ProviderRoutingRuleAction.ToggleSubscription(rule, enabled))
                 },
                 onProfileRuleClick = { rule ->
                     val editableRule = rule.editableRule
-                    if (rule.orphaned || editableRule == null) {
+                    if (selectionMode) {
+                        selectedRuleIds = selectedRuleIds.toggle(rule.selectionKey())
+                    } else if (rule.orphaned || editableRule == null) {
                         onViewRule(rule.toViewerRequest())
                     } else {
                         onEditRule(
@@ -253,9 +264,16 @@ fun RoutingScreen(
                         )
                     }
                 },
+                onProfileRuleLongClick = { rule -> selectedRuleIds = selectedRuleIds + rule.selectionKey() },
                 onProfileRuleToggled = { rule, enabled ->
                     requestProviderRuleAction(ProviderRoutingRuleAction.ToggleProfile(rule, enabled))
                 },
+                onScopeLongClick = { scope ->
+                    selectedRuleIds = routingScopeSelectionKeys(scope, rules, subscriptionRules, profileRouting?.rules.orEmpty())
+                },
+                onRulesReordered = viewModel::reorderRules,
+                onProfileRulesReordered = { ordered -> profileRouting?.serverId?.let { viewModel.reorderProfileRules(it, ordered) } },
+                onScopesReordered = viewModel::reorderScopes,
             ),
         )
     }
@@ -264,7 +282,9 @@ fun RoutingScreen(
             selectionMode = selectionMode,
             selectedRuleIds = selectedRuleIds,
             rules = rules,
-            onClearSelection = { selectedRuleIds = emptySet() },
+            onClearSelection = {
+                selectedRuleIds = emptySet()
+            },
             onRuleAction = ::applyRuleAction,
         )
     }
@@ -465,15 +485,17 @@ private fun RuleActions(
                     modifier = Modifier.size(24.dp),
                 )
             }
-            TooltipIconButton(
-                tooltip = stringResource(R.string.routing_delete_selected_rules),
-                onClick = { onRuleAction(RoutingRuleAction.Delete(selectedRuleIds)) },
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.routing_delete_selected_rules),
-                    modifier = Modifier.size(24.dp),
-                )
+            if (selectedRuleIds.all { it.startsWith("custom:") }) {
+                TooltipIconButton(
+                    tooltip = stringResource(R.string.routing_delete_selected_rules),
+                    onClick = { onRuleAction(RoutingRuleAction.Delete(selectedRuleIds.mapTo(mutableSetOf()) { it.removePrefix("custom:") })) },
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.routing_delete_selected_rules),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             }
         }
         else -> {
@@ -526,7 +548,7 @@ private fun RuleActions(
 }
 
 @Composable
-private fun ProviderGeoDataBanner(
+internal fun ProviderGeoDataBanner(
     notice: ProviderGeoDataNotice,
     onClick: () -> Unit,
 ) {
@@ -590,344 +612,20 @@ private fun ProviderGeoDataBanner(
 }
 
 /** What tapping, long-pressing and toggling the listed rules does. */
-private data class RoutingRuleActions(
+internal data class RoutingRuleActions(
     val onRuleToggled: (RoutingRule, Boolean) -> Unit,
     val onRuleClick: (RoutingRule) -> Unit,
     val onRuleLongClick: (RoutingRule) -> Unit,
     val onSubscriptionRuleClick: (RoutingRule) -> Unit,
+    val onSubscriptionRuleLongClick: (RoutingRule) -> Unit,
     val onSubscriptionRuleToggled: (RoutingRule, Boolean) -> Unit,
     val onProfileRuleClick: (ProfileRoutingRule) -> Unit,
+    val onProfileRuleLongClick: (ProfileRoutingRule) -> Unit,
     val onProfileRuleToggled: (ProfileRoutingRule, Boolean) -> Unit,
-)
-
-@Composable
-private fun RoutingRulesTab(
-    searchQuery: TextFieldState,
-    customRules: List<RoutingRule>,
-    subscriptionRules: List<RoutingRule>,
-    profileRules: List<ProfileRoutingRule>,
-    providerManaged: Boolean,
-    providerName: String?,
-    providerGeoDataNotice: ProviderGeoDataNotice?,
-    onProviderGeoDataNoticeClick: () -> Unit,
-    selectionMode: Boolean,
-    selectedRuleIds: Set<String>,
-    actions: RoutingRuleActions,
-) {
-    val query = searchQuery.text.toString()
-    val filteredCustomRules = customRules.filter { it.matchesSearch(query, routingRuleDisplayName(it)) }
-    val filteredSubscriptionRules = subscriptionRules.filter { it.matchesSearch(query, routingRuleDisplayName(it)) }
-    val filteredProfileRules = profileRules.filter { it.matchesSearch(query) }
-    val hasMatchingRules = filteredCustomRules.isNotEmpty() || filteredSubscriptionRules.isNotEmpty() || filteredProfileRules.isNotEmpty()
-    Column(modifier = Modifier.fillMaxSize()) {
-        RoutingSearchField(state = searchQuery, hint = stringResource(R.string.routing_search_rules))
-        Box(modifier = Modifier.weight(1f)) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                if (providerManaged) {
-                    item(contentType = "providerRoutingBanner") {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Text(
-                                    text = when {
-                                        customRules.isNotEmpty() && providerName != null -> stringResource(
-                                            R.string.routing_some_rules_managed_by_provider,
-                                            providerName,
-                                        )
-                                        customRules.isNotEmpty() -> stringResource(
-                                            R.string.routing_some_rules_managed_by_selected_subscription,
-                                        )
-                                        providerName != null -> stringResource(
-                                            R.string.routing_rules_managed_by_provider,
-                                            providerName,
-                                        )
-                                        else -> stringResource(R.string.routing_rules_managed_by_selected_subscription)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                    }
-                }
-                if (providerGeoDataNotice != null) {
-                    item(contentType = "providerGeoDataBanner") {
-                        ProviderGeoDataBanner(providerGeoDataNotice, onProviderGeoDataNoticeClick)
-                    }
-                }
-                if (filteredCustomRules.isNotEmpty()) {
-                    item(contentType = "routingScopeHeader") {
-                        RoutingScopeHeader(R.string.routing_scope_custom)
-                    }
-                }
-                itemsIndexed(items = filteredCustomRules, key = { _, rule -> rule.id }, contentType = { _, _ -> "routingRule" }) { index, rule ->
-                    val shape = routingRuleShape(index, filteredCustomRules.lastIndex)
-                    val selected = rule.id in selectedRuleIds
-                    val containerColor by animateColorAsState(
-                        targetValue = if (selected) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainer
-                        },
-                        label = "routingRuleContainerColor",
-                    )
-                    val contentText = routingRuleContentText(rule)
-
-                    Surface(
-                        color = containerColor,
-                        shape = shape,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(shape)
-                            .combinedClickable(
-                                onClick = { actions.onRuleClick(rule) },
-                                onLongClick = { actions.onRuleLongClick(rule) },
-                            ),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 72.dp)
-                                .padding(horizontal = 16.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AnimatedVisibility(
-                                visible = selectionMode,
-                                enter = expandHorizontally(
-                                    animationSpec = tween(durationMillis = 180),
-                                    expandFrom = Alignment.Start,
-                                ) + fadeIn(animationSpec = tween(durationMillis = 120)),
-                                exit = shrinkHorizontally(
-                                    animationSpec = tween(durationMillis = 150),
-                                    shrinkTowards = Alignment.Start,
-                                ) + fadeOut(animationSpec = tween(durationMillis = 90)),
-                            ) {
-                                Box(modifier = Modifier.padding(end = 12.dp)) {
-                                    Checkbox(
-                                        checked = selected,
-                                        onCheckedChange = null,
-                                    )
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(end = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Text(
-                                    text = routingRuleDisplayName(rule),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Normal,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = contentText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-
-                            Switch(
-                                checked = rule.enabled,
-                                enabled = !selectionMode,
-                                onCheckedChange = { enabled -> actions.onRuleToggled(rule, enabled) },
-                            )
-                        }
-                    }
-                }
-                if (filteredSubscriptionRules.isNotEmpty()) {
-                    item(contentType = "routingScopeHeader") {
-                        RoutingScopeHeader(R.string.routing_scope_subscription_wide)
-                    }
-                    itemsIndexed(
-                        items = filteredSubscriptionRules,
-                        key = { index, rule -> "subscription-$index-${rule.id}" },
-                        contentType = { _, _ -> "subscriptionRoutingRule" },
-                    ) { index, rule ->
-                        SubscriptionRoutingRuleCard(
-                            rule = rule,
-                            shape = routingRuleShape(index, filteredSubscriptionRules.lastIndex),
-                            onClick = { actions.onSubscriptionRuleClick(rule) },
-                            onToggled = { enabled -> actions.onSubscriptionRuleToggled(rule, enabled) },
-                        )
-                    }
-                }
-                if (filteredProfileRules.isNotEmpty()) {
-                    item(contentType = "routingScopeHeader") {
-                        RoutingScopeHeader(R.string.routing_scope_profile_specific)
-                    }
-                    itemsIndexed(
-                        items = filteredProfileRules,
-                        key = { index, rule -> "profile-$index-${rule.id}" },
-                        contentType = { _, _ -> "profileRoutingRule" },
-                    ) { index, rule ->
-                        ProfileRoutingRuleCard(
-                            rule = rule,
-                            shape = routingRuleShape(index, filteredProfileRules.lastIndex),
-                            onClick = { actions.onProfileRuleClick(rule) },
-                            onToggled = { enabled -> actions.onProfileRuleToggled(rule, enabled) },
-                        )
-                    }
-                }
-                if (query.isNotBlank() && !hasMatchingRules) {
-                    item(contentType = "noMatchingRules") {
-                        Text(
-                            text = stringResource(R.string.routing_no_matching_rules),
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            ScrollFadeEdges()
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SubscriptionRoutingRuleCard(
-    rule: RoutingRule,
-    shape: Shape,
-    onClick: () -> Unit,
-    onToggled: (Boolean) -> Unit,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = shape,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .combinedClickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = routingRuleDisplayName(rule),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = routingRuleContentText(rule),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = rule.enabled, onCheckedChange = onToggled)
-        }
-    }
-}
-
-@Composable
-private fun RoutingScopeHeader(@StringRes titleResource: Int) {
-    Text(
-        text = stringResource(titleResource),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 6.dp),
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ProfileRoutingRuleCard(
-    rule: ProfileRoutingRule,
-    shape: Shape,
-    onClick: () -> Unit,
-    onToggled: (Boolean) -> Unit,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = shape,
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (rule.orphaned) 0.55f else 1f)
-            .clip(shape)
-            .combinedClickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = rule.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = profileRoutingRuleContentText(rule),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                rule.target?.let { target ->
-                    Text(
-                        text = target.displayText(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (rule.orphaned) {
-                    Text(
-                        text = stringResource(R.string.routing_profile_rule_orphaned),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            Switch(
-                checked = rule.enabled && !rule.orphaned,
-                enabled = !rule.orphaned,
-                onCheckedChange = onToggled,
-            )
-        }
-    }
-}
-
-private fun routingRuleShape(index: Int, lastIndex: Int) = RoundedCornerShape(
-    topStart = if (index == 0) 20.dp else 4.dp,
-    topEnd = if (index == 0) 20.dp else 4.dp,
-    bottomStart = if (index == lastIndex) 20.dp else 4.dp,
-    bottomEnd = if (index == lastIndex) 20.dp else 4.dp,
+    val onScopeLongClick: (RoutingRuleScope) -> Unit,
+    val onRulesReordered: (RoutingRuleScope, List<String>) -> Unit,
+    val onProfileRulesReordered: (List<ProfileRoutingRule>) -> Unit,
+    val onScopesReordered: (List<RoutingRuleScope>) -> Unit,
 )
 
 @Composable
@@ -977,7 +675,7 @@ internal fun AutomaticRuleRoutingDialog(
 }
 
 @Composable
-private fun routingRuleContentText(rule: RoutingRule): String {
+internal fun routingRuleContentText(rule: RoutingRule): String {
     val domains = rule.domains.map(String::trim).filter(String::isNotEmpty)
     val ips = rule.ips.map(String::trim).filter(String::isNotEmpty)
     val protocols = rule.protocols.map(String::trim).filter(String::isNotEmpty)
@@ -997,7 +695,7 @@ private fun routingRuleContentText(rule: RoutingRule): String {
 }
 
 @Composable
-private fun profileRoutingRuleContentText(rule: ProfileRoutingRule): String {
+internal fun profileRoutingRuleContentText(rule: ProfileRoutingRule): String {
     val domainText = compactDomainText(rule.domains)
     val ipText = compactListText(rule.ips, R.plurals.routing_rule_ips, R.plurals.routing_rule_more_ips)
     val portText = rule.port?.let { stringResource(R.string.routing_rule_port, it) }
@@ -1066,13 +764,13 @@ private fun ProfileRoutingRule.toViewerRequest(): RoutingRuleViewerRequest = Rou
 )
 
 @Composable
-private fun ProfileRoutingTarget.displayText(): String = when (this) {
+internal fun ProfileRoutingTarget.displayText(): String = when (this) {
     is ProfileRoutingTarget.Outbound -> stringResource(R.string.routing_rule_target_outbound, tag)
     is ProfileRoutingTarget.Balancer -> stringResource(R.string.routing_rule_target_balancer, tag)
 }
 
 @Composable
-private fun routingRuleDisplayName(rule: RoutingRule): String {
+internal fun routingRuleDisplayName(rule: RoutingRule): String {
     if (rule.name != defaultRoutingRulesById[rule.id]?.name) return rule.name
     return when (rule.id) {
         "ru-direct" -> stringResource(R.string.routing_default_rule_ru_name)
@@ -1082,3 +780,9 @@ private fun routingRuleDisplayName(rule: RoutingRule): String {
 }
 
 private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
+
+private fun routingScopeSelectionKeys(scope: RoutingRuleScope, custom: List<RoutingRule>, subscription: List<RoutingRule>, profile: List<ProfileRoutingRule>): Set<String> = when (scope) {
+    RoutingRuleScope.Custom -> custom.mapTo(mutableSetOf()) { routingSelectionKey(scope, it.id) }
+    RoutingRuleScope.Subscription -> subscription.mapTo(mutableSetOf()) { routingSelectionKey(scope, it.id) }
+    RoutingRuleScope.Profile -> profile.mapTo(mutableSetOf()) { it.selectionKey() }
+}

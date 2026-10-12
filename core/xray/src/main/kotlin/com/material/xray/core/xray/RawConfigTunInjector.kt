@@ -5,6 +5,7 @@ import com.material.xray.core.model.SubscriptionRouting
 import com.material.xray.core.model.XrayLogLevel
 import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
+import com.material.xray.core.model.toXrayRules
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +31,7 @@ internal class RawConfigTunInjector(
         bypassLan: Boolean,
         allowIpv6: Boolean = false,
         routingRules: List<RoutingRule>,
+        profileRoutingInsertIndex: Int = routingRules.size,
         routingDomainStrategy: String = SubscriptionRouting.DEFAULT_DOMAIN_STRATEGY,
         routingDomainMatcher: String? = null,
         appProxyRoutes: List<AppProxyRoute>,
@@ -128,6 +130,8 @@ internal class RawConfigTunInjector(
             appProxyRoutes = appProxyRoutes,
             proxyOutboundTag = proxyOutboundTag,
             defaultRouteTarget = defaultRouteTarget,
+            routingRules = routingRules,
+            profileRoutingInsertIndex = profileRoutingInsertIndex,
         )
 
         return json.encodeToString(JsonObject.serializer(), JsonObject(original))
@@ -141,6 +145,8 @@ internal class RawConfigTunInjector(
         appProxyRoutes: List<AppProxyRoute>,
         proxyOutboundTag: String,
         defaultRouteTarget: XrayRouteTarget,
+        routingRules: List<RoutingRule>,
+        profileRoutingInsertIndex: Int,
     ): JsonObject {
         // Keep MX app rules from capturing the profile resolver's own requests. DNS interception
         // still feeds Xray's DNS outbound, including the synthetic resolver used by Android VPN.
@@ -153,7 +159,7 @@ internal class RawConfigTunInjector(
         }
         val fallbackCount = appProxyRoutes.count { it.applyRoutingRules }
         val rawRules = (raw?.get("rules") as? JsonArray).orEmpty().flatMap { rawRule ->
-            val original = rawRule as? JsonObject ?: return@flatMap listOf(rawRule)
+            val original = rawRule as? JsonObject ?: return@flatMap listOf(rawRule to false)
             val target = original.routeTarget()
             val targetsDefaultProxy = target == XrayRouteTarget.Outbound(proxyOutboundTag) ||
                 (defaultRouteTarget is XrayRouteTarget.Balancer && target == defaultRouteTarget)
@@ -181,12 +187,19 @@ internal class RawConfigTunInjector(
             } else {
                 emptyList()
             }
-            scoped + original
+            (scoped + original).map { it to original.isRoutineDefaultRoute() }
         }
+        val scopedProxyCount = appProxyRoutes.count { it.applyRoutingRules && it.outboundTag != "proxy" }
+        fun expandedCount(rules: List<RoutingRule>): Int = rules.filter { it.enabled }.sumOf { rule ->
+            rule.toXrayRules().size * (1 + if (rule.outboundTag == "proxy") scopedProxyCount else 0)
+        }
+        val infrastructureCount = generatedRules.size - fallbackCount - expandedCount(routingRules)
+        val insertIndex = infrastructureCount + expandedCount(routingRules.take(profileRoutingInsertIndex.coerceIn(0, routingRules.size)))
+        val (fallbackRules, profileRules) = rawRules.partition { it.second }
         return JsonObject(
             generated.toMutableMap().apply {
                 if (raw != null) putAll(raw)
-                put("rules", JsonArray(generatedRules.dropLast(fallbackCount) + rawRules + generatedRules.takeLast(fallbackCount)))
+                put("rules", JsonArray(generatedRules.take(insertIndex) + profileRules.map { it.first } + generatedRules.drop(insertIndex).dropLast(fallbackCount) + fallbackRules.map { it.first } + generatedRules.takeLast(fallbackCount)))
             },
         )
     }
@@ -250,6 +263,16 @@ internal class RawConfigTunInjector(
             else -> return false
         }
         return networks.any { it.trim().equals("tcp", ignoreCase = true) }
+    }
+
+    private fun JsonObject.isRoutineDefaultRoute(): Boolean {
+        if (keys.any { it !in setOf("type", "id", "name", "__name__", "ruleTag", "enabled", "outboundTag", "balancerTag", "network") }) return false
+        val networks = when (val network = get("network")) {
+            is JsonPrimitive -> network.contentOrNull?.split(',').orEmpty()
+            is JsonArray -> network.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.flatMap { it.split(',') }
+            else -> return false
+        }.map { it.trim().lowercase() }.toSet()
+        return networks == setOf("tcp", "udp") && routeTarget() != null
     }
 
     private fun JsonObject.routeTarget(): XrayRouteTarget? {

@@ -14,6 +14,7 @@ import com.material.xray.core.telemetry.ConnectionTelemetryStep
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
+import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.TUN_INBOUND_TAG
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayInbound
@@ -42,7 +43,7 @@ internal class XrayConfigWriter(
     var active: GeneratedXrayConfig? = null
 
     /** Points provider rules at the provider's geodata, leaving out what no available file defines. */
-    suspend fun resolveProviderRoutingRules(rules: List<RoutingRule>): List<RoutingRule> {
+    private suspend fun resolveProviderRoutingRules(rules: List<RoutingRule>): ProviderGeoDataResolution {
         val resolution = routingData.resolveProviderRules(rules)
         if (resolution.usedUrls.isNotEmpty()) {
             log.append(LogSource.APP, "Using provider routing data: ${resolution.usedUrls.joinToString()}")
@@ -61,7 +62,13 @@ internal class XrayConfigWriter(
                     resolution.droppedEntries.joinToString(),
             )
         }
-        return resolution.rules
+        return resolution
+    }
+
+    suspend fun resolveRoutingSettings(settings: XrayRuntimeSettings): XrayRuntimeSettings {
+        val resolved = resolveProviderRoutingRules(settings.routingRules)
+        val index = settings.profileRoutingInsertIndex?.let { resolved.profileInsertIndex(settings.routingRules, it) }
+        return settings.copy(routingRules = resolved.rules, profileRoutingInsertIndex = index)
     }
 
     /** Writes the config for a connect. Returns null when the hand-edited config was written instead. */
@@ -180,8 +187,10 @@ internal class XrayConfigWriter(
             log.append(LogSource.APP, "Live routing update requires a restart to change domain strategy")
             return false
         }
+        val resolved = resolveRoutingSettings(runtimeSettings)
         val nextRuntimeSettings = currentInputs.runtimeSettings.copy(
-            routingRules = resolveProviderRoutingRules(runtimeSettings.routingRules),
+            routingRules = resolved.routingRules,
+            profileRoutingInsertIndex = resolved.profileRoutingInsertIndex,
             routingDomainMatcher = runtimeSettings.routingDomainMatcher,
             routingFallbackOutbound = runtimeSettings.routingFallbackOutbound,
         )
@@ -246,6 +255,7 @@ internal class XrayConfigWriter(
             bypassLan = settings.bypassLan,
             allowIpv6 = settings.allowIpv6,
             routingRules = settings.routingRules,
+            profileRoutingInsertIndex = settings.profileRoutingInsertIndex ?: settings.routingRules.size,
             routingDomainStrategy = settings.routingDomainStrategy,
             routingDomainMatcher = settings.routingDomainMatcher,
             routingFallbackOutbound = settings.routingFallbackOutbound,

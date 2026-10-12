@@ -7,6 +7,10 @@ Open **Routing → Rules** to manage the rules Xray applies to each connection. 
 
 Use the search bar to filter custom, subscription-wide and profile-specific rules by name, destination tag or matching conditions, including domains, geosite/geoip entries, IPs, ports and protocols. Search ignores letter case and keeps the original rule order. Filtering the list does not change which rules Xray applies.
 
+Long-press a rule to enter selection mode. Selected rules use the same highlight as the selected server, and switches fade into drag handles. Hold a handle to move its rule within the category; hold a category header's handle to change the priority of entire categories. Long-pressing a category header selects its rules. The list scrolls automatically near the top and bottom while dragging. Screen readers offer **Move up** and **Move down** actions on the handles.
+
+Both orders are saved and determine Xray's first matching rule. DNS and LAN service rules stay ahead of these categories, and the profile's terminal default route stays after them. Filtering does not delete hidden rules. Reordering provider rules or categories switches routing policy to manual so refreshes cannot overwrite the chosen subscription-wide order. Profile order is stored with that server's local routing overrides. Close selection with the header's cross, the back gesture, or by deselecting the last rule to apply the saved order to an active connection.
+
 ## Built-in rules
 
 A fresh install includes:

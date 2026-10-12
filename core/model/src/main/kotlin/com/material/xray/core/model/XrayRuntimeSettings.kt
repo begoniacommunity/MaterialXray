@@ -16,6 +16,7 @@ data class XrayRuntimeSettings(
     val otherVpnMode: OtherVpnMode = OtherVpnMode.default,
     val allowIpv6: Boolean,
     val routingRules: List<RoutingRule>,
+    val profileRoutingInsertIndex: Int? = null,
     val xrayBufferSizeKiB: Int = DEFAULT_XRAY_BUFFER_SIZE_KIB,
     val tunMtu: Int = DEFAULT_TUN_MTU,
     val routingDomainStrategy: String = SubscriptionRouting.DEFAULT_DOMAIN_STRATEGY,

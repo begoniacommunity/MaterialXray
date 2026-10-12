@@ -141,9 +141,8 @@ class ConnectionManager(
             ) ?: return
             if (prepareXrayBinary(strategy, preparation) == null) return
             prepareRoutingData(preparation, transitionState)
-            val effectiveRuntimeSettings = runtimeSettings.copy(
+            val effectiveRuntimeSettings = configWriter.resolveRoutingSettings(runtimeSettings).copy(
                 tunName = tunName,
-                routingRules = configWriter.resolveProviderRoutingRules(runtimeSettings.routingRules),
             )
 
             val physicalRouteResult = detectPhysicalRoute(managesSystemRouting, tunName)

@@ -94,6 +94,7 @@ class SettingsBackupRoundTripTest {
         val MIGRATED_LEGACY_KEYS = setOf("allow_ipv6", "last_xray_log_level", "geo_data_base_url")
 
         val SAMPLES: Map<String, Any> = mapOf(
+            "routing_scope_order" to "profile,subscription,custom",
             "tun_name" to "tun9",
             "dns_servers" to "9.9.9.9",
             "domestic_dns_servers" to "8.8.8.8",

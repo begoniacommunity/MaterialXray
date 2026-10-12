@@ -17,6 +17,7 @@ data class ProfileRouting(
     val rules: List<ProfileRoutingRule>,
     val domainStrategy: String?,
     val domainMatcher: String?,
+    val serverId: Long? = null,
 )
 
 data class ProfileRoutingRule(
@@ -93,7 +94,7 @@ object ProfileRoutingInspector {
             val rule = element as? JsonObject ?: return@mapIndexedNotNull null
             if (rule.isRoutineDefaultRoute()) return@mapIndexedNotNull null
             describeRule(rule, index, matchedOverrides[index])
-        }
+        }.sortedBy { matchedOverrides[it.originalIndex]?.position ?: it.originalIndex }
         val orphanedRules = overrides.filter(ProfileRoutingOverride::orphaned).mapNotNull { override ->
             val original = runCatching { json.parseToJsonElement(override.originalRuleJson) as? JsonObject }.getOrNull()
                 ?: return@mapNotNull null

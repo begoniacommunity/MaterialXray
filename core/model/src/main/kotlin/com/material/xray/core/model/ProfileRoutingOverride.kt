@@ -13,6 +13,7 @@ data class ProfileRoutingOverride(
     val replacement: RoutingRule? = null,
     val enabled: Boolean = true,
     val orphaned: Boolean = false,
+    val position: Int? = null,
 )
 
 object ProfileRoutingOverrideEngine {
@@ -27,7 +28,8 @@ object ProfileRoutingOverrideEngine {
         if (matches.isEmpty()) return rawConfigJson
 
         val patchedRules = buildList {
-            rules.forEachIndexed { index, rule ->
+            rules.indices.sortedBy { matches[it]?.position ?: it }.forEach { index ->
+                val rule = rules[index]
                 val override = matches[index]
                 if (override == null) {
                     add(rule)
@@ -51,8 +53,23 @@ object ProfileRoutingOverrideEngine {
             ?.get("rules")
             ?.let { it as? JsonArray }
             ?: return overrides.map { it.copy(orphaned = true) }
-        val matchedOverrides = overrides.matchingRules(rules).values.toSet()
-        return overrides.map { override -> override.copy(orphaned = override !in matchedOverrides) }
+        val matchedOverrides = overrides.matchingRules(rules)
+        return overrides.map { override ->
+            val index = matchedOverrides.entries.firstOrNull { it.value == override }?.key
+            override.copy(originalIndex = index ?: override.originalIndex, orphaned = index == null)
+        }
+    }
+
+    fun reorder(rawConfigJson: String, overrides: List<ProfileRoutingOverride>, orderedRules: List<ProfileRoutingOverride>): List<ProfileRoutingOverride> {
+        val rules = rawConfigJson.objectOrNull()?.get("routing")?.let { it as? JsonObject }?.get("rules") as? JsonArray ?: return overrides
+        val existing = overrides.matchingRules(rules)
+        val desired = orderedRules.matchingRules(rules)
+        val positions = desired.keys.sorted()
+        val replaced = desired.keys.mapNotNull(existing::get).toSet()
+        val retained = overrides.filterNot { it in replaced }
+        return retained + desired.entries.mapIndexed { position, (index, rule) ->
+            (existing[index] ?: rule).copy(originalIndex = index, position = positions[position], orphaned = false)
+        }
     }
 
     fun replace(
@@ -68,7 +85,8 @@ object ProfileRoutingOverrideEngine {
         }.takeIf { it >= 0 } ?: overrides.indexOfFirst {
             it.originalRuleJson.objectOrNull() == canonicalOriginal.objectOrNull()
         }
-        if (enabled && replacement == null) {
+        val position = overrides.getOrNull(existingIndex)?.position
+        if (enabled && replacement == null && position == null) {
             return if (existingIndex < 0) overrides else overrides.toMutableList().apply { removeAt(existingIndex) }
         }
         val updated = ProfileRoutingOverride(
@@ -76,6 +94,7 @@ object ProfileRoutingOverrideEngine {
             originalIndex = originalIndex,
             replacement = replacement,
             enabled = enabled,
+            position = position,
         )
         if (existingIndex < 0) return overrides + updated
         return overrides.toMutableList().apply { set(existingIndex, updated) }

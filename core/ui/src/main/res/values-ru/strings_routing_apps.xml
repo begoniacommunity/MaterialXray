@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="routing_reorder_rule">Изменить порядок правила</string>
+    <string name="routing_reorder_category">Изменить порядок категории</string>
+    <string name="routing_move_up">Переместить выше</string>
+    <string name="routing_move_down">Переместить ниже</string>
     <string name="routing_title">Маршрутизация</string>
     <string name="routing_tab_rules">Правила</string>
     <string name="routing_tab_apps">Приложения</string>

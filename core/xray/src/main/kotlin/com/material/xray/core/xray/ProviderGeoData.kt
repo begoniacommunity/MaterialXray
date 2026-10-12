@@ -181,7 +181,11 @@ data class ProviderGeoDataResolution(
     val unavailableUrls: Set<String> = emptySet(),
     /** Entries no available file defines; Xray refuses to start on any of them, so they are left out. */
     val droppedEntries: List<String> = emptyList(),
-)
+    val sourceIndices: List<Int>? = null,
+) {
+    fun profileInsertIndex(original: List<RoutingRule>, index: Int): Int = sourceIndices?.count { it < index }
+        ?: original.take(index).count { rule -> rules.any { it.id == rule.id && it.geoData == rule.geoData } }
+}
 
 /**
  * Points the `geoip:` and `geosite:` entries of provider rules at the provider's own files.
@@ -225,19 +229,25 @@ fun resolveProviderGeoData(
         }
     }
 
-    val resolved = rules.mapNotNull { rule ->
-        val geoData = rule.geoData ?: return@mapNotNull rule
+    val sourceIndices = mutableListOf<Int>()
+    val resolved = rules.mapIndexedNotNull { index, rule ->
+        val geoData = rule.geoData ?: run {
+            sourceIndices += index
+            return@mapIndexedNotNull rule
+        }
         val domains = rule.domains.mapNotNull { resolveEntry(it, GEOSITE_PREFIX, geoData.geositeUrl, defaultGeositeCodes) }
         val ips = rule.ips.mapNotNull { resolveEntry(it, GEOIP_PREFIX, geoData.geoipUrl, defaultGeoipCodes) }
         val next = rule.copy(domains = domains, ips = ips)
         val lostCondition = (rule.domains.isNotEmpty() && domains.isEmpty()) || (rule.ips.isNotEmpty() && ips.isEmpty())
-        when {
+        val resolvedRule = when {
             next.matchesAllTraffic() && !rule.matchesAllTraffic() -> null
             rule.operator == RoutingRuleOperator.AND && lostCondition -> null
             else -> next
         }
+        if (resolvedRule != null) sourceIndices += index
+        resolvedRule
     }
-    return ProviderGeoDataResolution(resolved, usedUrls, unavailableUrls, droppedEntries)
+    return ProviderGeoDataResolution(resolved, usedUrls, unavailableUrls, droppedEntries, sourceIndices)
 }
 
 data class ProviderGeoDataState(

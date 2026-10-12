@@ -23,10 +23,13 @@ import com.material.xray.core.model.RootConnectionBackend
 import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.RoutingRuleCatalog
+import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.model.SubscriptionRouting
 import com.material.xray.core.model.XrayLogLevel
 import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
+import com.material.xray.core.model.orderRoutingRules
+import com.material.xray.core.model.reorderedBy
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.xray.GeoDataDefaults
 import com.material.xray.core.xray.GeoDataUrlSettings
@@ -124,6 +127,7 @@ class SettingsRepository(
         val APP_SPECIFIC_SERVER_NOTE_SHOWN = booleanPreferencesKey("app_specific_server_note_shown")
         val ROUTING_POLICY_CONTROL = stringPreferencesKey("routing_policy_control")
         val ROUTING_RULES = stringPreferencesKey("routing_rules")
+        val ROUTING_SCOPE_ORDER = stringPreferencesKey("routing_scope_order")
         val ROUTING_RULES_VERSION = intPreferencesKey("routing_rules_version")
         val ROUTING_RULE_STATES = stringPreferencesKey("routing_rule_states")
         val DELETED_DEFAULT_ROUTING_RULE_IDS = stringSetPreferencesKey("deleted_default_routing_rule_ids")
@@ -261,9 +265,9 @@ class SettingsRepository(
     }
 
     // Subscription rules apply in both modes; manual mode only stops refreshes from replacing them.
-    val routingRules: Flow<List<RoutingRule>> = combine(customRoutingRules, subscriptionRoutingRules) { custom, provider ->
-        custom + provider
-    }
+    val routingScopeOrder: Flow<List<RoutingRuleScope>> = store.data.map { RoutingRuleScope.decode(it[ROUTING_SCOPE_ORDER]) }
+    private val orderedRoutingRules = combine(customRoutingRules, subscriptionRoutingRules, routingScopeOrder, ::orderRoutingRules)
+    val routingRules: Flow<List<RoutingRule>> = orderedRoutingRules.map { it.rules }
     val customRoutingDomainStrategy: Flow<String> = store.data.map { prefs ->
         SubscriptionRouting.normalizeDomainStrategy(prefs[ROUTING_DOMAIN_STRATEGY])
     }
@@ -394,30 +398,34 @@ class SettingsRepository(
         )
     }
 
-    suspend fun runtimeSettingsSnapshot(): XrayRuntimeSettings = XrayRuntimeSettings(
-        tunName = tunName.first(),
-        fwmark = fwmark.first(),
-        routeTable = routeTable.first(),
-        useRootService = useRootService.first(),
-        rootConnectionBackend = rootConnectionBackend.first(),
-        dnsServers = dnsServers.first(),
-        domesticDnsServers = domesticDnsServers.first(),
-        preferProfileDns = preferProfileDns.first(),
-        logLevel = xrayLogLevel.first(),
-        defaultOutbound = defaultOutbound.first(),
-        bypassLan = bypassLan.first(),
-        tunnelTetheredClients = tunnelTetheredClients.first(),
-        otherVpnMode = otherVpnMode.first(),
-        // Auto is settled per session by the service, which starts from IPv4.
-        allowIpv6 = ipv6Mode.first() == Ipv6Mode.On,
-        routingRules = routingRules.first(),
-        xrayBufferSizeKiB = xrayBufferSizeKiB.first(),
-        tunMtu = tunMtu.first(),
-        routingDomainStrategy = routingDomainStrategy.first(),
-        routingDomainMatcher = routingDomainMatcher.first(),
-        routingFallbackOutbound = routingFallbackOutbound.first(),
-        routeMxrayTrafficThroughXray = routeMxrayTrafficThroughXray.first(),
-    )
+    suspend fun runtimeSettingsSnapshot(): XrayRuntimeSettings {
+        val ordered = orderedRoutingRules.first()
+        return XrayRuntimeSettings(
+            tunName = tunName.first(),
+            fwmark = fwmark.first(),
+            routeTable = routeTable.first(),
+            useRootService = useRootService.first(),
+            rootConnectionBackend = rootConnectionBackend.first(),
+            dnsServers = dnsServers.first(),
+            domesticDnsServers = domesticDnsServers.first(),
+            preferProfileDns = preferProfileDns.first(),
+            logLevel = xrayLogLevel.first(),
+            defaultOutbound = defaultOutbound.first(),
+            bypassLan = bypassLan.first(),
+            tunnelTetheredClients = tunnelTetheredClients.first(),
+            otherVpnMode = otherVpnMode.first(),
+            // Auto is settled per session by the service, which starts from IPv4.
+            allowIpv6 = ipv6Mode.first() == Ipv6Mode.On,
+            routingRules = ordered.rules,
+            profileRoutingInsertIndex = ordered.profileInsertIndex,
+            xrayBufferSizeKiB = xrayBufferSizeKiB.first(),
+            tunMtu = tunMtu.first(),
+            routingDomainStrategy = routingDomainStrategy.first(),
+            routingDomainMatcher = routingDomainMatcher.first(),
+            routingFallbackOutbound = routingFallbackOutbound.first(),
+            routeMxrayTrafficThroughXray = routeMxrayTrafficThroughXray.first(),
+        )
+    }
 
     suspend fun setTunName(name: String) = store.edit { it[TUN_NAME] = name }
     suspend fun setDnsServers(servers: String) = store.edit { it[DNS_SERVERS] = servers }
@@ -597,6 +605,31 @@ class SettingsRepository(
         prefs.remove(ROUTING_RULE_STATES)
     }
 
+    suspend fun reorderRoutingRules(scope: RoutingRuleScope, ids: List<String>) = store.edit { prefs ->
+        when (scope) {
+            RoutingRuleScope.Custom -> {
+                val current = decodeRoutingRules(prefs[ROUTING_RULES], prefs[ROUTING_RULES_VERSION], prefs[ROUTING_RULE_STATES], prefs[DELETED_DEFAULT_ROUTING_RULE_IDS].orEmpty())
+                val ordered = current.reorderedBy(ids, RoutingRule::id)
+                prefs[ROUTING_RULES] = encodeRoutingRules(ordered)
+                prefs[ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+                prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = deletedDefaultRuleIds(ordered)
+                prefs.remove(ROUTING_RULE_STATES)
+            }
+            RoutingRuleScope.Subscription -> {
+                val current = decodeProviderRoutingRules(prefs[PROVIDER_ROUTING_RULES], prefs[PROVIDER_ROUTING_RULES_VERSION])
+                prefs[PROVIDER_ROUTING_RULES] = encodeRoutingRules(current.reorderedBy(ids, RoutingRule::id))
+                prefs[PROVIDER_ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+                prefs[ROUTING_POLICY_CONTROL] = RoutingPolicyControl.User.value
+            }
+            RoutingRuleScope.Profile -> Unit
+        }
+    }
+
+    suspend fun setRoutingScopeOrder(scopes: List<RoutingRuleScope>) = store.edit { prefs ->
+        prefs[ROUTING_SCOPE_ORDER] = RoutingRuleScope.normalize(scopes).joinToString(",") { it.value }
+        prefs[ROUTING_POLICY_CONTROL] = RoutingPolicyControl.User.value
+    }
+
     suspend fun setCustomRouting(routing: SubscriptionRouting) = store.edit { prefs ->
         val normalized = routing.normalized()
         prefs[ROUTING_RULES] = encodeRoutingRules(normalized.rules)
@@ -743,6 +776,7 @@ class SettingsRepository(
             map["show_both_latency_results"]
                 ?.toBooleanStrictOrNull()
                 ?.let { prefs[SHOW_BOTH_LATENCY_RESULTS] = it }
+            map["routing_scope_order"]?.let { prefs[ROUTING_SCOPE_ORDER] = it }
             map["routing_rules"]?.takeIf { it.isNotBlank() }?.let { prefs[ROUTING_RULES] = it }
             map["routing_rules_version"]?.toIntOrNull()?.let { prefs[ROUTING_RULES_VERSION] = it }
             map["routing_rule_states"]?.takeIf { it.isNotBlank() }?.let { prefs[ROUTING_RULE_STATES] = it }
