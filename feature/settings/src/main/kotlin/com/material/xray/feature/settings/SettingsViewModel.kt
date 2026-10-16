@@ -12,6 +12,7 @@ import com.material.xray.core.data.repository.BackupSummary
 import com.material.xray.core.data.repository.PreparedBackupImport
 import com.material.xray.core.data.repository.ProviderRoutingCoordinator
 import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.model.AppUpdateCheckStatus
 import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -88,6 +90,7 @@ class SettingsViewModel(
     private val settingsRuntimeManager: SettingsRuntimeManager,
     private val oemAutostartManager: OemAutostartManager,
     private val geoDataManager: GeoDataManager,
+    private val subscriptionRepository: SubscriptionRepository,
     ipv6Detector: Ipv6Detector,
     settingsDataState: SettingsDataState,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -111,6 +114,7 @@ class SettingsViewModel(
 
     val settings = settingsDataState.data
     val selectedSubscriptionRequiresHwid = settingsDataState.selectedSubscriptionRequiresHardwareId
+    val selectedSubscriptionProfileDns = settingsDataState.selectedSubscriptionProfileDns
     val geoipUpdating: StateFlow<Boolean> = _geoipUpdating.asStateFlow()
     val geositeUpdating: StateFlow<Boolean> = _geositeUpdating.asStateFlow()
     val geoDataClearing: StateFlow<Boolean> = _geoDataClearing.asStateFlow()
@@ -151,6 +155,17 @@ class SettingsViewModel(
         settingsRepo::setDomesticDnsServers,
     )
     fun setPreferProfileDns(enabled: Boolean) = viewModelScope.launch {
+        val provider = selectedSubscriptionProfileDns.value.provider
+        if (provider != null) {
+            // The subscription decides for its own servers, so the answer belongs to it, not to the
+            // global setting. Agreeing with the provider drops the override so later headers apply.
+            subscriptionRepository.setUseProfileDnsOverrideForServer(
+                settingsRepo.lastServerId.first(),
+                enabled.takeIf { it != provider },
+            )
+            reloadActiveConnectionIfConnected()
+            return@launch
+        }
         if (enabled == currentSettings().preferProfileDns) return@launch
         settingsRepo.setPreferProfileDns(enabled)
         reloadActiveConnectionIfConnected()

@@ -52,6 +52,7 @@ class DatabaseValueValidatorTest {
                 supportUrl TEXT,
                 fallbackUrl TEXT,
                 requiresHardwareId INTEGER NOT NULL DEFAULT 0,
+                useProfileDnsOverride INTEGER,
                 descriptionHidden INTEGER NOT NULL,
                 userAgentMode TEXT,
                 customUserAgent TEXT,
@@ -102,11 +103,11 @@ class DatabaseValueValidatorTest {
                 id, name, url, preferJson, lastUpdated, autoUpdateIntervalHours,
                 subscriptionTotalBytes, subscriptionExpireAt, descriptionHidden,
                 userAgentMode, appRoutingPackages, appRoutingMode, appRoutingInverted,
-                fallbackUrl, requiresHardwareId
+                fallbackUrl, requiresHardwareId, useProfileDnsOverride
             ) VALUES (
                 1, '  ', ' https://example.com ', 2, -1, -6,
                 -1, 0, 4, ' CUSTOM ', ' ["com.example"] ', ' bypass ', 7,
-                '  https://backup.example.com  ', 9
+                '  https://backup.example.com  ', 9, 5
             )
             """.trimIndent(),
         )
@@ -158,6 +159,7 @@ class DatabaseValueValidatorTest {
         assertEquals("1", subscription["appRoutingInverted"])
         assertEquals("https://backup.example.com", subscription["fallbackUrl"])
         assertEquals("1", subscription["requiresHardwareId"])
+        assertNull(subscription["useProfileDnsOverride"])
 
         val server = query("SELECT * FROM servers").single()
         assertEquals("Server 10", server["name"])

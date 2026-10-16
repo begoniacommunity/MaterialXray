@@ -187,6 +187,9 @@ object DatabaseMigrations {
             "ALTER TABLE app_bypass ADD COLUMN alwaysProxied INTEGER NOT NULL DEFAULT 0",
             "UPDATE app_bypass SET alwaysProxied = 1, routeMode = 'default_selected' WHERE routeMode = 'always_proxied'",
         ),
+        23 to listOf(
+            "ALTER TABLE subscriptions ADD COLUMN useProfileDnsOverride INTEGER",
+        ),
     )
 
     val all: Array<Migration> = sqlByStartVersion.entries

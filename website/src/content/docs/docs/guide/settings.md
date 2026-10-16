@@ -30,7 +30,7 @@ Xray answers every port-53 query itself, so names routed through the proxy are n
 - **Proxied domains**: the resolver for every name routed through the proxy.
 - **Direct domains**: the resolver for LAN hosts and direct rules. These queries leave over your normal connection.
 - **Encrypt queries**: use encrypted DNS.
-- **Prefer profile DNS**: when a JSON profile defines its own DNS, use it. A subscription can override this for its own servers with [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json).
+- **Prefer profile DNS**: when a JSON profile defines its own DNS, use it. A subscription can override this for its own servers with [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json). While the selected server comes from such a subscription, the toggle shows the provider's choice, and switching it changes the choice for that subscription only.
 
 Resolvers are comma-separated and tried in order. Each one is an IP address or a DoH URL like `https://dns.quad9.net/dns-query`.
 

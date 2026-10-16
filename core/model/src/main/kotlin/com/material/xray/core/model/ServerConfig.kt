@@ -23,7 +23,10 @@ data class ServerConfig(
     val profileRoutingOverrides: List<ProfileRoutingOverride> = emptyList(),
     /** Null preserves the legacy edited flag until this config is next saved. */
     val configurationEdited: Boolean? = null,
-    /** The subscription's `mxray-use-dns-from-json` directive; it overrides the user's Prefer profile DNS. */
+    /**
+     * The subscription's `mxray-use-dns-from-json` directive, replaced by the user's per-subscription
+     * choice when connecting. Either overrides the global Prefer profile DNS.
+     */
     val subscriptionUseProfileDns: Boolean? = null,
     @Transient val bootstrapDnsHosts: Map<String, List<String>> = emptyMap(),
 ) {

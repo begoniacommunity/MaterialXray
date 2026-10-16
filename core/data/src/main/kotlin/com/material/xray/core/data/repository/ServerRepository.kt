@@ -24,6 +24,8 @@ class ServerRepository(
 
     suspend fun getById(id: Long): ServerEntity? = serverDao.getById(id)
 
+    fun observeById(id: Long): Flow<ServerEntity?> = serverDao.observeById(id)
+
     fun parseConfig(entity: ServerEntity): ServerConfig = json.decodeFromString(entity.configJson)
 
     suspend fun updateLatency(id: Long, latencyMs: Int) {

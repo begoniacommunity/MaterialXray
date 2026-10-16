@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.data.repository.SettingsSnapshot
 import com.material.xray.core.model.DnsPreset
 import com.material.xray.core.model.dnsPresetFor
@@ -106,10 +107,20 @@ fun DnsSettingsScreen(
             }
 
             item(key = "prefer_profile_dns") {
+                // While the selected server's subscription decides this, the switch shows and edits
+                // the choice for that subscription; the global one applies again elsewhere.
+                val subscriptionDns = viewModel.selectedSubscriptionProfileDns.collectAsStateWithLifecycle().value
                 SettingsSwitchRow(
                     title = stringResource(R.string.settings_prefer_profile_dns_title),
-                    description = stringResource(R.string.settings_prefer_profile_dns_description),
-                    checked = settings.preferProfileDns,
+                    description = stringResource(
+                        when {
+                            subscriptionDns.provider == null -> R.string.settings_prefer_profile_dns_description
+                            subscriptionDns.override != null -> R.string.settings_prefer_profile_dns_subscription_override
+                            subscriptionDns.provider -> R.string.settings_prefer_profile_dns_forced_on
+                            else -> R.string.settings_prefer_profile_dns_forced_off
+                        },
+                    ),
+                    checked = subscriptionDns.provider?.let { subscriptionDns.override ?: it } ?: settings.preferProfileDns,
                     onCheckedChange = viewModel::setPreferProfileDns,
                 )
             }

@@ -57,6 +57,10 @@ class SubscriptionRepository(
 
     fun observeRequiresHardwareIdForServer(serverId: Long): Flow<Boolean?> = subscriptionDao.observeRequiresHardwareIdForServer(serverId)
 
+    fun observeUseProfileDnsOverrideForServer(serverId: Long): Flow<Boolean?> = subscriptionDao.observeUseProfileDnsOverrideForServer(serverId)
+
+    suspend fun setUseProfileDnsOverrideForServer(serverId: Long, value: Boolean?) = subscriptionDao.setUseProfileDnsOverrideForServer(serverId, value)
+
     data class RefreshResult(
         val subscriptionId: Long,
         val serverIdByConfigJson: Map<String, Long>,

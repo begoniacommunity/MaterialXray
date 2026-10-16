@@ -60,6 +60,7 @@ import com.material.xray.core.data.repository.ProviderRoutingActiveUpdate
 import com.material.xray.core.data.repository.ProviderRoutingCoordinator
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.database.dao.AppBypassDao
 import com.material.xray.core.database.entity.AppRouteAssignment
 import com.material.xray.core.database.entity.AppRouteMode
@@ -139,6 +140,8 @@ class XrayService(
     private val appBypassDao: AppBypassDao by inject()
 
     private val serverRepository: ServerRepository by inject()
+
+    private val subscriptionRepository: SubscriptionRepository by inject()
 
     private val settingsRepo: SettingsRepository by inject()
     private val settingsRuntimeManager: SettingsRuntimeManager by inject()
@@ -487,7 +490,9 @@ class XrayService(
                 )
                 val configJson = intent.getStringExtra(EXTRA_SERVER_CONFIG) ?: return START_NOT_STICKY
                 launchConnectionCommand {
+                    // Home and the tile both connect the selected server.
                     val config = Json.decodeFromString<ServerConfig>(configJson)
+                        .withProfileDnsOverride(settingsRepo.lastServerId.first())
                     connectionLifecycle.updateActiveConfig(config)
                     connectWithCurrentSettings(config)
                 }
@@ -1201,7 +1206,14 @@ class XrayService(
     private suspend fun loadServerConfig(serverId: Long): ServerConfig? {
         if (serverId < 0) return null
         val serverEntity = serverRepository.getById(serverId) ?: return null
-        return runCatching { serverRepository.parseConfig(serverEntity) }.getOrNull()
+        val config = runCatching { serverRepository.parseConfig(serverEntity) }.getOrNull() ?: return null
+        return config.withProfileDnsOverride(serverId)
+    }
+
+    /** The user's per-subscription Prefer profile DNS choice beats the provider's directive. */
+    private suspend fun ServerConfig.withProfileDnsOverride(serverId: Long): ServerConfig {
+        val override = subscriptionRepository.observeUseProfileDnsOverrideForServer(serverId).first() ?: return this
+        return copy(subscriptionUseProfileDns = override)
     }
 
     private fun handleStateSideEffects(state: ConnectionState) {

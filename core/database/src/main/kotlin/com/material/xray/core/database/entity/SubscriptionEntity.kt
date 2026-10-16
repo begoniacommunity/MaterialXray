@@ -25,6 +25,8 @@ data class SubscriptionEntity(
     val supportUrl: String? = null,
     val fallbackUrl: String? = null,
     val requiresHardwareId: Boolean = false,
+    /** The user's Prefer profile DNS choice for this subscription; beats the provider's directive. */
+    val useProfileDnsOverride: Boolean? = null,
     val descriptionHidden: Boolean = false,
     val userAgentMode: String? = null,
     val customUserAgent: String? = null,

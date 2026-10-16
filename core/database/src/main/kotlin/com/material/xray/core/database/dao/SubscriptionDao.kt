@@ -31,6 +31,24 @@ interface SubscriptionDao {
     )
     fun observeRequiresHardwareIdForServer(serverId: Long): Flow<Boolean?>
 
+    @Query(
+        """
+        SELECT subscriptions.useProfileDnsOverride
+        FROM subscriptions
+        INNER JOIN servers ON servers.subscriptionId = subscriptions.id
+        WHERE servers.id = :serverId
+        """,
+    )
+    fun observeUseProfileDnsOverrideForServer(serverId: Long): Flow<Boolean?>
+
+    @Query(
+        """
+        UPDATE subscriptions SET useProfileDnsOverride = :value
+        WHERE id = (SELECT subscriptionId FROM servers WHERE id = :serverId)
+        """,
+    )
+    suspend fun setUseProfileDnsOverrideForServer(serverId: Long, value: Boolean?)
+
     @Insert
     suspend fun insert(sub: SubscriptionEntity): Long
 

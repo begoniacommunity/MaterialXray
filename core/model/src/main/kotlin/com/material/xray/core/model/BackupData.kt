@@ -30,6 +30,7 @@ data class BackupData(
         val customUserAgent: String? = null,
         val customHeaders: String? = null,
         val allowInsecureUpdates: Boolean = false,
+        val useProfileDnsOverride: Boolean? = null,
         val lastUpdated: Long = 0,
         val lastAutoRefreshFailureAt: Long = 0,
         val metadata: SubscriptionMetadata? = null,

@@ -82,6 +82,10 @@ internal object DatabaseValueValidator {
             supportUrl = NULLIF(TRIM(supportUrl), ''),
             fallbackUrl = NULLIF(TRIM(fallbackUrl), ''),
             requiresHardwareId = CASE WHEN requiresHardwareId = 0 THEN 0 ELSE 1 END,
+            useProfileDnsOverride = CASE
+                WHEN useProfileDnsOverride IS NULL OR useProfileDnsOverride IN (0, 1) THEN useProfileDnsOverride
+                ELSE NULL
+            END,
             descriptionHidden = CASE WHEN descriptionHidden = 0 THEN 0 ELSE 1 END,
             userAgentMode = CASE LOWER(TRIM(userAgentMode))
                 WHEN 'auto' THEN 'auto'
@@ -124,6 +128,7 @@ internal object DatabaseValueValidator {
             OR (supportUrl IS NOT NULL AND (TRIM(supportUrl) = '' OR supportUrl != TRIM(supportUrl)))
             OR (fallbackUrl IS NOT NULL AND (TRIM(fallbackUrl) = '' OR fallbackUrl != TRIM(fallbackUrl)))
             OR requiresHardwareId NOT IN (0, 1)
+            OR (useProfileDnsOverride IS NOT NULL AND useProfileDnsOverride NOT IN (0, 1))
             OR descriptionHidden NOT IN (0, 1)
             OR (userAgentMode IS NOT NULL AND userAgentMode != LOWER(TRIM(userAgentMode)))
             OR (userAgentMode IS NOT NULL AND LOWER(TRIM(userAgentMode)) NOT IN ('auto', 'happ', 'custom'))

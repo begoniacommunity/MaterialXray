@@ -135,7 +135,7 @@ subscription-always-hwid-enable: true
 
 ### mxray-use-dns-from-json
 
-Decides whether this subscription's JSON profiles use the `dns` block they carry or the DNS the user set in the app. Send `1`, `true`, `yes` or `on` to use the profile's DNS; send `0`, `false`, `no` or `off` to use the app's. This overrides the user's **Prefer profile DNS** setting for servers from this subscription only. Without the header, or with any other value, that setting applies as usual.
+Decides whether this subscription's JSON profiles use the `dns` block they carry or the DNS the user set in the app. Send `1`, `true`, `yes` or `on` to use the profile's DNS; send `0`, `false`, `no` or `off` to use the app's. This overrides the user's global **Prefer profile DNS** setting for servers from this subscription only. The user can still switch it for this subscription, and that choice wins over the header. Without the header, or with any other value, that setting applies as usual.
 
 ```http
 mxray-use-dns-from-json: 1
