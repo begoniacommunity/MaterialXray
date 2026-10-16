@@ -4,6 +4,7 @@
     <string name="home_subscription_fetch_failed_http">Не удалось загрузить подписку: сервер вернул HTTP %1$d.</string>
     <string name="home_subscription_fetch_failed_empty">Не удалось загрузить подписку: сервер вернул пустой ответ (HTTP %1$d).</string>
     <string name="home_subscription_fetch_failed_unsupported">Не удалось загрузить подписку: ответ не удалось обработать или он не содержит поддерживаемых конфигураций (HTTP %1$d).</string>
+    <string name="home_subscription_fetch_failed_too_large">Не удалось загрузить подписку: ответ больше %1$d МБ.</string>
     <string name="home_subscription_fetch_failed_invalid_url">Не удалось загрузить подписку: некорректный URL.</string>
     <string name="home_subscription_fetch_failed_insecure">Не удалось загрузить подписку: ответ был перенаправлен на небезопасное соединение.</string>
     <string name="home_subscription_fetch_failed_timeout">Не удалось загрузить подписку: время ожидания запроса истекло.</string>

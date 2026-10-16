@@ -7,6 +7,7 @@ import com.material.xray.core.android.locale.forAppLanguage
 import com.material.xray.core.android.locale.localizedString
 import com.material.xray.core.common.connection.ConnectionEvent
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
+import com.material.xray.core.data.parser.MAX_SUBSCRIPTION_BODY_BYTES
 import com.material.xray.core.data.parser.SubscriptionFetchException
 import com.material.xray.core.data.repository.ProviderRoutingAvailability
 import com.material.xray.core.data.repository.ServerRepository
@@ -666,6 +667,11 @@ class HomeViewModel(
             SubscriptionFetchException.Reason.UNSUPPORTED_CONTENT -> context.localizedString(
                 R.string.home_subscription_fetch_failed_unsupported,
                 error.statusCode ?: 0,
+            )
+
+            SubscriptionFetchException.Reason.RESPONSE_TOO_LARGE -> context.localizedString(
+                R.string.home_subscription_fetch_failed_too_large,
+                (MAX_SUBSCRIPTION_BODY_BYTES / (1024 * 1024)).toInt(),
             )
         }
 

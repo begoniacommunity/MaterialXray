@@ -64,6 +64,9 @@ data class FetchedSubscription(
     val routing: SubscriptionRouting? = null,
 )
 
+// Real subscriptions with thousands of nodes stay in the low megabytes.
+const val MAX_SUBSCRIPTION_BODY_BYTES = 16L * 1024 * 1024
+
 class SubscriptionFetchException(
     val reason: Reason,
     val statusCode: Int? = null,
@@ -74,6 +77,7 @@ class SubscriptionFetchException(
         Reason.INSECURE_TRANSPORT -> "Subscription must be fetched over HTTPS"
         Reason.EMPTY_RESPONSE -> "Subscription returned an empty response with HTTP $statusCode"
         Reason.UNSUPPORTED_CONTENT -> "Subscription did not contain any supported configurations"
+        Reason.RESPONSE_TOO_LARGE -> "Subscription response exceeds $MAX_SUBSCRIPTION_BODY_BYTES bytes"
     },
 ) {
     enum class Reason {
@@ -82,6 +86,7 @@ class SubscriptionFetchException(
         INSECURE_TRANSPORT,
         EMPTY_RESPONSE,
         UNSUPPORTED_CONTENT,
+        RESPONSE_TOO_LARGE,
     }
 }
 
@@ -201,7 +206,7 @@ class SubscriptionFetcher(
         return client.newCall(request).execute().use { response ->
             identity.checkHardwareIdConsent(parseMetadata(response.headers).requiresHardwareId, requireHardwareIdConsent)
             if (requireHardwareIdConsent && !identity.sendHardwareId && !response.isSuccessful) {
-                val headers = SubscriptionBodyComments.merge(response.headers, bodyCommentHeaders(response.body.string()))
+                val headers = SubscriptionBodyComments.merge(response.headers, bodyCommentHeaders(response.readCappedBody().orEmpty()))
                 identity.checkHardwareIdConsent(parseMetadata(headers).requiresHardwareId, requireHardwareIdConsent)
             }
             response.requireValidSubscriptionResponse(allowInsecureUpdates)
@@ -291,7 +296,10 @@ class SubscriptionFetcher(
     }
 
     private fun Response.readSubscriptionBody(): String {
-        val bodyText = body.string()
+        val bodyText = readCappedBody() ?: throw SubscriptionFetchException(
+            reason = SubscriptionFetchException.Reason.RESPONSE_TOO_LARGE,
+            statusCode = code,
+        )
         if (bodyText.isBlank()) {
             throw SubscriptionFetchException(
                 reason = SubscriptionFetchException.Reason.EMPTY_RESPONSE,
@@ -299,6 +307,15 @@ class SubscriptionFetcher(
             )
         }
         return bodyText
+    }
+
+    // Reading an unbounded body into a String, and then base64-decoding it, ran low-memory devices
+    // out of heap. string() continues from the bytes request() has already buffered, so it still
+    // handles the charset and BOM. Returns null when the body is over the cap.
+    private fun Response.readCappedBody(): String? {
+        if (body.contentLength() > MAX_SUBSCRIPTION_BODY_BYTES) return null
+        if (body.source().request(MAX_SUBSCRIPTION_BODY_BYTES + 1)) return null
+        return body.string()
     }
 
     private fun HttpUrl.jsonEndpointOrNull(): HttpUrl? {

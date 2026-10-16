@@ -4,6 +4,7 @@
     <string name="home_subscription_fetch_failed_http">Subscription fetch failed: server returned HTTP %1$d.</string>
     <string name="home_subscription_fetch_failed_empty">Subscription fetch failed: server returned an empty response (HTTP %1$d).</string>
     <string name="home_subscription_fetch_failed_unsupported">Subscription fetch failed: response could not be parsed or contained no supported configurations (HTTP %1$d).</string>
+    <string name="home_subscription_fetch_failed_too_large">Subscription fetch failed: the response is larger than %1$d MB.</string>
     <string name="home_subscription_fetch_failed_invalid_url">Subscription fetch failed: the URL is invalid.</string>
     <string name="home_subscription_fetch_failed_insecure">Subscription fetch failed: the response was redirected to an insecure connection.</string>
     <string name="home_subscription_fetch_failed_timeout">Subscription fetch failed: the request timed out.</string>

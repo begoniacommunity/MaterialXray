@@ -8,7 +8,10 @@ import java.util.Base64
  * parser that accepts only one variant silently rejects valid configurations.
  */
 internal fun decodeLenientBase64(value: String): ByteArray? {
-    val sanitized = value.trim().replace(WHITESPACE_REGEX, "")
+    // Both decoders reject any other character anyway. Checking up front means a large plain-text
+    // subscription body fails here without being copied several times first.
+    if (!value.all { it.isBase64Alphabet() || it.isWhitespace() }) return null
+    val sanitized = value.filterNot(Char::isWhitespace)
     if (sanitized.isEmpty()) return null
 
     val candidates = buildList {
@@ -36,4 +39,4 @@ private fun String.padBase64(): String {
     return this + "=".repeat(padding)
 }
 
-private val WHITESPACE_REGEX = "\\s+".toRegex()
+private fun Char.isBase64Alphabet(): Boolean = this in 'A'..'Z' || this in 'a'..'z' || this in '0'..'9' || this in "+/-_="

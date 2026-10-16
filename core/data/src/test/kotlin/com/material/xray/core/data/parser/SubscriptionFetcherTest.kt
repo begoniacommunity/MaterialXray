@@ -28,9 +28,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol as OkHttpProtocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.asResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
+import okio.Buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -436,6 +438,41 @@ class SubscriptionFetcherTest {
     }
 
     @Test
+    fun `fetch rejects oversized responses with a declared length`() = runTest {
+        assertTooLarge(fetcherReturning(body = oversizedBody(), contentType = "text/plain"))
+    }
+
+    @Test
+    fun `fetch rejects oversized responses without a declared length`() = runTest {
+        assertTooLarge(fetcherReturning(body = oversizedBody(), contentType = "text/plain", knownLength = false))
+    }
+
+    @Test
+    fun `fetch accepts responses of unknown length under the cap`() = runTest {
+        val fetcher = fetcherReturning(
+            body = "vless://uuid@example.com:443?encryption=none&type=tcp#One",
+            contentType = "text/plain",
+            knownLength = false,
+        )
+
+        val fetched = fetcher.fetchWithMetadata("https://subscriptions.example/chunked")
+
+        assertEquals(1, fetched.configs.size)
+    }
+
+    private fun oversizedBody(): String = "a".repeat((MAX_SUBSCRIPTION_BODY_BYTES + 1).toInt())
+
+    private suspend fun assertTooLarge(fetcher: SubscriptionFetcher) {
+        val error = runCatching {
+            fetcher.fetchWithMetadata("https://subscriptions.example/huge")
+        }.exceptionOrNull()
+
+        assertTrue(error is SubscriptionFetchException)
+        error as SubscriptionFetchException
+        assertEquals(SubscriptionFetchException.Reason.RESPONSE_TOO_LARGE, error.reason)
+    }
+
+    @Test
     fun `fetch reports responses without supported configurations`() = runTest {
         val fetcher = fetcherReturning(body = "not a subscription", contentType = "text/plain")
 
@@ -691,6 +728,7 @@ class SubscriptionFetcherTest {
         body: String,
         contentType: String,
         statusCode: Int = 200,
+        knownLength: Boolean = true,
     ): SubscriptionFetcher {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
@@ -700,7 +738,13 @@ class SubscriptionFetcherTest {
                     .code(statusCode)
                     .message(if (statusCode == 200) "OK" else "Error")
                     .headers(Headers.headersOf("content-type", contentType))
-                    .body(body.toResponseBody(contentType.toMediaType()))
+                    .body(
+                        if (knownLength) {
+                            body.toResponseBody(contentType.toMediaType())
+                        } else {
+                            Buffer().writeUtf8(body).asResponseBody(contentType.toMediaType(), contentLength = -1)
+                        },
+                    )
                     .build()
             }
             .build()
