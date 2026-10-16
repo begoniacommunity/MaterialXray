@@ -41,6 +41,7 @@ internal class RawConfigTunInjector(
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
         otherVpnDns: OtherVpnDns? = null,
+        systemDnsServers: List<String> = emptyList(),
     ): String {
         val original = Json.parseToJsonElement(rawJson).jsonObject.toMutableMap()
         val profileDns = (original["dns"] as? JsonObject)?.takeIf { preferProfileDns }
@@ -95,6 +96,7 @@ internal class RawConfigTunInjector(
             bypassLan,
             allowIpv6,
             managedOtherVpnDns,
+            systemDnsServers,
         )
         original["api"] = buildStatsApi(
             endpoint = xrayApiEndpoint,
@@ -123,6 +125,7 @@ internal class RawConfigTunInjector(
                 dataInboundTags = effectiveInbounds.map { it.tag },
                 manageDns = profileDns == null,
                 otherVpnDns = managedOtherVpnDns,
+                systemDnsServers = systemDnsServers,
             ),
             raw = rawRouting,
             dataInboundTags = effectiveInbounds.map { it.tag },

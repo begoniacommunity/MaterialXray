@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -553,6 +554,52 @@ class ConnectionManagerTest {
         assertTrue(harness.manager.otherVpnDnsChanged())
         harness.environment.vpnDns = null
         assertTrue(harness.manager.otherVpnDnsChanged())
+    }
+
+    @Test
+    fun `root mode uses the network's resolvers for system DNS and notices when they change`() = runTest {
+        val harness = Harness()
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(dnsServers = ""),
+            preparation = ConnectionPreparation.ReusePreparedRuntime,
+        )
+
+        val servers = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject
+            .getValue("dns").jsonObject.getValue("servers").jsonArray
+        val system = servers.mapNotNull { it as? JsonObject }.single { it["tag"]?.jsonPrimitive?.content == "system-dns" }
+        assertEquals("192.168.1.1", system.getValue("address").jsonPrimitive.content)
+        assertFalse(harness.manager.systemDnsChanged())
+
+        harness.environment.networkDns = listOf("10.0.0.1")
+        assertTrue(harness.manager.systemDnsChanged())
+    }
+
+    @Test
+    fun `configured resolvers do not follow the network's DNS`() = runTest {
+        val harness = Harness()
+
+        harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
+
+        assertFalse(requireNotNull(harness.binary.configJson).contains("192.168.1.1"))
+        harness.environment.networkDns = listOf("10.0.0.1")
+        assertFalse(harness.manager.systemDnsChanged())
+    }
+
+    @Test
+    fun `rootless keeps Android's resolver for system DNS`() = runTest {
+        val harness = Harness()
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(useRootService = false, tunName = "tun0", dnsServers = ""),
+            establishVpnInterface = { null },
+        )
+
+        val config = requireNotNull(harness.binary.configJson)
+        assertFalse(config.contains("192.168.1.1"))
+        assertTrue(config.contains("\"localhost\""))
     }
 
     @Test
@@ -1269,6 +1316,9 @@ class ConnectionManagerTest {
 
         var vpnRoutes: List<String> = emptyList()
         override fun otherVpnRoutes(): List<String> = vpnRoutes
+
+        var networkDns: List<String> = listOf("192.168.1.1")
+        override fun networkDnsServers(): List<String> = networkDns
     }
 
     private class FakeRootRuntime : ConnectionRootRuntime {

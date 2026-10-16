@@ -18,6 +18,7 @@ const val TUN_INBOUND_TAG = "tun-in"
 private const val DEFAULT_DNS_TAG = "default-dns"
 private const val DOMESTIC_DNS_TAG = "domestic-dns"
 private const val OTHER_VPN_DNS_TAG = "other-vpn-dns"
+private const val SYSTEM_DNS_TAG = "system-dns"
 private const val SYSTEM_DNS_SERVER = "localhost"
 
 internal sealed interface XrayRouteTarget {
@@ -34,9 +35,11 @@ fun buildDns(
     bypassLan: Boolean = false,
     allowIpv6: Boolean = false,
     otherVpnDns: OtherVpnDns? = null,
+    systemDnsServers: List<String> = emptyList(),
 ) = buildJsonObject {
     val domesticDomains = directDomains(routingRules, bypassLan)
     val defaultServers = resolveDnsServersForIpv6(servers, allowIpv6).map(String::toReliableXrayDnsAddress)
+    val systemServers = resolveSystemDnsServers(systemDnsServers, allowIpv6)
     if (!allowIpv6) {
         put("queryStrategy", "UseIPv4")
     }
@@ -67,10 +70,19 @@ fun buildDns(
                     },
                 )
             }
-            if (defaultServers.isEmpty()) {
-                add(SYSTEM_DNS_SERVER)
-            } else {
-                defaultServers.forEach { add(it) }
+            when {
+                defaultServers.isNotEmpty() -> defaultServers.forEach { add(it) }
+                systemServers.isEmpty() -> add(SYSTEM_DNS_SERVER)
+                // The network's resolvers are only reachable over the network itself, so they get
+                // a tag of their own that routing sends direct rather than through the proxy.
+                else -> systemServers.forEach { server ->
+                    add(
+                        buildJsonObject {
+                            put("address", server)
+                            put("tag", SYSTEM_DNS_TAG)
+                        },
+                    )
+                }
             }
             if (domesticDomains.isNotEmpty()) {
                 resolveDnsServersForIpv6(domesticServers, allowIpv6)
@@ -104,8 +116,11 @@ internal fun buildRouting(
     dataInboundTags: List<String> = listOf(TUN_INBOUND_TAG),
     manageDns: Boolean = true,
     otherVpnDns: OtherVpnDns? = null,
+    systemDnsServers: List<String> = emptyList(),
 ) = buildJsonObject {
     val hasDomesticDomains = directDomains(routingRules, bypassLan).isNotEmpty()
+    val hasSystemServers = resolveSystemDnsServers(systemDnsServers, allowIpv6).isNotEmpty()
+    val hasDomesticServers = resolveDnsServersForIpv6(domesticDnsServers, allowIpv6).isNotEmpty()
     val forcedRoutes = appProxyRoutes.filterNot { it.applyRoutingRules }
     val matchers = appProxyRoutes.associateWith { it.trafficMatcher(dataInboundTags) }
     // A group that shares the TUN inbound still has to reach the rules below, so only groups with
@@ -138,14 +153,10 @@ internal fun buildRouting(
             // same resolved lists. A stored list that IPv6 filtering empties leaves no tag to route.
             if (manageDns && resolveDnsServersForIpv6(dnsServers, allowIpv6).isNotEmpty()) {
                 add(defaultDnsRoutingRule(defaultRouteTarget))
+            } else if (manageDns && hasSystemServers) {
+                add(systemDnsRoutingRule())
             }
-            if (
-                manageDns &&
-                hasDomesticDomains &&
-                resolveDnsServersForIpv6(domesticDnsServers, allowIpv6).isNotEmpty()
-            ) {
-                add(domesticDnsRoutingRule())
-            }
+            if (manageDns && hasDomesticDomains && hasDomesticServers) add(domesticDnsRoutingRule())
             if (bypassLan) {
                 add(lanIpRoutingRule())
                 add(lanDomainRoutingRule())
@@ -236,6 +247,18 @@ private fun domesticDnsRoutingRule() = buildJsonObject {
     put("inboundTag", buildJsonArray { add(DOMESTIC_DNS_TAG) })
     put("outboundTag", "direct")
 }
+
+private fun systemDnsRoutingRule() = buildJsonObject {
+    put("type", "field")
+    put("inboundTag", buildJsonArray { add(SYSTEM_DNS_TAG) })
+    put("outboundTag", "direct")
+}
+
+/**
+ * The network's resolvers that stand in for [SYSTEM_DNS_SERVER] in root mode. There, Xray's
+ * `localhost` asks Android's resolver, whose queries the firewall sends straight back into Xray.
+ */
+private fun resolveSystemDnsServers(servers: List<String>, allowIpv6: Boolean): List<String> = resolveDnsServersForIpv6(servers.joinToString(","), allowIpv6)
 
 /**
  * Rule fields that select one app group's traffic. A TPROXY group arrives on an inbound of its own;

@@ -592,6 +592,8 @@ class ConnectionManager(
      */
     fun otherVpnDnsChanged(): Boolean = configWriter.otherVpnDnsChanged()
 
+    fun systemDnsChanged(): Boolean = configWriter.systemDnsChanged()
+
     private fun logAppRoutingPlan(appRoutingPlan: AppRoutingPlan) {
         log.append(
             LogSource.APP,

@@ -10,6 +10,7 @@ import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
+import com.material.xray.core.model.resolveDnsServersForIpv6
 import com.material.xray.core.telemetry.ConnectionTelemetryStep
 import com.material.xray.core.xray.ConfigGenerator
 import com.material.xray.core.xray.OtherVpnDns
@@ -135,6 +136,7 @@ internal class XrayConfigWriter(
             fwmark = outboundMark,
             followsOtherVpnDns = followsOtherVpnDns,
             otherVpnDns = if (followsOtherVpnDns) environment.otherVpnDns()?.forIpv6(runtimeSettings.allowIpv6) else null,
+            systemDnsServers = if (usesNetworkDns(managesSystemRouting, xrayServer, runtimeSettings)) environment.networkDnsServers() else null,
             appRoutingPlan = appRoutingPlan,
             physicalRoute = physicalRoute.takeUnless { unboundTproxy },
             xrayApiEndpoint = xrayApiEndpoint,
@@ -160,6 +162,7 @@ internal class XrayConfigWriter(
         )
         log.append(LogSource.APP, "Config written to ${xrayBinary.configPath()} (${configJson.length} chars)")
         generatedConfig.otherVpnDns?.let { log.append(LogSource.APP, "Other VPN DNS: ${it.describe()}") }
+        generatedConfig.systemDnsServers?.let { log.append(LogSource.APP, "Network DNS: ${it.describeDnsServers()}") }
         return generatedConfig
     }
 
@@ -174,6 +177,27 @@ internal class XrayConfigWriter(
         log.append(LogSource.APP, "Other VPN DNS changed: ${config.otherVpnDns.describe()} -> ${current.describe()}")
         return true
     }
+
+    /**
+     * Whether the network's resolvers, which stand in for system DNS in root mode, changed since the
+     * running config was written. Like [otherVpnDnsChanged], only a reconnect picks them up.
+     */
+    fun systemDnsChanged(): Boolean {
+        val config = active ?: return false
+        val previous = config.systemDnsServers ?: return false
+        val current = environment.networkDnsServers()
+        if (current == previous) return false
+        log.append(LogSource.APP, "Network DNS changed: ${previous.describeDnsServers()} -> ${current.describeDnsServers()}")
+        return true
+    }
+
+    /**
+     * Root mode cannot use Xray's `localhost` resolver: it asks Android's, and the firewall sends
+     * those queries back into Xray. An empty DNS list there uses the network's resolvers instead.
+     */
+    private fun usesNetworkDns(managesSystemRouting: Boolean, server: ServerConfig, settings: XrayRuntimeSettings): Boolean = managesSystemRouting &&
+        !configGenerator.usesProfileDns(server, settings.preferProfileDns) &&
+        resolveDnsServersForIpv6(settings.dnsServers, settings.allowIpv6).isEmpty()
 
     /**
      * Regenerates the [active] config with [runtimeSettings]' routing and swaps its routing section
@@ -266,6 +290,7 @@ internal class XrayConfigWriter(
             tunMtu = settings.tunMtu,
             inbounds = config.inbounds,
             otherVpnDns = config.otherVpnDns,
+            systemDnsServers = config.systemDnsServers.orEmpty(),
         )
     }
 
@@ -319,6 +344,8 @@ internal data class GeneratedXrayConfig(
     val fwmark: Int,
     val followsOtherVpnDns: Boolean,
     val otherVpnDns: OtherVpnDns?,
+    /** The network's resolvers standing in for system DNS, or null when the config does not use them. */
+    val systemDnsServers: List<String>? = null,
     val appRoutingPlan: AppRoutingPlan,
     val physicalRoute: TunManager.PhysicalRoute?,
     val xrayApiEndpoint: XrayApiEndpoint,
@@ -327,6 +354,8 @@ internal data class GeneratedXrayConfig(
 )
 
 internal fun XrayRuntimeSettings.usesProxyAsRoutingDefault(): Boolean = (routingFallbackOutbound ?: defaultOutbound) == XrayOutbound.Proxy
+
+private fun List<String>.describeDnsServers(): String = joinToString().ifEmpty { "none" }
 
 private fun OtherVpnDns?.describe(): String = this?.let { "${it.domains.joinToString()} via ${it.servers.joinToString()} (net ${it.netId})" } ?: "none"
 

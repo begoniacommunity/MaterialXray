@@ -44,6 +44,9 @@ interface ConnectionEnvironment {
 
     /** The destinations that VPN routes, default routes included, as "address/length". */
     fun otherVpnRoutes(): List<String> = emptyList()
+
+    /** The resolvers the current physical network hands out, as plain addresses. */
+    fun networkDnsServers(): List<String> = emptyList()
 }
 
 interface ConnectionRootRuntime {

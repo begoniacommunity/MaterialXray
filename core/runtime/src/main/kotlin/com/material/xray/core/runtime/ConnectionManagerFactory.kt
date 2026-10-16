@@ -3,6 +3,7 @@ package com.material.xray.core.runtime
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.RouteInfo
 import android.os.Build
@@ -108,6 +109,24 @@ internal class AndroidConnectionEnvironment(
         // Before Android 13 the route type is hidden, and a VPN cannot exclude routes anyway.
         .filter { Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || it.type == RouteInfo.RTN_UNICAST }
         .mapNotNull { route -> route.destination.address.hostAddress?.let { "$it/${route.destination.prefixLength}" } }
+
+    // Another app's VPN can be the active network in root mode, so it is skipped for the physical
+    // network underneath. Link-local resolvers need a scope Xray cannot express.
+    @Suppress("DEPRECATION") // allNetworks is the only listing of every network, VPNs included.
+    override fun networkDnsServers(): List<String> {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return emptyList()
+        fun Network.capabilities() = connectivityManager.getNetworkCapabilities(this)
+        fun Network.isPhysical() = capabilities()?.let {
+            it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        } == true
+        val network = connectivityManager.activeNetwork?.takeIf { it.isPhysical() }
+            ?: connectivityManager.allNetworks.filter { it.isPhysical() }
+                .maxByOrNull { it.capabilities()?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true }
+            ?: return emptyList()
+        return connectivityManager.getLinkProperties(network)?.dnsServers.orEmpty()
+            .filterNot { it.isLinkLocalAddress }
+            .mapNotNull { it.hostAddress }
+    }
 
     // Android runs one VPN per user. While it is being re-established the old network can linger
     // briefly, so the newest netId wins.

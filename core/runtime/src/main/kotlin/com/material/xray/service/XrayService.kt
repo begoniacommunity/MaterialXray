@@ -1883,8 +1883,13 @@ class XrayService(
         val latestConfig = activeConfig ?: return@runConnectionCommand NetworkRetargetResult.Done
         val latestState = connectionStateCoordinator.state.value as? ConnectionState.Connected
             ?: return@runConnectionCommand NetworkRetargetResult.Done
-        if (connectionManager.otherVpnDnsChanged()) {
-            logBuffer.append(LogSource.APP, "Network changed ($reason), reconnecting to follow the other VPN's DNS")
+        val dnsSource = when {
+            connectionManager.otherVpnDnsChanged() -> "the other VPN's DNS"
+            connectionManager.systemDnsChanged() -> "the network's DNS"
+            else -> null
+        }
+        if (dnsSource != null) {
+            logBuffer.append(LogSource.APP, "Network changed ($reason), reconnecting to follow $dnsSource")
             stopProcessWatchdog()
             connectionStateCoordinator.startConnection(ConnectionState.Connecting)
             restartRuntime(latestConfig)

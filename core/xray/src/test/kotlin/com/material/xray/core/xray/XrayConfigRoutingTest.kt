@@ -41,6 +41,25 @@ class XrayConfigRoutingTest {
     }
 
     @Test
+    fun `network resolvers replace localhost and are routed direct`() {
+        val network = listOf("192.168.1.1", "fd00::1")
+        val dns = buildDns(servers = "", systemDnsServers = network)
+        val routing = buildRouting(routingRules = emptyList(), bypassLan = false, systemDnsServers = network)
+
+        val servers = dns.getValue("servers").jsonArray.map { it.jsonObject }
+        // IPv6 is off by default, so only the IPv4 resolver is kept.
+        assertEquals(listOf("system-dns"), servers.map { it.getValue("tag").jsonPrimitive.content })
+        assertTrue(servers.all { it.getValue("address").jsonPrimitive.content == "192.168.1.1" })
+        val dnsRules = routing.getValue("rules").jsonArray.map { it.jsonObject }.filter { rule ->
+            rule["inboundTag"]?.jsonArray?.any { it.jsonPrimitive.content.endsWith("-dns") } == true
+        }
+        assertEquals(
+            listOf("system-dns" to "direct"),
+            dnsRules.map { it.getValue("inboundTag").jsonArray.single().jsonPrimitive.content to it.getValue("outboundTag").jsonPrimitive.content },
+        )
+    }
+
+    @Test
     fun `buildDns tags configured default servers for routing`() {
         val dns = buildDns(servers = "1.1.1.1, 8.8.8.8, 77.88.8.8, 77.88.8.1")
 

@@ -43,6 +43,7 @@ class ConfigGenerator {
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
         otherVpnDns: OtherVpnDns? = null,
+        systemDnsServers: List<String> = emptyList(),
     ): String {
         val effectiveInbounds = inbounds ?: listOf(XrayInbound.Tun(tunName, TUN_INBOUND_TAG, tunMtu))
         val dataInboundTags = effectiveInbounds.map { it.tag }
@@ -76,12 +77,13 @@ class ConfigGenerator {
                 tunMtu = tunMtu,
                 inbounds = effectiveInbounds,
                 otherVpnDns = otherVpnDns,
+                systemDnsServers = systemDnsServers,
             )
         }
 
         val config = buildJsonObject {
             put("log", buildLogConfig(logLevel))
-            put("dns", buildDns(dnsServers, domesticDnsServers, bootstrapDnsHosts, routingRules, bypassLan, allowIpv6, otherVpnDns))
+            put("dns", buildDns(dnsServers, domesticDnsServers, bootstrapDnsHosts, routingRules, bypassLan, allowIpv6, otherVpnDns, systemDnsServers))
             put(
                 "inbounds",
                 buildJsonArray {
@@ -121,6 +123,7 @@ class ConfigGenerator {
                     allowIpv6 = allowIpv6,
                     dataInboundTags = dataInboundTags,
                     otherVpnDns = otherVpnDns,
+                    systemDnsServers = systemDnsServers,
                 ),
             )
         }
@@ -152,6 +155,7 @@ class ConfigGenerator {
         tunMtu: Int = XrayRuntimeSettings.DEFAULT_TUN_MTU,
         inbounds: List<XrayInbound>? = null,
         otherVpnDns: OtherVpnDns? = null,
+        systemDnsServers: List<String> = emptyList(),
     ): String = RawConfigTunInjector(json).inject(
         rawJson = rawJson,
         tunName = tunName,
@@ -176,6 +180,7 @@ class ConfigGenerator {
         tunMtu = tunMtu,
         inbounds = inbounds,
         otherVpnDns = otherVpnDns,
+        systemDnsServers = systemDnsServers,
     )
 
     /**
