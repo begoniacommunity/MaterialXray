@@ -37,3 +37,4 @@ If the app falls back to rootless mode, or always-on VPN forces it there, the co
 - Every per-app proxy group shares one TUN interface. Each group's routing table gives its traffic a distinct source address, and Xray routes on that address.
 - Outbound connections are bound to the physical interface to avoid routing loops.
 - The service watches Wi-Fi and cellular changes and retargets the connection when the network changes.
+- Xray keeps the SELinux domain of `su`. Where that domain does not let apps connect to it, as with older KernelSU, the app adds that one rule with the root solution's policy tool (`ksud`, `magiskpolicy`, `apd` or `supolicy`) until the next reboot. Without such a tool, use rootless mode.

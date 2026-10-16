@@ -90,6 +90,7 @@ internal class AndroidConnectionEnvironment(
         is ConnectionError.XrayCrashed -> localized(R.string.connection_error_xray_crashed, error.reason)
         is ConnectionError.TunTimeout -> localized(R.string.connection_error_tun_timeout, error.tunName)
         ConnectionError.XrayApiNotReady -> localized(R.string.connection_error_xray_api_not_ready)
+        ConnectionError.CoreSocketBlocked -> localized(R.string.connection_error_core_socket_blocked)
     }
 
     private fun localized(@StringRes resourceId: Int, vararg arguments: Any): String = context.localizedString(resourceId, *arguments)

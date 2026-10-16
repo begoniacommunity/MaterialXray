@@ -229,6 +229,67 @@ class XrayProcessSupervisorTest {
     }
 
     @Test
+    fun `core socket access command is valid shell and adds only the app to core rule`() {
+        val command = coreSocketAccessCommand("u:r:untrusted_app:s0:c20,c257,c512,c768")
+
+        assertEquals(0, ProcessBuilder("sh", "-n", "-c", command).start().waitFor())
+        assertTrue(command.startsWith("app='u:r:untrusted_app:s0:c20,c257,c512,c768'; "))
+        assertTrue(command.contains("rule=\"allow untrusted_app \${type%%:*} unix_stream_socket connectto\""))
+        assertTrue(command.contains("ksud|apd) \"\$tool\" sepolicy patch \"\$rule\""))
+        assertTrue(command.contains("*) \"\$tool\" --live \"\$rule\""))
+    }
+
+    @Test
+    fun `core socket access answers unknown without selinuxfs`() {
+        val command = coreSocketAccessCommand("u:r:untrusted_app:s0:c20,c257,c512,c768")
+        val process = ProcessBuilder("sh", "-c", command).start()
+
+        assertEquals(0, process.waitFor())
+        // Build machines have no Android selinuxfs class layout.
+        assertEquals("unknown", process.inputStream.bufferedReader().readText().trim())
+    }
+
+    @Test
+    fun `core socket access is checked once and patching is logged`() = runTest {
+        val commands = FakeRootCommandRunner(
+            resultForCommand = { RootShell.Result(exitCode = 0, output = "patched ksud\n", error = "") },
+        )
+        val log = LogBuffer()
+        val supervisor = supervisor(commandRunner = commands, log = log)
+
+        assertTrue(supervisor.ensureCoreSocketAccess())
+        assertTrue(supervisor.ensureCoreSocketAccess())
+
+        assertEquals(1, commands.commands.size)
+        assertTrue(log.entries.value.any { it.message.contains("with ksud") })
+    }
+
+    @Test
+    fun `core socket access fails when no tool can add the rule`() = runTest {
+        val commands = FakeRootCommandRunner(
+            resultForCommand = {
+                RootShell.Result(exitCode = 0, output = "denied allow untrusted_app su unix_stream_socket connectto", error = "")
+            },
+        )
+        val log = LogBuffer()
+        val supervisor = supervisor(commandRunner = commands, log = log)
+
+        assertFalse(supervisor.ensureCoreSocketAccess())
+        assertFalse(supervisor.ensureCoreSocketAccess())
+
+        assertEquals(2, commands.commands.size)
+        assertTrue(log.entries.value.any { it.message.contains("allow untrusted_app su unix_stream_socket connectto") })
+    }
+
+    @Test
+    fun `core socket access is skipped without an app context`() = runTest {
+        val commands = FakeRootCommandRunner()
+
+        assertTrue(supervisor(environment = FakeRuntimeEnvironment(selinuxContext = null), commandRunner = commands).ensureCoreSocketAccess())
+        assertTrue(commands.commands.isEmpty())
+    }
+
+    @Test
     fun `user process stop waits for graceful exit`() = runTest {
         val launcher = FakeUserXrayProcessLauncher(
             alive = { pid, killedSignals -> pid == 42 && 15 !in killedSignals },
@@ -360,6 +421,7 @@ class XrayProcessSupervisorTest {
         override val packageName: String = "com.material.xray",
         override val packageUid: Int = 12345,
         override val memoryPageSizeKb: Long? = 4L,
+        override val selinuxContext: String? = "u:r:untrusted_app:s0:c20,c257,c512,c768",
         private val ignoringBatteryOptimizations: Boolean = true,
         private val lowPowerStandbyExempt: Boolean = false,
     ) : XrayRuntimeEnvironment {

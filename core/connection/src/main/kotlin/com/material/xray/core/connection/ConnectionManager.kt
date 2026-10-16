@@ -432,6 +432,10 @@ class ConnectionManager(
         } else {
             processSupervisor.ensureNativeRuntimeExemptions()
         }
+        if (!processSupervisor.ensureCoreSocketAccess()) {
+            fail(environment.describe(ConnectionError.CoreSocketBlocked))
+            return false
+        }
         return true
     }
 

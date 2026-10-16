@@ -41,6 +41,9 @@ internal interface XrayRuntimeEnvironment {
     val packageUid: Int
     val memoryPageSizeKb: Long?
 
+    /** The app's own SELinux context, such as `u:r:untrusted_app:s0:c20,c257,c512,c768`. */
+    val selinuxContext: String?
+
     fun isIgnoringBatteryOptimizations(): Boolean?
     fun isExemptFromLowPowerStandby(): Boolean?
 }
@@ -62,6 +65,12 @@ internal class AndroidXrayRuntimeEnvironment(
             .getOrNull()
             ?.takeIf { it > 0L && it % BYTES_PER_KILOBYTE == 0L }
             ?.div(BYTES_PER_KILOBYTE)
+    }
+
+    override val selinuxContext: String? by lazy {
+        runCatching { File("/proc/self/attr/current").readText().trimEnd('\u0000', '\n') }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
     }
 
     override fun isIgnoringBatteryOptimizations(): Boolean? = context.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName)
@@ -170,6 +179,41 @@ internal class XrayProcessSupervisor(
     override suspend fun readCrashReason(lines: Int): String {
         val crashLog = commandRunner.execute("tail -n $lines ${shellQuote(logFile)} 2>/dev/null").output.trim()
         return crashLog.lines().lastOrNull { it.isNotBlank() } ?: "xray process exited"
+    }
+
+    // The policy only changes at boot, or when this check itself patches it.
+    @Volatile
+    private var coreSocketAccessConfirmed = false
+
+    override suspend fun ensureCoreSocketAccess(): Boolean {
+        if (coreSocketAccessConfirmed) return true
+        val appContext = environment.selinuxContext
+        if (appContext == null || !SELINUX_CONTEXT.matches(appContext)) {
+            log.append(LogSource.APP, "SELinux core socket check skipped: unknown app context")
+            return true
+        }
+        val result = commandRunner.execute(coreSocketAccessCommand(appContext))
+        val verdict = result.output.trim()
+        when {
+            verdict == "allowed" -> coreSocketAccessConfirmed = true
+            verdict.startsWith("patched ") -> {
+                log.append(LogSource.APP, "Allowed the app to reach the core's sockets with ${verdict.removePrefix("patched ")}")
+                coreSocketAccessConfirmed = true
+            }
+            verdict.startsWith("denied ") -> {
+                log.append(
+                    LogSource.APP,
+                    "SELinux blocks the app from the core's sockets and no policy tool could add: ${verdict.removePrefix("denied ")}",
+                )
+                return false
+            }
+            // Without selinuxfs there is nothing to ask; the API readiness check still catches a block.
+            else -> log.append(
+                LogSource.APP,
+                "SELinux core socket check unavailable${result.error.trim().takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()}",
+            )
+        }
+        return true
     }
 
     override suspend fun ensureNativeRuntimeExemptions() {
@@ -471,6 +515,38 @@ internal const val XRAY_CERTIFICATE_BUNDLE_FILE = "xray-ca-certificates.pem"
  * system one, which the app-standby and background firewall chains always let through.
  */
 internal const val ROOT_CORE_UID = 9990
+
+private val SELINUX_CONTEXT = Regex("[a-z]+:[a-z]+:[a-z0-9_]+:[a-z0-9:,.-]+")
+
+/**
+ * The core keeps the root shell's SELinux domain, and its sockets are of that domain. KernelSU's own
+ * `ksu` domain lets apps connect to them; the `su` domain of older KernelSU, or of other root
+ * solutions, may not. This asks the kernel through selinuxfs, adds the one missing rule with
+ * whichever policy tool the root solution ships, and prints `allowed`, `patched <tool>`,
+ * `denied <rule>` or `unknown`.
+ */
+internal fun coreSocketAccessCommand(appContext: String): String = buildString {
+    val appType = appContext.split(':')[2]
+    append("app=${shellQuote(appContext)}; cls=/sys/fs/selinux/class/unix_stream_socket; ")
+    append("[ \"\$(cat /sys/fs/selinux/enforce 2>/dev/null)\" = 0 ] && { echo allowed; exit 0; }; ")
+    append("core=\$(tr -d '\\0' < /proc/self/attr/current 2>/dev/null); ")
+    append("index=\$(cat \$cls/index 2>/dev/null); bit=\$(cat \$cls/perms/connectto 2>/dev/null); ")
+    append("[ -n \"\$core\" ] && [ -n \"\$index\" ] && [ -n \"\$bit\" ] || { echo unknown; exit 0; }; ")
+    // Prints "allowed decided auditallow auditdeny seqno flags" in hex; flag 1 marks a permissive domain.
+    append("allowed() { av=''; exec 3<>/sys/fs/selinux/access || return 2; ")
+    append("printf '%s %s %s' \"\$app\" \"\$core\" \"\$index\" >&3 && read -r av _ _ _ _ flags <&3; exec 3>&-; ")
+    append("[ -n \"\$av\" ] || return 2; ")
+    append("[ \$(( (0x\$av >> (bit - 1)) & 1 )) = 1 ] || [ \$(( 0x\${flags:-0} & 1 )) = 1 ]; }; ")
+    append("allowed; status=\$?; ")
+    append("[ \$status = 0 ] && { echo allowed; exit 0; }; [ \$status = 2 ] && { echo unknown; exit 0; }; ")
+    append("type=\${core#*:*:}; rule=\"allow $appType \${type%%:*} unix_stream_socket connectto\"; ")
+    append("for tool in ksud /data/adb/ksud apd /data/adb/apd magiskpolicy supolicy; do ")
+    append("command -v \"\$tool\" >/dev/null 2>&1 || continue; ")
+    append("case \${tool##*/} in ksud|apd) \"\$tool\" sepolicy patch \"\$rule\";; *) \"\$tool\" --live \"\$rule\";; esac >/dev/null 2>&1 || continue; ")
+    append("allowed && { echo \"patched \${tool##*/}\"; exit 0; }; ")
+    append("done; ")
+    append("echo \"denied \$rule\"")
+}
 
 /**
  * Defines `is_owned <pid>`, true for this app's root-mode core. A sandboxed core runs as

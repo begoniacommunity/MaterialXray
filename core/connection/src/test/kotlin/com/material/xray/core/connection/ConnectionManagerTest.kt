@@ -891,6 +891,19 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `root connection fails before launch when SELinux blocks the core sockets`() = runTest {
+        val harness = Harness().apply { rootProcess.coreSocketAccess = false }
+
+        harness.manager.connect(server(), runtimeSettings(), preparation = ConnectionPreparation.ReusePreparedRuntime)
+
+        assertEquals(
+            ConnectionState.Error(harness.environment.message(ConnectionError.CoreSocketBlocked::class)),
+            harness.stateCoordinator.state.value,
+        )
+        assertEquals(0, harness.rootProcess.startCalls)
+    }
+
+    @Test
     fun `connection is not published before Xray API readiness`() = runTest {
         val harness = Harness().apply { apiClients.sysStats = null }
 
@@ -1524,6 +1537,7 @@ class ConnectionManagerTest {
         var crashReason = "process failed"
         var alive = true
         var lastTun: RootTunDevice? = null
+        var coreSocketAccess = true
 
         override suspend fun prepareLogFile() = Unit
 
@@ -1538,6 +1552,7 @@ class ConnectionManagerTest {
         override suspend fun readResidentMemoryMb(pid: Int): Long = 1
         override suspend fun readCrashReason(lines: Int): String = crashReason
         override suspend fun ensureNativeRuntimeExemptions() = Unit
+        override suspend fun ensureCoreSocketAccess(): Boolean = coreSocketAccess
     }
 
     private class FakeUserProcess : UserXrayProcessController {

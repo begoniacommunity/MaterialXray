@@ -30,4 +30,7 @@ sealed interface ConnectionError {
     data class TunTimeout(val tunName: String) : ConnectionError
 
     data object XrayApiNotReady : ConnectionError
+
+    /** SELinux keeps the app off the root core's sockets and nothing on the device can lift that. */
+    data object CoreSocketBlocked : ConnectionError
 }

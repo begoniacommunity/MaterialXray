@@ -20,6 +20,12 @@ interface RootXrayProcessController : XrayProcessProbe {
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
     suspend fun ensureNativeRuntimeExemptions()
+
+    /**
+     * Makes sure SELinux lets the app connect to the core's Unix sockets, patching the live policy
+     * when the root solution's domain does not. False when they stay blocked.
+     */
+    suspend fun ensureCoreSocketAccess(): Boolean
 }
 
 interface UserXrayProcessController : XrayProcessProbe {

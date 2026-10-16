@@ -12,6 +12,7 @@
     <string name="connection_error_server_address_unresolved">Could not resolve %1$s before starting Xray</string>
     <string name="connection_error_xray_crashed">Xray crashed: %1$s</string>
     <string name="connection_error_xray_api_not_ready">Xray control API did not become ready</string>
+    <string name="connection_error_core_socket_blocked">SELinux keeps the app from reaching Xray in root mode, and the root solution offers no way to allow it. Use VPN mode instead</string>
     <string name="connection_error_tun_timeout">TUN interface %1$s did not come up within the time limit</string>
     <string name="connection_error_apply_ip_routing">Failed to apply IP routing: %1$s</string>
     <string name="connection_error_cleanup_failed">Could not fully stop the previous Xray runtime</string>
