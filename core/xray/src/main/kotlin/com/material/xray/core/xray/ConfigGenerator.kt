@@ -57,7 +57,7 @@ class ConfigGenerator {
                 fwmark = fwmark,
                 dnsServers = dnsServers,
                 domesticDnsServers = domesticDnsServers,
-                preferProfileDns = preferProfileDns,
+                preferProfileDns = server.subscriptionUseProfileDns ?: preferProfileDns,
                 syntheticDnsAddress = syntheticDnsAddress,
                 bootstrapDnsHosts = bootstrapDnsHosts,
                 logLevel = logLevel,
@@ -249,7 +249,7 @@ class ConfigGenerator {
     }
 
     /** Whether a raw profile's own DNS replaces the generated one, which leaves another VPN's zone out. */
-    fun usesProfileDns(server: ServerConfig, preferProfileDns: Boolean): Boolean = preferProfileDns &&
+    fun usesProfileDns(server: ServerConfig, preferProfileDns: Boolean): Boolean = (server.subscriptionUseProfileDns ?: preferProfileDns) &&
         server.rawConfigJson.isNotBlank() &&
         runCatching { json.parseToJsonElement(server.rawConfigJson).jsonObject["dns"] is JsonObject }.getOrDefault(false)
 

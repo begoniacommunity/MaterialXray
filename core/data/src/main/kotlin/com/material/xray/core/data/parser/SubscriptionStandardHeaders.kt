@@ -40,6 +40,7 @@ object SubscriptionStandardHeaders {
     const val PER_APP_PROXY_LIST_INVERT = "per-app-proxy-list-invert"
     const val ROUTING = "routing"
     const val ROUTING_ENABLE = "routing-enable"
+    const val MXRAY_USE_DNS_FROM_JSON = "mxray-use-dns-from-json"
 
     val requestHeaderNames: List<String> = listOf(
         USER_AGENT,
@@ -67,6 +68,7 @@ object SubscriptionStandardHeaders {
         PER_APP_PROXY_LIST_INVERT,
         ROUTING,
         ROUTING_ENABLE,
+        MXRAY_USE_DNS_FROM_JSON,
     )
 
     fun applyRequestHeaders(
@@ -192,5 +194,14 @@ object SubscriptionStandardHeaders {
 
     private const val BASE64_PREFIX = "base64:"
     private val PACKAGE_LIST_SEPARATOR_REGEX = "[,;\\s]+".toRegex()
-    private val TRUTHY_HEADER_VALUES = setOf("1", "true", "yes", "on")
+}
+
+private val TRUTHY_HEADER_VALUES = setOf("1", "true", "yes", "on")
+private val FALSY_HEADER_VALUES = setOf("0", "false", "no", "off")
+
+/** The provider's choice between a JSON profile's own DNS and the app's; null leaves it to the user. */
+fun parseUseProfileDnsHeader(headers: Headers): Boolean? = when (SubscriptionStandardHeaders.normalizeNullableHeader(headers[SubscriptionStandardHeaders.MXRAY_USE_DNS_FROM_JSON])?.lowercase()) {
+    in TRUTHY_HEADER_VALUES -> true
+    in FALSY_HEADER_VALUES -> false
+    else -> null
 }

@@ -46,7 +46,7 @@ A full Xray configuration object, or an array of them. Each one becomes a server
 
 - The server name comes from `remarks`, `remark` or `name`.
 - The outbound tagged `proxy` drives the summary (protocol, address, transport) shown in the list. Without one, the client uses the first non-special outbound.
-- Routing inside a profile shows up as **Server-specific** rules on the Routing tab. DNS inside a profile is used when the user turns on **Prefer profile DNS**.
+- Routing inside a profile shows up as **Server-specific** rules on the Routing tab. DNS inside a profile is used when the user turns on **Prefer profile DNS**, or when the provider sends [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json).
 
 ## JSON first
 

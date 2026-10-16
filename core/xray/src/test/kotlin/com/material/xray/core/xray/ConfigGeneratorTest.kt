@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -54,6 +55,23 @@ class ConfigGeneratorTest {
             assertEquals(generator.generate(rawServer), generator.generate(rawServer, preferProfileDns = true))
         }
         assertEquals(generator.generate(vlessReality), generator.generate(vlessReality, preferProfileDns = true))
+    }
+
+    @Test
+    fun `subscription DNS directive overrides the profile DNS preference`() {
+        val rawServer = vlessReality.copy(
+            rawConfigJson = """{"dns":{"servers":["9.9.9.9"]},"outbounds":[{"tag":"proxy","protocol":"vless","settings":{}}]}""",
+        )
+        fun dnsTag(server: ServerConfig, preferProfileDns: Boolean) = Json.parseToJsonElement(generator.generate(server, preferProfileDns = preferProfileDns))
+            .jsonObject.getValue("dns").jsonObject["tag"]?.jsonPrimitive?.content
+
+        for (preferProfileDns in listOf(false, true)) {
+            assertNull(dnsTag(rawServer.copy(subscriptionUseProfileDns = true), preferProfileDns))
+            assertEquals("default-dns", dnsTag(rawServer.copy(subscriptionUseProfileDns = false), preferProfileDns))
+        }
+        assertTrue(generator.usesProfileDns(rawServer.copy(subscriptionUseProfileDns = true), preferProfileDns = false))
+        assertFalse(generator.usesProfileDns(rawServer.copy(subscriptionUseProfileDns = false), preferProfileDns = true))
+        assertTrue(generator.usesProfileDns(rawServer, preferProfileDns = true))
     }
 
     @Test

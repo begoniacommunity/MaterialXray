@@ -176,6 +176,37 @@ class SubscriptionFetcherTest {
     }
 
     @Test
+    fun `parse use profile dns header is tri-state`() {
+        fun parse(value: String?) = parseUseProfileDnsHeader(
+            if (value == null) Headers.headersOf() else Headers.headersOf("mxray-use-dns-from-json", value),
+        )
+
+        assertEquals(true, parse(" 1 "))
+        assertEquals(true, parse("TRUE"))
+        assertEquals(false, parse("0"))
+        assertEquals(false, parse("off"))
+        assertNull(parse("maybe"))
+        assertNull(parse(""))
+        assertNull(parse(null))
+    }
+
+    @Test
+    fun `fetch stamps the dns directive on every config`() = runTest {
+        val body = """
+            #mxray-use-dns-from-json: 1
+            vless://uuid@example.com:443?encryption=none&type=tcp#One
+            vless://uuid@example.org:443?encryption=none&type=tcp#Two
+        """.trimIndent()
+
+        val configs = fetcherReturning(body, contentType = "text/plain").fetchWithMetadata("https://subscriptions.example/sub").configs
+
+        assertEquals(listOf(true, true), configs.map { it.subscriptionUseProfileDns })
+        val plain = fetcherReturning("vless://uuid@example.com:443?encryption=none&type=tcp#One", contentType = "text/plain")
+            .fetchWithMetadata("https://subscriptions.example/sub").configs
+        assertNull(plain.single().subscriptionUseProfileDns)
+    }
+
+    @Test
     fun `parse metadata reads url replacement headers`() {
         val metadata = SubscriptionStandardHeaders.parseMetadata(
             Headers.headersOf(

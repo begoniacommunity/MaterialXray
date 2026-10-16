@@ -19,6 +19,7 @@ Material Xray reads the following headers from a subscription response. Names ar
 | [`new-domain`](#new-domain) | Permanently move to a new host |
 | [`fallback-url`](#fallback-url) | Backup endpoint |
 | [`subscription-always-hwid-enable`](#subscription-always-hwid-enable) | Require a hardware ID |
+| [`mxray-use-dns-from-json`](#mxray-use-dns-from-json) | Use or ignore the DNS inside JSON profiles |
 | [`routing`](/docs/providers/routing-header/) | Routing rules |
 | [`routing-enable`](/docs/providers/routing-header/#routing-enable) | Turn routing import off |
 | [`per-app-proxy-mode`](/docs/providers/per-app-routing/) | Per-app routing mode |
@@ -129,6 +130,18 @@ Send `1`, `true`, `yes` or `on` to require a hardware ID. When the user has turn
 ```http
 subscription-always-hwid-enable: true
 ```
+
+## DNS
+
+### mxray-use-dns-from-json
+
+Decides whether this subscription's JSON profiles use the `dns` block they carry or the DNS the user set in the app. Send `1`, `true`, `yes` or `on` to use the profile's DNS; send `0`, `false`, `no` or `off` to use the app's. This overrides the user's **Prefer profile DNS** setting for servers from this subscription only. Without the header, or with any other value, that setting applies as usual.
+
+```http
+mxray-use-dns-from-json: 1
+```
+
+Profiles without a `dns` object, and non-JSON servers, always use the app's DNS. Servers the user guarded keep the value from the last refresh before they were guarded.
 
 ## Body comments
 

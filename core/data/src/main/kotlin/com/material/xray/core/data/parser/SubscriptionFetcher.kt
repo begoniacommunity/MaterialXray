@@ -215,10 +215,11 @@ class SubscriptionFetcher(
             )
             val metadata = parseMetadata(headers)
             identity.checkHardwareIdConsent(metadata.requiresHardwareId, requireHardwareIdConsent)
+            val useProfileDns = parseUseProfileDnsHeader(headers)
             val configs = parseSubscriptionBody(
                 body = bodyText,
                 contentType = metadata.contentType,
-            )
+            ).map { it.copy(subscriptionUseProfileDns = useProfileDns) }
 
             if (configs.isEmpty()) {
                 throw SubscriptionFetchException(
