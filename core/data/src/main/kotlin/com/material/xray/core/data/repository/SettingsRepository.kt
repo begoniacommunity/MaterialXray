@@ -168,7 +168,7 @@ class SettingsRepository(
         // Spelled as presets rather than literals so the shipped default is always one the DNS
         // screen can name back to the user.
         val DEFAULT_DNS_SERVERS = DnsPreset.Cloudflare.servers(encrypted = true)
-        val DEFAULT_DOMESTIC_DNS_SERVERS = DnsPreset.Yandex.servers(encrypted = false)
+        val DEFAULT_DOMESTIC_DNS_SERVERS = DnsPreset.System.servers(encrypted = false)
         const val DEFAULT_PASSIVE_HEALTH_MONITORING_ENABLED = true
         const val DEFAULT_TUN_NAME = ""
     }

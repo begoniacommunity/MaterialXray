@@ -15,7 +15,7 @@ class SettingsDnsDefaultsTest {
     fun `the shipped defaults are presets the DNS screen can name`() {
         assertEquals(DnsPreset.Cloudflare, dnsPresetFor(SettingsRepository.DEFAULT_DNS_SERVERS))
         assertTrue(isEncryptedDnsValue(SettingsRepository.DEFAULT_DNS_SERVERS))
-        assertEquals(DnsPreset.Yandex, dnsPresetFor(SettingsRepository.DEFAULT_DOMESTIC_DNS_SERVERS))
+        assertEquals(DnsPreset.System, dnsPresetFor(SettingsRepository.DEFAULT_DOMESTIC_DNS_SERVERS))
         assertNull(canonicalDnsServers(SettingsRepository.DEFAULT_DNS_SERVERS))
         assertNull(canonicalDnsServers(SettingsRepository.DEFAULT_DOMESTIC_DNS_SERVERS))
     }

@@ -76,6 +76,4 @@
     <string name="dns_preset_yandex_description">77.88.8.8. Близко к российским сетям.</string>
     <string name="dns_preset_custom_label">Свои</string>
     <string name="dns_preset_custom_description">Ввести адреса серверов вручную.</string>
-    <string name="dns_preset_direct_none_label">Как для проксируемых</string>
-    <string name="dns_preset_direct_none_description">Отдельного сервера нет. Прямые имена идут через выбранный выше.</string>
 </resources>

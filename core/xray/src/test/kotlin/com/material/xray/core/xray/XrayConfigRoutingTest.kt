@@ -41,20 +41,30 @@ class XrayConfigRoutingTest {
     }
 
     @Test
+    fun `buildDns sends direct domains to the system resolver when the direct list is empty`() {
+        val dns = buildDns(servers = "1.1.1.1", routingRules = listOf(directRule()), bypassLan = true)
+
+        val domestic = dns.getValue("servers").jsonArray.mapNotNull { it as? JsonObject }.single()
+        assertEquals("localhost", domestic.getValue("address").jsonPrimitive.content)
+        assertEquals("domestic-dns", domestic.getValue("tag").jsonPrimitive.content)
+        assertTrue("domain:example" in domestic.getValue("domains").jsonArray.map { it.jsonPrimitive.content })
+    }
+
+    @Test
     fun `network resolvers replace localhost and are routed direct`() {
         val network = listOf("192.168.1.1", "fd00::1")
-        val dns = buildDns(servers = "", systemDnsServers = network)
-        val routing = buildRouting(routingRules = emptyList(), bypassLan = false, systemDnsServers = network)
+        val dns = buildDns(servers = "", routingRules = listOf(directRule()), bypassLan = true, systemDnsServers = network)
+        val routing = buildRouting(routingRules = listOf(directRule()), bypassLan = true, systemDnsServers = network)
 
         val servers = dns.getValue("servers").jsonArray.map { it.jsonObject }
         // IPv6 is off by default, so only the IPv4 resolver is kept.
-        assertEquals(listOf("system-dns"), servers.map { it.getValue("tag").jsonPrimitive.content })
+        assertEquals(listOf("system-dns", "domestic-dns"), servers.map { it.getValue("tag").jsonPrimitive.content })
         assertTrue(servers.all { it.getValue("address").jsonPrimitive.content == "192.168.1.1" })
         val dnsRules = routing.getValue("rules").jsonArray.map { it.jsonObject }.filter { rule ->
             rule["inboundTag"]?.jsonArray?.any { it.jsonPrimitive.content.endsWith("-dns") } == true
         }
         assertEquals(
-            listOf("system-dns" to "direct"),
+            listOf("system-dns" to "direct", "domestic-dns" to "direct"),
             dnsRules.map { it.getValue("inboundTag").jsonArray.single().jsonPrimitive.content to it.getValue("outboundTag").jsonPrimitive.content },
         )
     }
@@ -145,7 +155,9 @@ class XrayConfigRoutingTest {
         )
 
         assertTrue("tag" !in dns)
-        assertEquals("localhost", dns.getValue("servers").jsonArray.single().jsonPrimitive.content)
+        val servers = dns.getValue("servers").jsonArray
+        assertEquals("localhost", servers.first().jsonPrimitive.content)
+        assertEquals("localhost", servers.drop(1).single().jsonObject.getValue("address").jsonPrimitive.content)
         val inboundTags = routing.getValue("rules").jsonArray.flatMap { rule ->
             rule.jsonObject["inboundTag"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
         }

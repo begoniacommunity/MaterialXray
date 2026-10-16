@@ -142,11 +142,9 @@ fun DnsSettingsScreen(
                     title = stringResource(R.string.settings_dns_direct_title),
                     description = stringResource(R.string.settings_dns_direct_description),
                     servers = settings.domesticDnsServers,
-                    // An empty direct list adds no resolver of its own, so these names fall through
-                    // to the proxied list above. That is not the network's resolver, so it cannot
-                    // borrow the label the primary list uses for the same empty value.
-                    emptyLabel = stringResource(R.string.dns_preset_direct_none_label),
-                    emptyDescription = stringResource(R.string.dns_preset_direct_none_description),
+                    // An empty direct list asks the network's own resolver, as the primary list does.
+                    emptyLabel = stringResource(R.string.dns_preset_system_label),
+                    emptyDescription = stringResource(R.string.dns_preset_system_description),
                     onServersChange = viewModel::setDomesticDnsServers,
                 )
             }

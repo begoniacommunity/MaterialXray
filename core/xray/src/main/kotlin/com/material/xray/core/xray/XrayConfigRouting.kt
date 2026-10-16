@@ -85,8 +85,10 @@ fun buildDns(
                 }
             }
             if (domesticDomains.isNotEmpty()) {
+                // Like the default list, an empty direct list means the network's own resolver.
                 resolveDnsServersForIpv6(domesticServers, allowIpv6)
                     .map(String::toReliableXrayDnsAddress)
+                    .ifEmpty { systemServers.ifEmpty { listOf(SYSTEM_DNS_SERVER) } }
                     .forEach { domesticServer ->
                         add(
                             buildJsonObject {
@@ -120,7 +122,8 @@ internal fun buildRouting(
 ) = buildJsonObject {
     val hasDomesticDomains = directDomains(routingRules, bypassLan).isNotEmpty()
     val hasSystemServers = resolveSystemDnsServers(systemDnsServers, allowIpv6).isNotEmpty()
-    val hasDomesticServers = resolveDnsServersForIpv6(domesticDnsServers, allowIpv6).isNotEmpty()
+    // An empty direct list still gets a resolver: the system one, through these servers or localhost.
+    val hasDomesticServers = resolveDnsServersForIpv6(domesticDnsServers, allowIpv6).isNotEmpty() || hasSystemServers
     val forcedRoutes = appProxyRoutes.filterNot { it.applyRoutingRules }
     val matchers = appProxyRoutes.associateWith { it.trafficMatcher(dataInboundTags) }
     // A group that shares the TUN inbound still has to reach the rules below, so only groups with

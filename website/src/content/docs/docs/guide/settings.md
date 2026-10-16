@@ -28,7 +28,7 @@ If root access is unavailable, **Use root service** shows a **Retry** button. Gr
 Xray answers every port-53 query itself, so names routed through the proxy are never looked up on the network you're on.
 
 - **Proxied domains**: the resolver for every name routed through the proxy.
-- **Direct domains**: the resolver for LAN hosts and direct rules. These queries leave over your normal connection.
+- **Direct domains**: the resolver for LAN hosts and direct rules. These queries leave over your normal connection. The default, **System**, uses the resolver of the network you're on. In rootless mode it goes through Android, so it also follows your Private DNS setting. In root mode it asks the network's resolvers directly and reconnects when they change.
 - **Encrypt queries**: use encrypted DNS.
 - **Prefer profile DNS**: when a JSON profile defines its own DNS, use it. A subscription can override this for its own servers with [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json). While the selected server comes from such a subscription, the toggle shows the provider's choice, and switching it changes the choice for that subscription only.
 

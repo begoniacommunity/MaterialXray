@@ -89,6 +89,4 @@
     <string name="dns_preset_yandex_description">77.88.8.8. Close to Russian networks.</string>
     <string name="dns_preset_custom_label">Custom</string>
     <string name="dns_preset_custom_description">Enter resolver addresses yourself.</string>
-    <string name="dns_preset_direct_none_label">Same as proxied</string>
-    <string name="dns_preset_direct_none_description">No separate resolver. Direct names use the proxied one above.</string>
 </resources>

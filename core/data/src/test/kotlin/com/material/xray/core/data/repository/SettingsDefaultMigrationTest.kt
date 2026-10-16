@@ -2,6 +2,7 @@ package com.material.xray.core.data.repository
 
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.material.xray.core.model.DnsPreset
 import com.material.xray.core.model.RoutingPolicyControl
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -140,7 +141,7 @@ class SettingsDefaultMigrationTest {
         val preferences = mutablePreferencesOf(
             SETTINGS_DEFAULTS_REVISION to 5,
             SettingsRepository.DNS_SERVERS to "https://8.8.8.8/dns-query,https://8.8.4.4/dns-query",
-            SettingsRepository.DOMESTIC_DNS_SERVERS to "77.88.8.8,77.88.8.1",
+            SettingsRepository.DOMESTIC_DNS_SERVERS to "94.140.14.14,94.140.15.15",
         )
 
         val migrated = SettingsDefaultMigration().migrate(preferences)
@@ -151,10 +152,26 @@ class SettingsDefaultMigrationTest {
             migrated[SettingsRepository.DNS_SERVERS],
         )
         assertEquals(
-            "77.88.8.8,77.88.8.1,2a02:6b8::feed:0ff,2a02:6b8:0:1::feed:0ff",
+            "94.140.14.14,94.140.15.15,2a10:50c0::ad1:ff,2a10:50c0::ad2:ff",
             migrated[SettingsRepository.DOMESTIC_DNS_SERVERS],
         )
         assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
+    }
+
+    @Test
+    fun `the retired Yandex direct default gives way to the system resolver`() = runTest {
+        suspend fun migrate(stored: String) = SettingsDefaultMigration().migrate(
+            mutablePreferencesOf(
+                SETTINGS_DEFAULTS_REVISION to 11,
+                SettingsRepository.DOMESTIC_DNS_SERVERS to stored,
+            ),
+        )[SettingsRepository.DOMESTIC_DNS_SERVERS]
+
+        assertNull(migrate(DnsPreset.Yandex.servers(encrypted = false)))
+        val encryptedYandex = DnsPreset.Yandex.servers(encrypted = true)
+        assertEquals(encryptedYandex, migrate(encryptedYandex))
+        assertEquals("", migrate(""))
+        assertEquals("192.0.2.53", migrate("192.0.2.53"))
     }
 
     @Test

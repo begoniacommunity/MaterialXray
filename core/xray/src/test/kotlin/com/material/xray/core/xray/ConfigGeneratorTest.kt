@@ -482,7 +482,12 @@ class ConfigGeneratorTest {
         val json = Json.parseToJsonElement(config).jsonObject
         val servers = json["dns"]!!.jsonObject["servers"]!!.jsonArray
 
-        assertEquals(listOf("localhost"), servers.map { it.jsonPrimitive.content })
+        assertEquals("localhost", servers.first().jsonPrimitive.content)
+        // LAN names are direct, and an empty direct list sends them to the system resolver too.
+        assertEquals(
+            listOf("localhost"),
+            servers.drop(1).map { it.jsonObject.getValue("address").jsonPrimitive.content },
+        )
         assertTrue("tag" !in json["dns"]!!.jsonObject)
         assertTrue(
             json["routing"]!!.jsonObject["rules"]!!.jsonArray.none {

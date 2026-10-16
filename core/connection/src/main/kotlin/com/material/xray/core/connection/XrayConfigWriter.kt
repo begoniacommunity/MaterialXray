@@ -197,7 +197,10 @@ internal class XrayConfigWriter(
      */
     private fun usesNetworkDns(managesSystemRouting: Boolean, server: ServerConfig, settings: XrayRuntimeSettings): Boolean = managesSystemRouting &&
         !configGenerator.usesProfileDns(server, settings.preferProfileDns) &&
-        resolveDnsServersForIpv6(settings.dnsServers, settings.allowIpv6).isEmpty()
+        (
+            resolveDnsServersForIpv6(settings.dnsServers, settings.allowIpv6).isEmpty() ||
+                resolveDnsServersForIpv6(settings.domesticDnsServers, settings.allowIpv6).isEmpty()
+            )
 
     /**
      * Regenerates the [active] config with [runtimeSettings]' routing and swaps its routing section
