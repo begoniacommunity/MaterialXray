@@ -79,6 +79,7 @@ import com.material.xray.core.model.SessionTrafficMetrics
 import com.material.xray.core.model.XrayRuntimeSettings
 import com.material.xray.core.model.primaryBalancerTag
 import com.material.xray.core.model.proxyOutboundCount
+import com.material.xray.core.model.withProfileDnsOverride
 import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.network.Ipv6SessionState
 import com.material.xray.core.network.ServerLatencyTester
@@ -1210,11 +1211,7 @@ class XrayService(
         return config.withProfileDnsOverride(serverId)
     }
 
-    /** The user's per-subscription Prefer profile DNS choice beats the provider's directive. */
-    private suspend fun ServerConfig.withProfileDnsOverride(serverId: Long): ServerConfig {
-        val override = subscriptionRepository.observeUseProfileDnsOverrideForServer(serverId).first() ?: return this
-        return copy(subscriptionUseProfileDns = override)
-    }
+    private suspend fun ServerConfig.withProfileDnsOverride(serverId: Long): ServerConfig = withProfileDnsOverride(subscriptionRepository.observeUseProfileDnsOverrideForServer(serverId).first())
 
     private fun handleStateSideEffects(state: ConnectionState) {
         when (state) {

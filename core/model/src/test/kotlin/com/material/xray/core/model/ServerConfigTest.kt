@@ -185,4 +185,19 @@ class ServerConfigTest {
 
         assertEquals("vlessenc • ml-dsa+reality • grpc", summary)
     }
+
+    @Test
+    fun `profile DNS override replaces the provider directive`() {
+        val config = ServerConfig(Protocol.VLESS, "Node", "example.com", 443, "id", subscriptionUseProfileDns = true)
+
+        assertEquals(false, config.withProfileDnsOverride(false).subscriptionUseProfileDns)
+        assertEquals(true, config.withProfileDnsOverride(null).subscriptionUseProfileDns)
+    }
+
+    @Test
+    fun `profile DNS override is ignored once the provider drops the directive`() {
+        val config = ServerConfig(Protocol.VLESS, "Node", "example.com", 443, "id")
+
+        assertEquals(null, config.withProfileDnsOverride(false).subscriptionUseProfileDns)
+    }
 }

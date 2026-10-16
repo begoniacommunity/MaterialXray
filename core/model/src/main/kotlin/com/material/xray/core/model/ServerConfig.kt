@@ -50,6 +50,12 @@ data class ServerConfig(
     )
 }
 
+/**
+ * Applies the user's per-subscription Prefer profile DNS choice. It only beats the provider's directive,
+ * so once the provider drops the header the server follows the global setting again.
+ */
+fun ServerConfig.withProfileDnsOverride(override: Boolean?): ServerConfig = if (override == null || subscriptionUseProfileDns == null) this else copy(subscriptionUseProfileDns = override)
+
 fun ServerConfig.endpointSummary(): String {
     val proxyOutboundCount = proxyOutboundCount()
     if (proxyOutboundCount != null) {
