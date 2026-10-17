@@ -276,7 +276,6 @@ main {
 .hero h1 em {
 	font-style: normal;
 	color: var(--md-primary);
-	font-weight: 700;
 }
 
 .lead {
@@ -804,4 +803,51 @@ pre.http .c {
 
 .footer p {
 	margin-inline-start: auto;
+}
+
+/* A native select drawn as a text button; the icons sit on top and let clicks through. */
+.lang-select {
+	position: relative;
+	display: flex;
+	align-items: center;
+	border-radius: var(--md-shape-full);
+	color: var(--md-on-surface-variant);
+	transition: background-color 150ms ease;
+}
+
+.lang-select:hover {
+	background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.lang-select select {
+	appearance: none;
+	height: 2.5rem;
+	padding: 0 2.25rem 0 2.5rem;
+	border: none;
+	border-radius: inherit;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-weight: 500;
+	font-size: 0.9375rem;
+	cursor: pointer;
+}
+
+.lang-select option {
+	background: var(--md-surface-container);
+	color: var(--md-on-surface);
+}
+
+.lang-select .ms {
+	position: absolute;
+	font-size: 1.25rem;
+	pointer-events: none;
+}
+
+.lang-select .ms:first-child {
+	left: 0.75rem;
+}
+
+.lang-select .ms:last-child {
+	right: 0.625rem;
 }

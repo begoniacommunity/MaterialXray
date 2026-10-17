@@ -1,0 +1,110 @@
+{
+	"sidebar": {
+		"startHere": "Start here",
+		"introduction": "Introduction",
+		"usingTheApp": "Using the app",
+		"forProviders": "For providers",
+		"overview": "Overview",
+		"reference": "Reference"
+	},
+	"landing": {
+		"languageName": "English",
+		"title": "Material Xray: an Android proxy client powered by Xray-core",
+		"description": "An Android proxy client powered by Xray-core, with a Material Design 3 interface.",
+		"ogImageAlt": "Material Xray's home screen, connected to a server",
+		"nav": { "docs": "Docs", "providers": "For providers" },
+		"languageSelect": "Select language",
+		"themeToggle": "Toggle dark theme",
+		"download": "Download",
+		"hero": {
+			"titleStart": "A proxy client that feels ",
+			"titleEmphasis": "right at home",
+			"titleEnd": " on Android.",
+			"lead": "Material Xray combines Xray-core with a Material 3 interface and rootful capabilities that let it run alongside your other VPNs, invisible to the apps you leave out.",
+			"downloadApk": "Download APK",
+			"readDocs": "Read the docs"
+		},
+		"features": {
+			"eyebrow": "Features",
+			"titleLine1": "Simple by default.",
+			"titleLine2": "Powerful when you need it.",
+			"core": {
+				"title": "Always on the latest Xray-core",
+				"body": "New Xray-core releases land soon after upstream ships them. VLESS with REALITY and XHTTP, post-quantum REALITY, Hysteria2, WireGuard: your provider’s links just work."
+			},
+			"perApp": {
+				"title": "Per-app proxy",
+				"body": "Choose which apps use the proxy. In root mode, give each app its own server."
+			},
+			"routing": {
+				"title": "Simple routing rules",
+				"body": "Proxy, bypass or block by domain, IP, port or protocol. Or let your provider manage it all."
+			},
+			"stats": {
+				"title": "Live stats",
+				"body": "Speed, session traffic and ping, on the home screen and in the notification."
+			},
+			"native": {
+				"title": "Native to Android",
+				"body": "Jetpack Compose and Material 3, not a web view, with wallpaper colors and layouts for phones, tablets and TV."
+			},
+			"tools": {
+				"title": "Power tools, one tap away",
+				"body": "Live logs, a config viewer and editor, raw Xray JSON profiles, backups and a Quick Settings tile."
+			}
+		},
+		"modes": {
+			"eyebrow": "Two ways to run",
+			"title": "Rootless when you want it simple. Rootful when you want it hidden.",
+			"tablistLabel": "Service mode",
+			"rootless": "Rootless",
+			"rootful": "Rootful",
+			"rootlessItems": [
+				["check", "Uses Android’s standard VPN permission"],
+				["check", "Works with always-on VPN"],
+				["check", "Routing handled by Android itself"],
+				["warning", "Takes the VPN slot, which other apps can see"],
+				["warning", "Doesn’t tunnel tethered devices"]
+			],
+			"rootfulItems": [
+				["check", "Invisible to apps that bypass the tunnel"],
+				["check", "Runs alongside other VPNs, like Tailscale"],
+				["check", "A different server for each app"],
+				["check", "Tunnels hotspot and tethered devices"],
+				["warning", "Requires root access. KernelSU is preferred"]
+			],
+			"compare": "Compare in detail"
+		},
+		"providers": {
+			"eyebrow": "For subscription providers",
+			"title": "Speaks the language your servers already know.",
+			"body": "Material Xray reads the common subscription headers, Happ’s included: titles, quotas, announcements, routing and per-app rules. Can’t set headers? Use the body.",
+			"headerReference": "Header reference",
+			"deeplinks": "Deeplinks"
+		},
+		"start": {
+			"eyebrow": "Get started",
+			"title": "Up and running in a minute.",
+			"steps": [
+				{
+					"title": "Install the APK",
+					"body": "Universal APK from GitHub Releases, for Android 7.0+ on arm64, armv7 and x86_64."
+				},
+				{
+					"title": "Add a subscription",
+					"body": "Paste a link, scan a QR code, or open your provider’s mxray:// link."
+				},
+				{ "title": "Tap Start", "body": "Pick a server, check its ping, connect." }
+			],
+			"disclaimer": "Material Xray is a client, not a VPN service: bring your own server."
+		},
+		"footer": {
+			"documentation": "Documentation",
+			"releases": "Releases",
+			"reportIssue": "Report an issue",
+			"sourceCode": "Source code",
+			"poweredByStart": "Powered by ",
+			"poweredByEnd": ". © 2026 Material Xray contributors."
+		}
+	}
+}

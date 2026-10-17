@@ -1,0 +1,352 @@
+---
+import '../styles/tokens.css';
+import '../styles/landing.css';
+import en from '../i18n/en.json';
+import ru from '../i18n/ru.json';
+import HomeScreen from './HomeScreen.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+	lang: 'en' | 'ru';
+}
+
+const strings = { en: en.landing, ru: ru.landing };
+const { lang } = Astro.props;
+const t = strings[lang];
+// English lives at the root; every other language under its own prefix, like Starlight's docs.
+const prefix = (code: keyof typeof strings) => (code === 'en' ? '' : `/${code}`);
+const base = prefix(lang);
+const languages = Object.keys(strings) as (keyof typeof strings)[];
+
+const repo = 'https://github.com/AetherMagee/MaterialXray';
+const latest = `${repo}/releases/latest`;
+const { title, description } = t;
+const site = Astro.site!;
+const pageUrl = new URL(`${base}/`, site).href;
+const ogImage = new URL('/og.jpg', site).href;
+
+// Lets search engines describe the page as an app rather than an article.
+const structuredData = {
+	'@context': 'https://schema.org',
+	'@type': 'SoftwareApplication',
+	name: 'Material Xray',
+	description,
+	url: pageUrl,
+	inLanguage: lang,
+	image: new URL('/icon.png', site).href,
+	screenshot: ogImage,
+	downloadUrl: latest,
+	operatingSystem: 'Android 7.0+',
+	applicationCategory: 'UtilitiesApplication',
+	license: 'https://www.gnu.org/licenses/gpl-3.0.html',
+	offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+};
+
+// MD3 Expressive "cookie" shape: a circle with a gentle 12-lobe ripple, rendered as an SVG path.
+function blob(lobes: number, depth: number, size = 200, steps = 360) {
+	const c = size / 2;
+	const r = c * (1 - depth);
+	const points = Array.from({ length: steps }, (_, i) => {
+		const t = (i / steps) * Math.PI * 2;
+		const rr = r * (1 + depth * Math.cos(lobes * t));
+		return `${(c + rr * Math.cos(t)).toFixed(2)},${(c + rr * Math.sin(t)).toFixed(2)}`;
+	});
+	return `M${points.join('L')}Z`;
+}
+const cookie = blob(12, 0.045);
+const flower = blob(8, 0.12);
+const clover = blob(4, 0.16);
+
+const modes = { rootless: t.modes.rootlessItems, rootful: t.modes.rootfulItems };
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- The site has its own dark theme; Dark Reader would recolour the phone mockup beyond recognition. -->
+		<meta name="darkreader-lock" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<link rel="canonical" href={pageUrl} />
+		{languages.map((code) => <link rel="alternate" hreflang={code} href={new URL(`${prefix(code)}/`, site).href} />)}
+		<link rel="alternate" hreflang="x-default" href={site.href} />
+		<link rel="sitemap" href="/sitemap-index.xml" />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={pageUrl} />
+		<meta property="og:site_name" content="Material Xray" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:image" content={ogImage} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={t.ogImageAlt} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+		<link rel="icon" href="/favicon.png" type="image/png" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&family=Roboto+Flex:opsz,wght@8..144,400..800&family=Roboto+Mono:wght@400;500&display=swap"
+		/>
+		{
+			lang === 'en' && (
+				<script is:inline define:vars={{ languages }}>
+					// First visit to the English root: follow the browser's preferred language, until the visitor picks one.
+					if (!localStorage.getItem('mxray-lang')) {
+						const preferred = navigator.languages
+							.map((tag) => tag.toLowerCase().split('-')[0])
+							.find((code) => languages.includes(code));
+						if (preferred && preferred !== 'en') location.replace(`/${preferred}/`);
+					}
+				</script>
+			)
+		}
+		<script is:inline>
+			// Shares Starlight's storage key so the theme follows you between the landing page and docs.
+			(() => {
+				const stored = localStorage.getItem('starlight-theme');
+				const theme = stored || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+				document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+			})();
+		</script>
+	</head>
+	<body>
+		<header class="top-bar" data-top-bar>
+			<a class="brand" href={`${base}/`}>
+				<span class="brand-icon"><img src="/icon.png" alt="" width="40" height="40" /></span>
+				<span>Material Xray</span>
+			</a>
+			<nav class="top-nav">
+				<a href={`${base}/docs/`}>{t.nav.docs}</a>
+				<a href={`${base}/docs/providers/`}>{t.nav.providers}</a>
+				<a href={repo}>GitHub</a>
+			</nav>
+			<div class="top-actions">
+				<label class="lang-select">
+					<Icon name="translate" />
+					<select aria-label={t.languageSelect} data-lang-select>
+						{
+							languages.map((code) => (
+								<option value={`${prefix(code)}/`} lang={code} selected={code === lang}>
+									{strings[code].languageName}
+								</option>
+							))
+						}
+					</select>
+					<Icon name="expand_more" />
+				</label>
+				<button class="icon-button" type="button" data-theme-toggle aria-label={t.themeToggle}>
+					<Icon name="dark_mode" class="theme-dark" />
+					<Icon name="light_mode" class="theme-light" />
+				</button>
+				<a class="btn btn-tonal btn-small" href={latest}>
+					<Icon name="download" />{t.download}
+				</a>
+			</div>
+		</header>
+
+		<main>
+			<section class="hero">
+				<div class="hero-copy">
+					<h1>{t.hero.titleStart}<em>{t.hero.titleEmphasis}</em>{t.hero.titleEnd}</h1>
+					<p class="lead">{t.hero.lead}</p>
+					<div class="hero-actions">
+						<a class="btn btn-filled btn-large" href={latest}>
+							<Icon name="android" />{t.hero.downloadApk}
+						</a>
+						<a class="btn btn-outlined btn-large" href={`${base}/docs/`}>
+							<Icon name="menu_book" />{t.hero.readDocs}
+						</a>
+					</div>
+				</div>
+
+				<div class="hero-art" aria-hidden="true">
+					<svg class="shape shape-cookie" viewBox="0 0 200 200"><path d={cookie}></path></svg>
+					<svg class="shape shape-flower" viewBox="0 0 200 200"><path d={flower}></path></svg>
+					<svg class="shape shape-clover" viewBox="0 0 200 200"><path d={clover}></path></svg>
+
+					<div class="phone">
+						<HomeScreen />
+					</div>
+				</div>
+			</section>
+
+			<section class="section" id="features">
+				<header class="section-head">
+					<span class="eyebrow">{t.features.eyebrow}</span>
+					<h2>{t.features.titleLine1}<br />{t.features.titleLine2}</h2>
+				</header>
+
+				<div class="bento">
+					<article class="tile tile-wide tile-primary">
+						<span class="tile-icon"><Icon name="rocket_launch" /></span>
+						<h3>{t.features.core.title}</h3>
+						<p>{t.features.core.body}</p>
+					</article>
+
+					<article class="tile">
+						<span class="tile-icon"><Icon name="apps" /></span>
+						<h3>{t.features.perApp.title}</h3>
+						<p>{t.features.perApp.body}</p>
+					</article>
+
+					<article class="tile tile-tertiary">
+						<span class="tile-icon"><Icon name="alt_route" /></span>
+						<h3>{t.features.routing.title}</h3>
+						<p>{t.features.routing.body}</p>
+					</article>
+
+					<article class="tile">
+						<span class="tile-icon"><Icon name="monitoring" /></span>
+						<h3>{t.features.stats.title}</h3>
+						<p>{t.features.stats.body}</p>
+					</article>
+
+					<article class="tile">
+						<span class="tile-icon"><Icon name="palette" /></span>
+						<h3>{t.features.native.title}</h3>
+						<p>{t.features.native.body}</p>
+					</article>
+
+					<article class="tile tile-wide tile-dark">
+						<span class="tile-icon"><Icon name="terminal" /></span>
+						<h3>{t.features.tools.title}</h3>
+						<p>{t.features.tools.body}</p>
+						<pre><code><span class="c">// generated by Material Xray</span>
+{"{"} <span class="k">"inbounds"</span>: [{"{"} <span class="k">"protocol"</span>: <span class="s">"tun"</span>, … {"}"}],
+  <span class="k">"routing"</span>: {"{"} <span class="k">"domainStrategy"</span>: <span class="s">"IPIfNonMatch"</span> {"}"} {"}"}</code></pre>
+					</article>
+				</div>
+			</section>
+
+			<section class="section modes" id="modes">
+				<header class="section-head">
+					<span class="eyebrow">{t.modes.eyebrow}</span>
+					<h2>{t.modes.title}</h2>
+				</header>
+
+				<div class="segmented" role="tablist" aria-label={t.modes.tablistLabel}>
+					<button role="tab" aria-selected="true" data-mode="rootless">
+						<Icon name="check" class="check" />{t.modes.rootless}
+					</button>
+					<button role="tab" aria-selected="false" data-mode="rootful">
+						<Icon name="check" class="check" />{t.modes.rootful}
+					</button>
+				</div>
+
+				<div class="mode-card">
+					{
+						Object.entries(modes).map(([mode, items], i) => (
+							<ul class="mode-list" data-panel={mode} hidden={i !== 0}>
+								{items.map(([icon, text]) => (
+									<li class={icon}>
+										<Icon name={icon === 'check' ? 'check_circle' : 'error'} />
+										{text}
+									</li>
+								))}
+							</ul>
+						))
+					}
+					<a class="btn btn-text" href={`${base}/docs/guide/root-vs-rootless/`}>
+						{t.modes.compare}<Icon name="arrow_forward" />
+					</a>
+				</div>
+			</section>
+
+			<section class="section providers" id="providers">
+				<div class="providers-card">
+					<div class="providers-copy">
+						<span class="eyebrow">{t.providers.eyebrow}</span>
+						<h2>{t.providers.title}</h2>
+						<p>{t.providers.body}</p>
+						<div class="hero-actions">
+							<a class="btn btn-filled" href={`${base}/docs/providers/response-headers/`}>{t.providers.headerReference}</a>
+							<a class="btn btn-outlined" href={`${base}/docs/providers/deeplinks/`}>{t.providers.deeplinks}</a>
+						</div>
+					</div>
+					<pre class="http"><code><span class="m">HTTP/1.1 200 OK</span>
+<span class="k">profile-title</span>: base64:TXkgUHJvdmlkZXI=
+<span class="k">subscription-userinfo</span>: upload=0; download=73443041280; total=214748364800; expire=1798761600
+<span class="k">profile-update-interval</span>: 12
+<span class="k">support-url</span>: https://t.me/myprovider
+<span class="k">announce</span>: Maintenance on Sunday, 03:00 UTC
+<span class="k">routing</span>: happ://routing/onadd/eyJOYW1lIjoi…
+
+<span class="c">vless://…#Frankfurt</span>
+<span class="c">hysteria2://…#Amsterdam</span></code></pre>
+				</div>
+			</section>
+
+			<section class="section" id="start">
+				<header class="section-head">
+					<span class="eyebrow">{t.start.eyebrow}</span>
+					<h2>{t.start.title}</h2>
+				</header>
+				<ol class="steps">
+					{
+						t.start.steps.map((step, i) => (
+							<li>
+								<span class="step-num">{i + 1}</span>
+								<h3>{step.title}</h3>
+								<p>{step.body}</p>
+							</li>
+						))
+					}
+				</ol>
+				<p class="disclaimer">
+					<Icon name="info" />
+					{t.start.disclaimer}
+				</p>
+			</section>
+		</main>
+
+		<footer class="footer">
+			<div class="footer-brand">
+				<span class="brand-icon"><img src="/icon.png" alt="" width="32" height="32" /></span>
+				<span>Material Xray</span>
+			</div>
+			<nav>
+				<a href={`${base}/docs/`}>{t.footer.documentation}</a>
+				<a href={`${repo}/releases`}>{t.footer.releases}</a>
+				<a href={`${repo}/issues`}>{t.footer.reportIssue}</a>
+				<a href={repo}>{t.footer.sourceCode}</a>
+			</nav>
+			<p>
+				{t.footer.poweredByStart}<a href="https://github.com/XTLS/Xray-core">Xray-core</a>{t.footer.poweredByEnd}
+			</p>
+		</footer>
+
+		<script>
+			const root = document.documentElement;
+			document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+				const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+				root.dataset.theme = next;
+				localStorage.setItem('starlight-theme', next);
+			});
+
+			const languageSelect = document.querySelector<HTMLSelectElement>('[data-lang-select]');
+			languageSelect?.addEventListener('change', () => {
+				localStorage.setItem('mxray-lang', languageSelect.selectedOptions[0].lang);
+				location.assign(languageSelect.value);
+			});
+
+			const bar = document.querySelector('[data-top-bar]');
+			const onScroll = () => bar?.classList.toggle('scrolled', window.scrollY > 8);
+			addEventListener('scroll', onScroll, { passive: true });
+			onScroll();
+
+			const tabs = document.querySelectorAll<HTMLButtonElement>('.segmented [data-mode]');
+			tabs.forEach((tab) =>
+				tab.addEventListener('click', () => {
+					tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+					document.querySelectorAll<HTMLElement>('[data-panel]').forEach((panel) => {
+						panel.hidden = panel.dataset.panel !== tab.dataset.mode;
+					});
+				}),
+			);
+		</script>
+	</body>
+</html>

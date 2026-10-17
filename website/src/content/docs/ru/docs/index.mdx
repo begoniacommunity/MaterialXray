@@ -1,0 +1,35 @@
+---
+title: Введение
+description: Что такое Material Xray, что он умеет и с чего начать.
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Material Xray — прокси-клиент для Android на основе [Xray-core](https://github.com/XTLS/Xray-core) с интерфейсом Material Design 3. Он управляет подписками, серверами, маршрутизацией и правилами для приложений, а туннель запускает в одном из двух режимов: как обычный VPN Android или через маршрутизацию с root-доступом, которая скрывает туннель от других приложений.
+
+:::note
+Material Xray — это клиент, а не VPN-сервис. Вам нужен собственный прокси-сервер или подписка.
+:::
+
+## Возможности
+
+<CardGrid>
+	<Card title="Подписки" icon="list-format">
+		Серверы сгруппированы по подпискам, с лимитом трафика, сроком действия, объявлениями и проверкой задержки.
+	</Card>
+	<Card title="Протоколы" icon="puzzle">
+		VLESS, VMess, Trojan, Shadowsocks, Hysteria2, WireGuard, HTTP, SOCKS и конфигурации Xray в формате JSON.
+	</Card>
+	<Card title="Прокси для приложений" icon="setting">
+		Выбирайте, какие приложения используют прокси. В режиме с root назначайте приложениям отдельные серверы.
+	</Card>
+	<Card title="Маршрутизация" icon="random">
+		Собственные правила по доменам, IP, портам и протоколам или правила от вашего провайдера.
+	</Card>
+</CardGrid>
+
+## С чего начать
+
+<LinkCard title="Установка приложения" href="/ru/docs/guide/installation/" description="Требования, загрузка и проверка релиза." />
+<LinkCard title="С root или без?" href="/ru/docs/guide/root-vs-rootless/" description="Выберите подходящий режим работы." />
+<LinkCard title="Для провайдеров подписок" href="/ru/docs/providers/" description="Заголовки, форматы тела ответа, маршрутизация и диплинки для вашей панели." />

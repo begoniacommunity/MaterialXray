@@ -1,8 +1,15 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import en from './src/i18n/en.json' with { type: 'json' };
+import ru from './src/i18n/ru.json' with { type: 'json' };
 
 const repo = 'https://github.com/AetherMagee/MaterialXray';
+// A sidebar label in every locale, from the same string files as the landing page.
+const label = (/** @type {keyof typeof en.sidebar} */ key) => ({
+	label: en.sidebar[key],
+	translations: { ru: ru.sidebar[key] },
+});
 
 export default defineConfig({
 	site: 'https://materialxray.app',
@@ -12,6 +19,11 @@ export default defineConfig({
 			description: 'An Android proxy client powered by Xray-core, with a Material Design 3 interface.',
 			logo: { src: './src/assets/icon.png', alt: 'Material Xray' },
 			favicon: '/favicon.png',
+			defaultLocale: 'root',
+			locales: {
+				root: { label: 'English', lang: 'en' },
+				ru: { label: 'Русский', lang: 'ru' },
+			},
 			social: [{ icon: 'github', label: 'GitHub', href: repo }],
 			customCss: ['./src/styles/tokens.css', './src/styles/docs.css'],
 			head: [
@@ -26,7 +38,7 @@ export default defineConfig({
 					tag: 'link',
 					attrs: {
 						rel: 'stylesheet',
-						href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&display=swap',
+						href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&family=Roboto+Flex:opsz,wght@8..144,400..800&family=Roboto+Mono:wght@400;500&display=swap',
 					},
 				},
 			],
@@ -49,16 +61,16 @@ export default defineConfig({
 			},
 			sidebar: [
 				{
-					label: 'Start here',
+					...label('startHere'),
 					items: [
-						{ label: 'Introduction', slug: 'docs' },
+						{ ...label('introduction'), slug: 'docs' },
 						'docs/guide/installation',
 						'docs/guide/adding-servers',
 						'docs/guide/root-vs-rootless',
 					],
 				},
 				{
-					label: 'Using the app',
+					...label('usingTheApp'),
 					items: [
 						'docs/guide/per-app-proxy',
 						'docs/guide/routing',
@@ -67,9 +79,9 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'For providers',
+					...label('forProviders'),
 					items: [
-						{ label: 'Overview', slug: 'docs/providers' },
+						{ ...label('overview'), slug: 'docs/providers' },
 						'docs/providers/subscription-format',
 						'docs/providers/request-headers',
 						'docs/providers/response-headers',
@@ -79,7 +91,7 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Reference',
+					...label('reference'),
 					items: ['docs/reference/share-links', 'docs/reference/faq'],
 				},
 			],
