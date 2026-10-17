@@ -394,8 +394,8 @@ android {
     defaultConfig {
         applicationId = "com.material.xray"
         targetSdk = 36
-        versionCode = 970
-        versionName = "0.9.7"
+        versionCode = 980
+        versionName = "0.9.8"
     }
 
     // A universal APK plus one per ABI, all with the same versionCode so an install can move
