@@ -23,7 +23,7 @@ internal fun VersionCatalog.lib(alias: String): Provider<MinimalExternalModuleDe
 internal fun Project.configureAndroidCommon() {
     extensions.configure<CommonExtension>("android") {
         compileSdk = 37
-        compileSdkMinor = 0
+        compileSdkMinor = 2
         buildToolsVersion = "37.0.0"
         // :core:runtime builds its launcher with it and :app's buildXray compiles Xray with its clang.
         ndkVersion = "30.0.16248370"
