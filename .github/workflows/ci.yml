@@ -42,7 +42,7 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platform-tools" "platforms;android-37.0" "cmake;3.31.6"
+          sdkmanager "platform-tools" "platforms;android-37.2" "cmake;3.31.6"
 
       - name: Build debug APK
         # Universal and per-ABI APK packaging share the Gradle heap.
