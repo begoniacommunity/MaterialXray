@@ -32,11 +32,18 @@ class HomeServerController(
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
     private val connectionStateCoordinator: ConnectionStateCoordinator,
     private val routingChangeManager: RoutingChangeManager,
+    val coreRequirements: HomeCoreRequirements,
 ) {
     fun connect(server: ServerConfig) {
         // The new connection is built from the current settings, so nothing is left pending.
         routingChangeManager.clearPendingChanges()
         XrayService.connect(context, server)
+    }
+
+    /** The server a running connection would switch to on [apply], or null when nothing is running or it is gone. */
+    suspend fun serverForRunningSwitch(serverId: Long): ServerConfig? {
+        if (!connectionStateCoordinator.state.value.isRunning() || serverId == settingsRepo.lastServerId.first()) return null
+        return serverRepo.getById(serverId)?.let { runCatching { serverRepo.parseConfig(it) }.getOrNull() }
     }
 
     /** What the user has to confirm before [apply] may select [serverId], or null if nothing. */
@@ -68,14 +75,15 @@ class HomeServerController(
             if (serverId != settingsRepo.lastServerId.first()) return@withSelectionLock
             providerRoutingCoordinator.refreshSelectedServer(ProviderRoutingActiveUpdate.DEFER)
 
-            val state = connectionStateCoordinator.state.value
-            if (state is ConnectionState.Connected ||
-                state is ConnectionState.ApplyingRoutingChanges ||
-                state is ConnectionState.Error
-            ) {
+            if (connectionStateCoordinator.state.value.isRunning()) {
                 routingChangeManager.clearPendingChanges()
                 XrayService.switchServer(context)
             }
         }
     }
 }
+
+/** Whether a server change restarts the connection on the new server. */
+private fun ConnectionState.isRunning(): Boolean = this is ConnectionState.Connected ||
+    this is ConnectionState.ApplyingRoutingChanges ||
+    this is ConnectionState.Error

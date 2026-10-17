@@ -1,5 +1,6 @@
 package com.material.xray.core.xraycore
 
+import com.material.xray.core.model.compareXrayVersions
 import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

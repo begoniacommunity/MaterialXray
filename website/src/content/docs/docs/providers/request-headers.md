@@ -11,6 +11,7 @@ Every subscription request carries identification headers. Which ones depends on
 | --- | --- | --- |
 | `User-Agent` | `Material Xray/0.9.4 (Android 16; Google Pixel 9)` | All modes |
 | `x-hwid` | `a1b2c3d4e5f60789` | All modes, while **Send hardware ID** is on (the default) |
+| `x-xray-core` | `26.10.25` | All modes |
 | `x-device-os` | `Android` | Auto, Happ |
 | `x-ver-os` | `16` | Auto, Happ |
 | `x-device-model` | `Google Pixel 9` | Auto, Happ |
@@ -22,12 +23,15 @@ Every subscription request carries identification headers. Which ones depends on
 ```http
 User-Agent: Material Xray/0.9.4 (Android 16; Google Pixel 9)
 x-hwid: a1b2c3d4e5f60789
+x-xray-core: 26.10.25
 x-device-os: Android
 x-ver-os: 16
 x-device-model: Google Pixel 9
 ```
 
 The format is `Material Xray/<app version> (Android <OS version>; <manufacturer> <model>)`. Match on the `Material Xray/` prefix.
+
+`x-xray-core` is the version of the Xray-core the next connection runs, without the `v`. It changes when the user switches or updates the core, so don't use it to identify a device; [`mxray-min-core-version`](/docs/providers/response-headers/#mxray-min-core-version) can ask for a different one.
 
 ### Happ
 
@@ -36,6 +40,7 @@ For panels that only serve content to Happ, the client sends a Happ-compatible U
 ```http
 User-Agent: Happ/3.23.0
 x-hwid: a1b2c3d4e5f60789
+x-xray-core: 26.10.25
 x-device-os: Android
 x-ver-os: 16
 x-device-model: Google Pixel 9
@@ -43,7 +48,7 @@ x-device-model: Google Pixel 9
 
 ### Custom
 
-The user sets the User-Agent, or leaves it blank to keep the Auto value, and adds any headers they like, one `Name: Value` per line. Custom headers override built-in ones with the same name. The `x-device-*` headers are not sent in this mode. `x-hwid` is still added unless the user supplies their own or has turned sending off.
+The user sets the User-Agent, or leaves it blank to keep the Auto value, and adds any headers they like, one `Name: Value` per line. Custom headers override built-in ones with the same name. The `x-device-*` headers are not sent in this mode. `x-hwid` is still added unless the user supplies their own or has turned sending off, and `x-xray-core` unless the user supplies their own.
 
 ## The hardware ID
 

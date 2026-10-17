@@ -20,6 +20,8 @@ Material Xray reads the following headers from a subscription response. Names ar
 | [`fallback-url`](#fallback-url) | Backup endpoint |
 | [`subscription-always-hwid-enable`](#subscription-always-hwid-enable) | Require a hardware ID |
 | [`mxray-use-dns-from-json`](#mxray-use-dns-from-json) | Use or ignore the DNS inside JSON profiles |
+| [`mxray-min-core-version`](#mxray-min-core-version) | Oldest Xray-core version the servers work with |
+| [`mxray-max-core-version`](#mxray-max-core-version) | Newest Xray-core version the servers work with |
 | [`routing`](/docs/providers/routing-header/) | Routing rules |
 | [`routing-enable`](/docs/providers/routing-header/#routing-enable) | Turn routing import off |
 | [`per-app-proxy-mode`](/docs/providers/per-app-routing/) | Per-app routing mode |
@@ -142,6 +144,26 @@ mxray-use-dns-from-json: 1
 ```
 
 Profiles without a `dns` object, and non-JSON servers, always use the app's DNS. Servers the user guarded keep the value from the last refresh before they were guarded.
+
+## Xray-core version
+
+### mxray-min-core-version
+
+### mxray-max-core-version
+
+The range of Xray-core versions this subscription's servers work with. Both bounds are inclusive, and either may be sent alone. A version is written as Xray tags it, with or without the `v`. A value that is not a version is ignored.
+
+```http
+mxray-min-core-version: 26.10.10
+mxray-max-core-version: v26.12.31
+```
+
+When the user connects to one of the subscription's servers from the Home screen, or switches to one there while connected, and the current core is out of range:
+
+- With **Follow provider core requirements** on (the default), the app switches to the newest upstream release in range, downloading it first if it is not installed. If the release list can't be fetched, it uses the newest installed core in range instead.
+- Otherwise, or when no core in range can be found, the user is warned and can switch to a core in range, connect anyway or cancel.
+
+The current core is kept as long as it is in range. Connecting from the quick settings tile, on boot or through always-on VPN uses the selected core without checking. The release list is looked up in the background when the user selects such a server, and the release found is cached for a day; a changed range is looked up again. Builds without the core manager can only warn. The app reports its current core in the [`x-xray-core`](/docs/providers/request-headers/) request header, so a panel can also serve configs to match.
 
 ## Body comments
 

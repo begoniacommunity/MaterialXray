@@ -19,13 +19,21 @@ class XrayCoreUpdateBackupSection(
 
     override fun export(): JsonElement {
         val settings = settingsStore.settings.value
-        return json.encodeToJsonElement(Backup.serializer(), Backup(settings.periodicChecks, settings.action, settings.interval.hours))
+        return json.encodeToJsonElement(
+            Backup.serializer(),
+            Backup(settings.periodicChecks, settings.action, settings.interval.hours, settings.followProviderRequirements),
+        )
     }
 
     override suspend fun restore(value: JsonElement?) {
         val backup = value?.let { json.decodeFromJsonElement(Backup.serializer(), it) } ?: Backup()
         val updated = settingsStore.update {
-            it.copy(periodicChecks = backup.periodicChecks, action = backup.action, intervalHours = backup.intervalHours)
+            it.copy(
+                periodicChecks = backup.periodicChecks,
+                action = backup.action,
+                intervalHours = backup.intervalHours,
+                followProviderRequirements = backup.followProviderRequirements,
+            )
         }
         scheduler.setEnabled(updated.periodicChecks, updated.interval)
     }
@@ -35,6 +43,7 @@ class XrayCoreUpdateBackupSection(
         val periodicChecks: Boolean = false,
         val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
         val intervalHours: Int = XrayCoreUpdateInterval.default.hours,
+        val followProviderRequirements: Boolean = true,
     )
 
     private companion object {

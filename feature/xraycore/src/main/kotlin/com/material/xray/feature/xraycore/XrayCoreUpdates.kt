@@ -21,15 +21,20 @@ import androidx.work.WorkerParameters
 import com.material.xray.core.android.locale.localizedString
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
+import com.material.xray.core.data.repository.ServerRepository
+import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.model.XrayCoreRequirement
+import com.material.xray.core.model.normalizeXrayVersion
 import com.material.xray.core.ui.R
 import com.material.xray.core.xraycore.XrayCoreManager
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
 import com.material.xray.core.xraycore.XrayCoreUpdateInterval
+import com.material.xray.core.xraycore.XrayCoreUpdateSettings
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
-import com.material.xray.core.xraycore.normalizeXrayVersion
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import org.koin.android.annotation.KoinWorker
 import org.koin.core.annotation.Singleton
 
@@ -40,12 +45,16 @@ class XrayCoreUpdater(
     private val settingsStore: XrayCoreUpdateSettingsStore,
     private val switcher: XrayCoreSwitcher,
     private val notifier: XrayCoreUpdateNotifier,
+    private val settingsRepository: SettingsRepository,
+    private val serverRepository: ServerRepository,
     private val log: LogBuffer,
 ) {
     suspend fun check() {
         val settings = settingsStore.settings.value
         if (!settings.periodicChecks || !manager.canDownload) return
         val release = manager.findUpdate() ?: return
+        // An update past the selected subscription's range would only be switched back on connect.
+        if (selectedServerRequirement(settings)?.accepts(release.tag) == false) return
         when (settings.action) {
             XrayCoreUpdateAction.Notify -> if (settings.notifiedTag != release.tag && notifier.showAvailable(release.tag)) {
                 settingsStore.update { it.copy(notifiedTag = release.tag) }
@@ -58,6 +67,13 @@ class XrayCoreUpdater(
                 notifier.showInstalled(core.version)
             }
         }
+    }
+
+    /** The selected server's subscription range, while the user lets subscriptions pick the core. */
+    private suspend fun selectedServerRequirement(settings: XrayCoreUpdateSettings): XrayCoreRequirement? {
+        if (!settings.followProviderRequirements) return null
+        val server = serverRepository.getById(settingsRepository.lastServerId.first()) ?: return null
+        return runCatching { serverRepository.parseConfig(server) }.getOrNull()?.subscriptionCoreRequirement
     }
 
     /** Each update would otherwise leave the core it replaced behind; cores the user chose stay. */

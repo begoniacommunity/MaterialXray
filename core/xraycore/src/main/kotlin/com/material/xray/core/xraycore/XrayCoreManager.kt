@@ -5,6 +5,7 @@ import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.data.repository.githubMirrorUrls
+import com.material.xray.core.model.compareXrayVersions
 import com.material.xray.core.network.AppHttpClient
 import com.material.xray.core.xray.InstalledXrayCore
 import com.material.xray.core.xray.XrayBinary

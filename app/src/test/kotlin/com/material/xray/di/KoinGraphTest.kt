@@ -49,7 +49,9 @@ import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.TproxyCompatibilityCache
 import com.material.xray.core.xray.VpnTransportProbe
+import com.material.xray.core.xray.XrayCoreProvisioner
 import com.material.xray.core.xray.XrayPaths
+import com.material.xray.core.xraycore.XrayCoreRequirementProvisioner
 import com.material.xray.feature.xraycore.XrayCoreUpdateBackupSection
 import com.material.xray.feature.xraycore.XrayCoreUpdateWorker
 import com.material.xray.service.AppUpdateWorker
@@ -133,6 +135,7 @@ class KoinGraphTest {
             LauncherIconSwitcher::class to LauncherIconManager::class,
             AppInventorySource::class to AppInventory::class,
             BackupSection::class to XrayCoreUpdateBackupSection::class,
+            XrayCoreProvisioner::class to XrayCoreRequirementProvisioner::class,
         )
         val definitions = koin.instanceRegistry.instances.values.map { it.beanDefinition }
 

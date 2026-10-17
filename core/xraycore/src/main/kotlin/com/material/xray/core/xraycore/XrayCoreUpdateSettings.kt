@@ -38,6 +38,8 @@ data class XrayCoreUpdateSettings(
     val notifiedTag: String? = null,
     /** The core the last automatic update installed, removed once a newer one replaces it. */
     val autoInstalledId: String? = null,
+    /** Whether a subscription's required core versions pick, and download, the core on their own. */
+    val followProviderRequirements: Boolean = true,
 ) {
     val interval: XrayCoreUpdateInterval
         get() = XrayCoreUpdateInterval.fromHours(intervalHours)

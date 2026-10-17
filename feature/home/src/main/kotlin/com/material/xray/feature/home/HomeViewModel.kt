@@ -55,9 +55,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -309,9 +313,70 @@ class HomeViewModel(
     internal val pendingHwidAddition: StateFlow<HardwareIdConsentPrompt?> = _pendingHwidAddition.asStateFlow()
     val showInstallPermissionRationale: StateFlow<Boolean> = appUpdates.installPermissionRationaleRequired
 
+    private val coreRequirements = serverController.coreRequirements
+    private var connectJob: Job? = null
+    private val _coreRequirementPrompt = MutableStateFlow<CoreRequirementPrompt?>(null)
+    internal val coreRequirementPrompt: StateFlow<CoreRequirementPrompt?> = _coreRequirementPrompt.asStateFlow()
+
+    init {
+        // Looking the fitting release up early keeps connecting from waiting on GitHub. The range is
+        // the cache key, so a subscription that changes its headers is looked up afresh.
+        selectedServer
+            .map { it?.subscriptionCoreRequirement }
+            .distinctUntilChanged()
+            .filterNotNull()
+            .onEach(coreRequirements::prefetch)
+            .launchIn(viewModelScope)
+    }
+
     fun connect() {
         val server = selectedServer.value ?: return
-        serverController.connect(server)
+        if (connectJob?.isActive == true) return
+        connectJob = viewModelScope.launch {
+            val prompt = coreRequirements.check(server, switchToServerId = null, onDownload = ::announceCoreDownload)
+            if (prompt == null) serverController.connect(server) else _coreRequirementPrompt.value = prompt
+        }
+    }
+
+    fun connectDespiteCoreRequirement() {
+        val prompt = _coreRequirementPrompt.value ?: return
+        _coreRequirementPrompt.value = null
+        proceed(prompt)
+    }
+
+    fun switchCoreAndConnect() {
+        val prompt = _coreRequirementPrompt.value ?: return
+        val candidate = prompt.candidate ?: return
+        if (connectJob?.isActive == true) return
+        _coreRequirementPrompt.value = null
+        connectJob = viewModelScope.launch {
+            if (coreRequirements.switchTo(prompt.requirement, candidate, ::announceCoreDownload)) {
+                proceed(prompt)
+            } else {
+                _uiEvents.send(HomeUiEvent.Toast(context.localizedString(R.string.home_core_requirement_failed, candidate.version)))
+            }
+        }
+    }
+
+    fun dismissCoreRequirement() {
+        _coreRequirementPrompt.value = null
+    }
+
+    private fun proceed(prompt: CoreRequirementPrompt) {
+        val serverId = prompt.switchToServerId ?: return serverController.connect(prompt.server)
+        serverSelectionJob?.cancel()
+        serverSelectionJob = viewModelScope.launch { serverController.apply(serverId) }
+    }
+
+    /** Selects [serverId]; when that restarts a running connection, the core is checked first, as when connecting. */
+    private suspend fun applyAfterCoreCheck(serverId: Long) {
+        val server = serverController.serverForRunningSwitch(serverId)
+        val prompt = server?.let { coreRequirements.check(it, switchToServerId = serverId, onDownload = ::announceCoreDownload) }
+        if (prompt == null) serverController.apply(serverId) else _coreRequirementPrompt.value = prompt
+    }
+
+    private fun announceCoreDownload(version: String) {
+        _uiEvents.trySend(HomeUiEvent.Toast(context.localizedString(R.string.home_core_requirement_installing, version)))
     }
 
     fun disconnect() {
@@ -362,7 +427,7 @@ class HomeViewModel(
     private suspend fun selectServerChecked(serverId: Long) {
         when (serverController.blocker(serverId)) {
             ServerSelectionBlocker.EditedActiveConfig -> _pendingServerSelection.value = serverId
-            null -> serverController.apply(serverId)
+            null -> applyAfterCoreCheck(serverId)
         }
     }
 
@@ -393,7 +458,7 @@ class HomeViewModel(
         serverSelectionJob?.cancel()
         serverSelectionJob = viewModelScope.launch {
             serverController.discardEditedActiveConfig()
-            serverController.apply(serverId)
+            applyAfterCoreCheck(serverId)
         }
     }
 

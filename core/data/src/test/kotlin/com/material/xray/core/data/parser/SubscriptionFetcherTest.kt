@@ -15,6 +15,7 @@ import com.material.xray.core.model.SubscriptionAppRoutingMode
 import com.material.xray.core.model.SubscriptionHeader
 import com.material.xray.core.model.SubscriptionRequestIdentity
 import com.material.xray.core.model.SubscriptionUserAgentMode
+import com.material.xray.core.model.XrayCoreRequirement
 import com.material.xray.core.model.endpointSummary
 import com.material.xray.core.network.DirectHttpClient
 import java.net.InetAddress
@@ -190,6 +191,59 @@ class SubscriptionFetcherTest {
         assertNull(parse("maybe"))
         assertNull(parse(""))
         assertNull(parse(null))
+    }
+
+    @Test
+    fun `parse core requirement headers ignores values that are not versions`() {
+        fun parse(min: String?, max: String?) = parseCoreRequirementHeaders(
+            Headers.Builder().apply {
+                min?.let { add("mxray-min-core-version", it) }
+                max?.let { add("mxray-max-core-version", it) }
+            }.build(),
+        )
+
+        assertEquals(XrayCoreRequirement(min = "26.10.10"), parse(" v26.10.10 ", null))
+        assertEquals(XrayCoreRequirement(max = "26.12.31"), parse("latest", "26.12.31"))
+        assertEquals(XrayCoreRequirement("26.1.23", "26.9.30"), parse("26.1.23", "v26.9.30"))
+        assertNull(parse("soon", "null"))
+        assertNull(parse(null, null))
+    }
+
+    @Test
+    fun `fetch stamps the core requirement on every config`() = runTest {
+        val body = """
+            #mxray-min-core-version: 26.10.10
+            vless://uuid@example.com:443?encryption=none&type=tcp#One
+            vless://uuid@example.org:443?encryption=none&type=tcp#Two
+        """.trimIndent()
+
+        val configs = fetcherReturning(body, contentType = "text/plain").fetchWithMetadata("https://subscriptions.example/sub").configs
+
+        assertEquals(List(2) { XrayCoreRequirement(min = "26.10.10") }, configs.map { it.subscriptionCoreRequirement })
+    }
+
+    @Test
+    fun `requests report the active core version unless a custom header replaces it`() = runTest {
+        val identity = object : SubscriptionDeviceIdentity by testDeviceIdentity {
+            override fun xrayCoreVersion(): String = "v26.10.25"
+        }
+        val auto = RequestCapture()
+        capturingFetcher(auto, deviceIdentity = identity).fetchWithMetadata("https://subscriptions.example/auto", SubscriptionRequestIdentity())
+        assertEquals("26.10.25", requireNotNull(auto.request).header("x-xray-core"))
+
+        val custom = RequestCapture()
+        capturingFetcher(custom, deviceIdentity = identity).fetchWithMetadata(
+            "https://subscriptions.example/custom",
+            SubscriptionRequestIdentity(
+                mode = SubscriptionUserAgentMode.CUSTOM,
+                customHeaders = listOf(SubscriptionHeader("x-xray-core", "1.8.0")),
+            ),
+        )
+        assertEquals(listOf("1.8.0"), requireNotNull(custom.request).headers("x-xray-core"))
+
+        val unknown = RequestCapture()
+        capturingFetcher(unknown).fetchWithMetadata("https://subscriptions.example/unknown", SubscriptionRequestIdentity())
+        assertNull(requireNotNull(unknown.request).header("x-xray-core"))
     }
 
     @Test
@@ -1145,6 +1199,7 @@ class SubscriptionFetcherTest {
         capture: RequestCapture,
         body: String = "vless://uuid@example.com:443?encryption=none&type=tcp#Captured",
         contentType: String = "text/plain",
+        deviceIdentity: SubscriptionDeviceIdentity = testDeviceIdentity,
     ): SubscriptionFetcher {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
@@ -1159,6 +1214,6 @@ class SubscriptionFetcherTest {
                     .build()
             }
             .build()
-        return SubscriptionFetcher(DirectHttpClient(client), testDeviceIdentity, testPlatform)
+        return SubscriptionFetcher(DirectHttpClient(client), deviceIdentity, testPlatform)
     }
 }

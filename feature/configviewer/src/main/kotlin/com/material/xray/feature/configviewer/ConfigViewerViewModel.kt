@@ -280,8 +280,11 @@ class ConfigViewerViewModel(
             if (parsed == null && state != null) {
                 _uiState.value = state.copy(errorRes = R.string.config_viewer_error_invalid_json)
             }
-            // The provider's DNS directive lives outside the JSON, so a hand edit must not drop it.
-            parsed?.copy(subscriptionUseProfileDns = serverConfig?.subscriptionUseProfileDns)
+            // The provider's directives live outside the JSON, so a hand edit must not drop them.
+            parsed?.copy(
+                subscriptionUseProfileDns = serverConfig?.subscriptionUseProfileDns,
+                subscriptionCoreRequirement = serverConfig?.subscriptionCoreRequirement,
+            )
         }
         is EditDraft.Params -> {
             val state = _uiState.value as? ConfigViewerUiState.ParamsEditor

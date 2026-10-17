@@ -28,6 +28,8 @@ data class ServerConfig(
      * choice when connecting. Either overrides the global Prefer profile DNS.
      */
     val subscriptionUseProfileDns: Boolean? = null,
+    /** The core versions the subscription's `mxray-min-core-version` and `mxray-max-core-version` ask for. */
+    val subscriptionCoreRequirement: XrayCoreRequirement? = null,
     @Transient val bootstrapDnsHosts: Map<String, List<String>> = emptyMap(),
 ) {
     @Serializable

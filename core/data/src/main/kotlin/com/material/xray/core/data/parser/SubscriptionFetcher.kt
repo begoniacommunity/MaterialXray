@@ -221,10 +221,11 @@ class SubscriptionFetcher(
             val metadata = parseMetadata(headers)
             identity.checkHardwareIdConsent(metadata.requiresHardwareId, requireHardwareIdConsent)
             val useProfileDns = parseUseProfileDnsHeader(headers)
+            val coreRequirement = parseCoreRequirementHeaders(headers)
             val configs = parseSubscriptionBody(
                 body = bodyText,
                 contentType = metadata.contentType,
-            ).map { it.copy(subscriptionUseProfileDns = useProfileDns) }
+            ).map { it.copy(subscriptionUseProfileDns = useProfileDns, subscriptionCoreRequirement = coreRequirement) }
 
             if (configs.isEmpty()) {
                 throw SubscriptionFetchException(
@@ -671,6 +672,7 @@ class SubscriptionFetcher(
     ): SubscriptionRequestHeaderValues = SubscriptionRequestHeaderValues(
         userAgent = userAgent,
         hardwareId = if (identity.sendHardwareId) deviceIdentity.hardwareId() else null,
+        xrayCoreVersion = deviceIdentity.xrayCoreVersion(),
         deviceOs = platformInfo.osName,
         osVersion = platformInfo.osVersion,
         deviceModel = platformInfo.deviceModel,
@@ -684,6 +686,7 @@ class SubscriptionFetcher(
         return SubscriptionRequestHeaderValues(
             userAgent = identity.customUserAgent.trim().ifBlank { buildUserAgent() },
             hardwareId = if (identity.sendHardwareId && !hasHardwareIdHeader) deviceIdentity.hardwareId() else null,
+            xrayCoreVersion = deviceIdentity.xrayCoreVersion(),
             extraHeaders = headers.map { it.name to it.value },
         )
     }

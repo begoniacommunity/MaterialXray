@@ -4,12 +4,15 @@ import com.material.xray.core.model.SubscriptionAppRouting
 import com.material.xray.core.model.SubscriptionAppRoutingMode
 import com.material.xray.core.model.SubscriptionMetadata
 import com.material.xray.core.model.SubscriptionUserInfo
+import com.material.xray.core.model.XrayCoreRequirement
+import com.material.xray.core.model.normalizeXrayVersion
 import okhttp3.Headers
 import okhttp3.Request
 
 data class SubscriptionRequestHeaderValues(
     val userAgent: String,
     val hardwareId: String? = null,
+    val xrayCoreVersion: String? = null,
     val deviceOs: String? = null,
     val osVersion: String? = null,
     val deviceModel: String? = null,
@@ -19,6 +22,7 @@ data class SubscriptionRequestHeaderValues(
 object SubscriptionStandardHeaders {
     const val USER_AGENT = "User-Agent"
     const val X_HWID = "x-hwid"
+    const val X_XRAY_CORE = "x-xray-core"
     const val X_DEVICE_OS = "x-device-os"
     const val X_VER_OS = "x-ver-os"
     const val X_DEVICE_MODEL = "x-device-model"
@@ -41,10 +45,13 @@ object SubscriptionStandardHeaders {
     const val ROUTING = "routing"
     const val ROUTING_ENABLE = "routing-enable"
     const val MXRAY_USE_DNS_FROM_JSON = "mxray-use-dns-from-json"
+    const val MXRAY_MIN_CORE_VERSION = "mxray-min-core-version"
+    const val MXRAY_MAX_CORE_VERSION = "mxray-max-core-version"
 
     val requestHeaderNames: List<String> = listOf(
         USER_AGENT,
         X_HWID,
+        X_XRAY_CORE,
         X_DEVICE_OS,
         X_VER_OS,
         X_DEVICE_MODEL,
@@ -69,6 +76,8 @@ object SubscriptionStandardHeaders {
         ROUTING,
         ROUTING_ENABLE,
         MXRAY_USE_DNS_FROM_JSON,
+        MXRAY_MIN_CORE_VERSION,
+        MXRAY_MAX_CORE_VERSION,
     )
 
     fun applyRequestHeaders(
@@ -77,6 +86,7 @@ object SubscriptionStandardHeaders {
     ): Request.Builder = builder.apply {
         header(USER_AGENT, values.userAgent)
         values.hardwareId?.takeIf { it.isNotBlank() }?.let { header(X_HWID, it) }
+        values.xrayCoreVersion?.takeIf { it.isNotBlank() }?.let { header(X_XRAY_CORE, normalizeXrayVersion(it)) }
         values.deviceOs?.takeIf { it.isNotBlank() }?.let { header(X_DEVICE_OS, it) }
         values.osVersion?.takeIf { it.isNotBlank() }?.let { header(X_VER_OS, it) }
         values.deviceModel?.takeIf { it.isNotBlank() }?.let { header(X_DEVICE_MODEL, it) }
@@ -205,3 +215,9 @@ fun parseUseProfileDnsHeader(headers: Headers): Boolean? = when (SubscriptionSta
     in FALSY_HEADER_VALUES -> false
     else -> null
 }
+
+/** The core versions the provider asks for; null without a usable bound. */
+fun parseCoreRequirementHeaders(headers: Headers): XrayCoreRequirement? = XrayCoreRequirement.of(
+    min = SubscriptionStandardHeaders.normalizeNullableHeader(headers[SubscriptionStandardHeaders.MXRAY_MIN_CORE_VERSION]),
+    max = SubscriptionStandardHeaders.normalizeNullableHeader(headers[SubscriptionStandardHeaders.MXRAY_MAX_CORE_VERSION]),
+)

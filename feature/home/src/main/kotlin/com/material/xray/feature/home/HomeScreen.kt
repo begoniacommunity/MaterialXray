@@ -187,6 +187,8 @@ import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.model.SessionTrafficMetrics
 import com.material.xray.core.model.SubscriptionUserAgentMode
+import com.material.xray.core.model.XrayCoreRequirement
+import com.material.xray.core.model.normalizeXrayVersion
 import com.material.xray.core.runtime.AppUpdateInstallProgress
 import com.material.xray.core.runtime.AppUpdateInstallStage
 import com.material.xray.core.ui.R
@@ -653,6 +655,64 @@ fun HomeScreen(
         onDismiss = { uiState.pendingHwidAddition?.let { viewModel.dismissHwidRequiredAddition(it.id) } },
         onConfirm = { uiState.pendingHwidAddition?.let { viewModel.confirmHwidRequiredAddition(it.id) } },
     )
+    CoreRequirementDialogHost(
+        prompt = uiState.coreRequirementPrompt,
+        onDismiss = viewModel::dismissCoreRequirement,
+        onConnectAnyway = viewModel::connectDespiteCoreRequirement,
+        onSwitch = viewModel::switchCoreAndConnect,
+    )
+}
+
+@Composable
+private fun CoreRequirementDialogHost(
+    prompt: CoreRequirementPrompt?,
+    onDismiss: () -> Unit,
+    onConnectAnyway: () -> Unit,
+    onSwitch: () -> Unit,
+) {
+    if (prompt == null) return
+    val candidate = prompt.candidate
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_core_requirement_title)) },
+        text = {
+            Text(
+                stringResource(
+                    R.string.home_core_requirement_body,
+                    coreRequirementRange(prompt.requirement),
+                    normalizeXrayVersion(prompt.currentVersion),
+                ),
+            )
+        },
+        // Three labelled actions do not fit one row, so they stack like Material's long-label dialogs.
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                if (candidate != null) {
+                    TextButton(onClick = onSwitch) {
+                        Text(
+                            stringResource(
+                                if (candidate.needsDownload) R.string.home_core_requirement_download else R.string.home_core_requirement_switch,
+                                candidate.version,
+                            ),
+                        )
+                    }
+                }
+                TextButton(onClick = onConnectAnyway) { Text(stringResource(R.string.home_core_requirement_connect_anyway)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.home_core_requirement_cancel)) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun coreRequirementRange(requirement: XrayCoreRequirement): String {
+    val min = requirement.min
+    val max = requirement.max
+    return when {
+        min != null && max != null -> stringResource(R.string.home_core_requirement_range_both, min, max)
+        min != null -> stringResource(R.string.home_core_requirement_range_min, min)
+        else -> stringResource(R.string.home_core_requirement_range_max, max.orEmpty())
+    }
 }
 
 @Composable
@@ -1024,6 +1084,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val showInstallPermissionRationale by viewModel.showInstallPermissionRationale.collectAsStateWithLifecycle()
     val pendingServerSelection by viewModel.pendingServerSelection.collectAsStateWithLifecycle()
     val pendingHwidAddition by viewModel.pendingHwidAddition.collectAsStateWithLifecycle()
+    val coreRequirementPrompt by viewModel.coreRequirementPrompt.collectAsStateWithLifecycle()
 
     return HomeUiState(
         connectionState = connectionState,
@@ -1050,6 +1111,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
         showInstallPermissionRationale = showInstallPermissionRationale,
         pendingServerSelection = pendingServerSelection,
         pendingHwidAddition = pendingHwidAddition,
+        coreRequirementPrompt = coreRequirementPrompt,
     )
 }
 
@@ -1119,6 +1181,8 @@ private data class HomeUiState(
     val pendingServerSelection: Long?,
     /** A new subscription awaiting consent to its required hardware ID policy. */
     val pendingHwidAddition: HardwareIdConsentPrompt?,
+    /** A connection held back because the core is outside the subscription's version range. */
+    val coreRequirementPrompt: CoreRequirementPrompt?,
 )
 
 private data class ConnectionUiState(

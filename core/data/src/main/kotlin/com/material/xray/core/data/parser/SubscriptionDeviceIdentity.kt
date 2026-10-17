@@ -8,6 +8,9 @@ interface SubscriptionDeviceIdentity {
     fun appVersion(): String
 
     fun hardwareId(): String
+
+    /** The version of the core that runs on the next start, or null when it cannot be read. */
+    fun xrayCoreVersion(): String? = null
 }
 
 /**

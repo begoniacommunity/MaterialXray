@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.material.xray.core.model.normalizeXrayVersion
 import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.xraycore.XrayCoreException
 import com.material.xray.core.xraycore.XrayCoreFailure
@@ -16,7 +17,6 @@ import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettings
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import com.material.xray.core.xraycore.newestReleaseFirst
-import com.material.xray.core.xraycore.normalizeXrayVersion
 import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -213,6 +213,10 @@ class XrayCoreViewModel(
     fun setUpdateInterval(interval: XrayCoreUpdateInterval) {
         val updated = updateSettingsStore.update { it.copy(intervalHours = interval.hours) }
         updateScheduler.setEnabled(updated.periodicChecks, updated.interval)
+    }
+
+    fun setFollowProviderRequirements(enabled: Boolean) {
+        updateSettingsStore.update { it.copy(followProviderRequirements = enabled) }
     }
 
     fun setUpdateAction(action: XrayCoreUpdateAction) {

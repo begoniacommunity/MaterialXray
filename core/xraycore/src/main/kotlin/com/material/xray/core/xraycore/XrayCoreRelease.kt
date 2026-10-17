@@ -1,5 +1,6 @@
 package com.material.xray.core.xraycore
 
+import com.material.xray.core.model.compareXrayVersions
 import java.io.IOException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -112,26 +113,6 @@ fun isRecommendedXrayVersion(version: String): Boolean = (compareXrayVersions(ve
 
 /** Whether [version] is at least [MINIMUM_XRAY_VERSION]. Unparseable versions are not. */
 fun isSupportedXrayVersion(version: String): Boolean = (compareXrayVersions(version, MINIMUM_XRAY_VERSION) ?: -1) >= 0
-
-/** Compares the numeric part of two Xray versions, or returns null when either is not numeric. */
-fun compareXrayVersions(left: String, right: String): Int? {
-    val leftParts = numericVersion(left) ?: return null
-    val rightParts = numericVersion(right) ?: return null
-    for (index in 0 until maxOf(leftParts.size, rightParts.size)) {
-        val comparison = leftParts.getOrElse(index) { 0 }.compareTo(rightParts.getOrElse(index) { 0 })
-        if (comparison != 0) return comparison
-    }
-    return 0
-}
-
-/** Drops the `v` of a tag such as `v26.9.30`, which `xray version` does not print. */
-fun normalizeXrayVersion(version: String): String = version.trim().removePrefix("v")
-
-private fun numericVersion(version: String): List<Int>? {
-    val parts = normalizeXrayVersion(version).substringBefore('-').substringBefore('+').split('.')
-    if (parts.size < 2) return null
-    return parts.map { it.toIntOrNull()?.takeIf { number -> number >= 0 } ?: return null }
-}
 
 private fun isValidReleaseTag(tag: String): Boolean = RELEASE_TAG_PATTERN.matches(tag)
 

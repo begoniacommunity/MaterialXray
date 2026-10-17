@@ -221,4 +221,15 @@
     <string name="home_hwid_required_body">Subscription “%1$s” requires Send hardware ID (HWID). Proceed will enable it for this subscription.\n\nSending HWID may help link outgoing traffic to your device and reduce anonymity.</string>
     <string name="home_hwid_required_confirm">Proceed</string>
     <string name="home_hwid_required_cancel">Cancel</string>
+    <string name="home_core_requirement_title">This profile may not work with the current Xray core</string>
+    <string name="home_core_requirement_body">Its provider asks for Xray %1$s. You have v%2$s.</string>
+    <string name="home_core_requirement_range_min">v%1$s or newer</string>
+    <string name="home_core_requirement_range_max">v%1$s or older</string>
+    <string name="home_core_requirement_range_both">v%1$s to v%2$s</string>
+    <string name="home_core_requirement_download">Download v%1$s</string>
+    <string name="home_core_requirement_switch">Use v%1$s</string>
+    <string name="home_core_requirement_connect_anyway">Connect anyway</string>
+    <string name="home_core_requirement_cancel">Cancel</string>
+    <string name="home_core_requirement_installing">Installing Xray v%1$s for this profile…</string>
+    <string name="home_core_requirement_failed">Could not switch to Xray v%1$s</string>
 </resources>

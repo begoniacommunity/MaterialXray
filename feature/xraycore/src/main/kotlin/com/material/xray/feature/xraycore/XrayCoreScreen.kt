@@ -75,6 +75,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.material.xray.core.model.compareXrayVersions
+import com.material.xray.core.model.normalizeXrayVersion
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.ActionFeedback
 import com.material.xray.core.ui.components.AnimatedActionIcon
@@ -86,6 +88,7 @@ import com.material.xray.core.ui.components.ScrolledTopAppBar
 import com.material.xray.core.ui.components.SelectableOptionRow
 import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsItemSpacing
+import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
 import com.material.xray.core.ui.components.UpdateIntervalDialog
@@ -99,9 +102,7 @@ import com.material.xray.core.xraycore.XrayCoreState
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
 import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettings
-import com.material.xray.core.xraycore.compareXrayVersions
 import com.material.xray.core.xraycore.isRecommendedXrayVersion
-import com.material.xray.core.xraycore.normalizeXrayVersion
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -268,6 +269,7 @@ fun XrayCoreScreen(
                         },
                         onIntervalClick = { showUpdateIntervalDialog = true },
                         onActionSelected = viewModel::setUpdateAction,
+                        onFollowProviderRequirementsChange = viewModel::setFollowProviderRequirements,
                     )
                 }
             }
@@ -333,6 +335,7 @@ private fun UpdateSettings(
     onPeriodicChecksChange: (Boolean) -> Unit,
     onActionSelected: (XrayCoreUpdateAction) -> Unit,
     onIntervalClick: () -> Unit,
+    onFollowProviderRequirementsChange: (Boolean) -> Unit,
 ) {
     Column(
         modifier = Modifier.padding(top = 16.dp),
@@ -360,6 +363,12 @@ private fun UpdateSettings(
                 modifier = Modifier.padding(start = 16.dp, top = SettingsFieldSpacing, end = 16.dp, bottom = SettingsFieldSpacing),
             )
         }
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_xray_core_follow_requirements),
+            description = stringResource(R.string.settings_xray_core_follow_requirements_description),
+            checked = settings.followProviderRequirements,
+            onCheckedChange = onFollowProviderRequirementsChange,
+        )
     }
 }
 

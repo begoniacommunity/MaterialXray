@@ -237,4 +237,15 @@
     <string name="home_hwid_required_body">Подписка «%1$s» требует включить отправку HWID. Продолжение включит её для этой подписки.\n\nОтправка HWID может помочь связать исходящий трафик с вашим устройством и снизить анонимность.</string>
     <string name="home_hwid_required_confirm">Продолжить</string>
     <string name="home_hwid_required_cancel">Отмена</string>
+    <string name="home_core_requirement_title">Профиль может не работать с текущим ядром Xray</string>
+    <string name="home_core_requirement_body">Провайдер требует Xray %1$s. Установлена v%2$s.</string>
+    <string name="home_core_requirement_range_min">v%1$s или новее</string>
+    <string name="home_core_requirement_range_max">v%1$s или старее</string>
+    <string name="home_core_requirement_range_both">от v%1$s до v%2$s</string>
+    <string name="home_core_requirement_download">Скачать v%1$s</string>
+    <string name="home_core_requirement_switch">Использовать v%1$s</string>
+    <string name="home_core_requirement_connect_anyway">Всё равно подключиться</string>
+    <string name="home_core_requirement_cancel">Отмена</string>
+    <string name="home_core_requirement_installing">Установка Xray v%1$s для этого профиля…</string>
+    <string name="home_core_requirement_failed">Не удалось переключиться на Xray v%1$s</string>
 </resources>
