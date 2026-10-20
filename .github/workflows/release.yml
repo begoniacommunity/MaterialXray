@@ -39,25 +39,35 @@ jobs:
 
       - name: Validate release secrets
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          LEGACY_KEYSTORE_BASE64: ${{ secrets.LEGACY_KEYSTORE_BASE64 }}
+          LEGACY_KEY_ALIAS: ${{ secrets.LEGACY_KEY_ALIAS }}
+          LEGACY_KEY_PASSWORD: ${{ secrets.LEGACY_KEY_PASSWORD }}
+          LEGACY_STORE_PASSWORD: ${{ secrets.LEGACY_STORE_PASSWORD }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
-          for secret_name in ANDROID_KEYSTORE_BASE64 RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD RELEASE_STORE_PASSWORD SENTRY_AUTH_TOKEN; do
+          for secret_name in \
+            RELEASE_KEYSTORE_BASE64 RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD RELEASE_STORE_PASSWORD \
+            LEGACY_KEYSTORE_BASE64 LEGACY_KEY_ALIAS LEGACY_KEY_PASSWORD LEGACY_STORE_PASSWORD \
+            SENTRY_AUTH_TOKEN; do
             if [ -z "${!secret_name}" ]; then
               echo "$secret_name is not configured" >&2
               exit 1
             fi
           done
 
-      - name: Decode release keystore
+      - name: Decode release keystores
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          LEGACY_KEYSTORE_BASE64: ${{ secrets.LEGACY_KEYSTORE_BASE64 }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
-          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          echo "$LEGACY_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/legacy.keystore"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+          echo "LEGACY_KEYSTORE_PATH=$RUNNER_TEMP/legacy.keystore" >> "$GITHUB_ENV"
 
       - name: Build release APK
         env:
@@ -71,6 +81,15 @@ jobs:
       - name: Prepare release APK artifacts
         id: artifact
         shell: bash
+        env:
+          LEGACY_KEYSTORE_PATH: ${{ env.LEGACY_KEYSTORE_PATH }}
+          LEGACY_KEY_ALIAS: ${{ secrets.LEGACY_KEY_ALIAS }}
+          LEGACY_KEY_PASSWORD: ${{ secrets.LEGACY_KEY_PASSWORD }}
+          LEGACY_STORE_PASSWORD: ${{ secrets.LEGACY_STORE_PASSWORD }}
+          RELEASE_KEYSTORE_PATH: ${{ env.RELEASE_KEYSTORE_PATH }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
           set -euo pipefail
           version_name="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
@@ -83,11 +102,32 @@ jobs:
           apk_base="MaterialXray-v${version_name}-${short_sha}"
           apk_dir="app/build/outputs/apk/release/dist"
           mkdir -p "$apk_dir"
-          # GitHub lists release assets by name and older updaters take the first APK, so the
-          # universal one keeps the plain name and per-ABI ones add ".<abi>" before ".apk".
-          cp app/build/outputs/apk/release/app-universal-release.apk "$apk_dir/${apk_base}.apk"
+
+          apksigner="$ANDROID_SDK_ROOT/build-tools/37.0.0/apksigner"
+          sign_with_lineage() {
+            "$apksigner" sign \
+              --ks "$LEGACY_KEYSTORE_PATH" \
+              --ks-key-alias "$LEGACY_KEY_ALIAS" \
+              --ks-pass env:LEGACY_STORE_PASSWORD \
+              --key-pass env:LEGACY_KEY_PASSWORD \
+              --next-signer \
+              --ks "$RELEASE_KEYSTORE_PATH" \
+              --ks-key-alias "$RELEASE_KEY_ALIAS" \
+              --ks-pass env:RELEASE_STORE_PASSWORD \
+              --key-pass env:RELEASE_KEY_PASSWORD \
+              --lineage config/signing/lineage.bin \
+              --rotation-min-sdk-version 28 \
+              --in "$1" \
+              --out "$2"
+          }
+
+          sign_with_lineage \
+            "app/build/outputs/apk/release/app-universal-release.apk" \
+            "$apk_dir/${apk_base}.apk"
           for abi in arm64-v8a x86_64 armeabi-v7a; do
-            cp "app/build/outputs/apk/release/app-${abi}-release.apk" "$apk_dir/${apk_base}.${abi}.apk"
+            sign_with_lineage \
+              "app/build/outputs/apk/release/app-${abi}-release.apk" \
+              "$apk_dir/${apk_base}.${abi}.apk"
           done
 
           echo "apk_base=$apk_base" >> "$GITHUB_OUTPUT"
