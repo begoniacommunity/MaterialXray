@@ -43,3 +43,15 @@ Server rows show a filled pencil for an edited configuration, a filled lock for 
 ## Hardware ID
 
 Some providers require a device identifier (HWID). Material Xray sends one by default. You can turn it off under **Settings → Send hardware ID (HWID)**. If a subscription [requires HWID](/docs/providers/response-headers/#subscription-always-hwid-enable) while sending is off, the app asks before adding it. **Cancel** leaves it unadded. **Proceed** permits HWID for that subscription and fetches it again with HWID; your global choice stays unchanged. The warning explains that HWID can help link traffic to your device and reduce anonymity. Selecting a subscription that requires HWID forces the Settings switch on and locks it. Switching to another subscription restores your saved choice.
+
+## TLS certificate fingerprints
+
+For a VLESS, VMess or Trojan profile with TLS, open **View config → Edit → Security**. **Certificate fingerprint (SHA-256)** is separate from the **TLS ClientHello fingerprint** (such as Chrome).
+
+Paste a fingerprint supplied by your administrator, or tap **Fetch certificate**. The app contacts the address and port in the current draft, sends the configured SNI (or uses the address when SNI is empty), negotiates the ALPN protocols from the draft, and retrieves the certificate without sending proxy credentials or an HTTP request. The preview shows the endpoint, SHA-256, subject, issuer, validity dates and the result of ordinary TLS trust and name checks.
+
+Fetching a self-signed certificate does **not** prove the server's identity. Compare its fingerprint with the administrator through a separate trusted channel. **Use this fingerprint** fills the draft only; save the configuration to apply it. A differing existing fingerprint is never replaced automatically. Cancelling the request or changing the endpoint discards the result.
+
+Xray pins SHA-256 of the complete DER certificate, not its public key. Accepting a server certificate replaces ordinary CA, hostname and expiry verification with an exact certificate match. A renewed or changed certificate therefore blocks connections until you explicitly update the fingerprint. Leave the field empty for ordinary TLS verification. Colon-separated hexadecimal and multiple comma-separated fingerprints are accepted.
+
+When saving a subscription profile, choose **Lock this server configuration** if future subscription updates must preserve your fingerprint. The original share link remains unchanged and is marked as outdated after an edit; backups preserve the edited configuration and fingerprint. VLESS/Trojan links accept `pcs` (or `pinnedPeerCertSha256`); VMess JSON links accept the same fields. Raw Xray JSON profiles keep using the JSON editor and `tlsSettings.pinnedPeerCertSha256`.

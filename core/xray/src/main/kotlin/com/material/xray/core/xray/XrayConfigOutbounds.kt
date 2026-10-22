@@ -441,7 +441,9 @@ private fun JsonObjectBuilder.putSecuritySettings(server: ServerConfig) {
                 if (alpn.isNotEmpty()) {
                     put("alpn", buildJsonArray { alpn.forEach { add(it) } })
                 }
-                server.extra[SERVER_EXTRA_HYSTERIA_PIN_SHA256]?.takeIf { it.isNotBlank() }?.let { put("pinnedPeerCertSha256", it) }
+                val certificatePins = server.security.pinnedPeerCertSha256.joinToString(",")
+                    .ifBlank { server.extra[SERVER_EXTRA_HYSTERIA_PIN_SHA256].orEmpty() }
+                if (certificatePins.isNotBlank()) put("pinnedPeerCertSha256", certificatePins)
             },
         )
 

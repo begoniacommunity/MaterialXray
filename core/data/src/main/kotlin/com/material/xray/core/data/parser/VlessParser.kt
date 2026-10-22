@@ -6,6 +6,7 @@ import com.material.xray.core.model.SERVER_EXTRA_MLDSA65_VERIFY
 import com.material.xray.core.model.SERVER_EXTRA_SPIDER_X
 import com.material.xray.core.model.SERVER_EXTRA_XHTTP_EXTRA
 import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.parseCertificateFingerprints
 import java.net.URI
 
 object VlessParser {
@@ -38,6 +39,7 @@ object VlessParser {
                 alpn = params["alpn"]?.split(",").orEmpty(),
                 publicKey = params["pbk"].orEmpty(),
                 shortId = params["sid"].orEmpty(),
+                pinnedPeerCertSha256 = parseCertificateFingerprints(params["pcs"] ?: params["pinnedPeerCertSha256"].orEmpty()),
             ),
             extra = buildMap {
                 params["encryption"]?.let { put("encryption", it) }

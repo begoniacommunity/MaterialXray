@@ -5,6 +5,8 @@ import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.SERVER_EXTRA_HYSTERIA_OBFS_PASSWORD
 import com.material.xray.core.model.SERVER_EXTRA_WIREGUARD_PRESHARED_KEY
 import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.parseCertificateFingerprints
+import com.material.xray.core.network.TlsCertificateEndpoint
 import com.material.xray.core.ui.R
 
 /** Which part of a [ServerConfig] an editable field writes back to. */
@@ -34,6 +36,8 @@ sealed interface EditKey {
     data object SecuritySni : EditKey
 
     data object SecurityFingerprint : EditKey
+
+    data object SecurityCertificatePin : EditKey
 
     data object SecurityAlpn : EditKey
 
@@ -90,6 +94,7 @@ fun ServerConfig.toEditSections(): List<EditSection> = listOfNotNull(
         listOf(
             EditField(EditKey.SecurityType, ParamLabel.Resource(R.string.config_viewer_field_security_type), security.type),
             EditField(EditKey.SecuritySni, ParamLabel.Resource(R.string.config_viewer_field_security_sni), security.sni),
+            EditField(EditKey.SecurityCertificatePin, ParamLabel.Resource(R.string.config_viewer_certificate_pin), security.pinnedPeerCertSha256.joinToString(", ")),
             EditField(
                 EditKey.SecurityFingerprint,
                 ParamLabel.Resource(R.string.config_viewer_field_security_fingerprint),
@@ -125,6 +130,7 @@ enum class EditValidationError(@param:StringRes val messageRes: Int) {
     INVALID_PORT(R.string.config_viewer_error_invalid_port),
     MISSING_ADDRESS(R.string.config_viewer_error_missing_address),
     MISSING_NAME(R.string.config_viewer_error_missing_name),
+    INVALID_CERTIFICATE_PIN(R.string.config_viewer_certificate_invalid_pin),
 }
 
 sealed interface EditOutcome {
@@ -152,6 +158,11 @@ fun List<EditSection>.toServerConfig(original: ServerConfig): EditOutcome {
     if (port == null || port !in 1..MAX_PORT) return EditOutcome.Invalid(EditValidationError.INVALID_PORT)
 
     val protocol = Protocol.entries.find { it.name == value(EditKey.Protocol) } ?: original.protocol
+    val certificatePins = try {
+        parseCertificateFingerprints(value(EditKey.SecurityCertificatePin))
+    } catch (_: IllegalArgumentException) {
+        return EditOutcome.Invalid(EditValidationError.INVALID_CERTIFICATE_PIN)
+    }
 
     return EditOutcome.Valid(
         original.copy(
@@ -177,6 +188,7 @@ fun List<EditSection>.toServerConfig(original: ServerConfig): EditOutcome {
                     .filter { it.isNotEmpty() },
                 publicKey = value(EditKey.SecurityPublicKey),
                 shortId = value(EditKey.SecurityShortId),
+                pinnedPeerCertSha256 = certificatePins,
             ),
             extra = values
                 .mapNotNull { (key, value) -> (key as? EditKey.Extra)?.let { it.key to value.trim() } }
@@ -195,3 +207,15 @@ internal fun Protocol.credentialLabelRes(): Int = when (this) {
 internal val SECRET_EXTRA_KEYS = setOf(SERVER_EXTRA_HYSTERIA_OBFS_PASSWORD, SERVER_EXTRA_WIREGUARD_PRESHARED_KEY)
 
 private const val MAX_PORT = 65535
+
+internal fun certificateEndpoint(values: Map<EditKey, String>): TlsCertificateEndpoint? {
+    if (values[EditKey.Protocol] !in setOf("VLESS", "VMESS", "TROJAN") || values[EditKey.SecurityType]?.trim() != "tls") return null
+    val address = values[EditKey.Address]?.trim()?.removeSurrounding("[", "]").orEmpty()
+    val port = values[EditKey.Port]?.trim()?.toIntOrNull() ?: return null
+    val serverName = values[EditKey.SecuritySni]?.trim()?.ifBlank { address } ?: address
+    val alpn = values[EditKey.SecurityAlpn].orEmpty().split(',').map(String::trim).filter(String::isNotEmpty)
+    return runCatching { TlsCertificateEndpoint(address, port, serverName, alpn) }.getOrNull()
+}
+
+/** Keep a rotation's other pins when the fetched certificate is already among them. */
+internal fun confirmedCertificatePins(current: String, fetched: String): String = if (runCatching { fetched in parseCertificateFingerprints(current) }.getOrDefault(false)) current else fetched

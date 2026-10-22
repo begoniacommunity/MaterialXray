@@ -26,7 +26,7 @@
     <string name="config_viewer_field_transport_mode">Режим</string>
     <string name="config_viewer_field_security_type">Тип</string>
     <string name="config_viewer_field_security_sni">SNI</string>
-    <string name="config_viewer_field_security_fingerprint">Отпечаток</string>
+    <string name="config_viewer_field_security_fingerprint">Отпечаток TLS ClientHello</string>
     <string name="config_viewer_field_security_alpn">ALPN</string>
     <string name="config_viewer_field_security_public_key">Открытый ключ</string>
     <string name="config_viewer_field_security_short_id">Короткий ID</string>
@@ -57,4 +57,20 @@
     <string name="config_viewer_save_failed">Не удалось сохранить конфигурацию.</string>
     <string name="config_viewer_save_failed_gone">Этот сервер был заменён обновлением подписки. Изменения не сохранены.</string>
     <string name="config_viewer_override_discarded">Изменённая активная конфигурация удалена в пользу этого изменения.</string>
+    <string name="config_viewer_certificate_pin">Отпечаток сертификата (SHA-256)</string>
+    <string name="config_viewer_certificate_pin_help">Необязательно. Вставьте отпечаток SHA-256 от администратора или получите сертификат и проверьте его перед использованием. Несколько отпечатков разделяйте запятыми.</string>
+    <string name="config_viewer_certificate_invalid_pin">Отпечаток SHA-256 должен содержать 64 шестнадцатеричные цифры. Допустимы двоеточия; несколько отпечатков разделяйте запятыми.</string>
+    <string name="config_viewer_certificate_fetch">Получить сертификат</string>
+    <string name="config_viewer_certificate_fetch_failed">Не удалось получить TLS-сертификат. Проверьте адрес, порт и SNI, затем повторите попытку.</string>
+    <string name="config_viewer_certificate_title">Сертификат сервера</string>
+    <string name="config_viewer_certificate_endpoint">Сервер: %1$s:%2$d\nSNI / ожидаемое имя: %3$s</string>
+    <string name="config_viewer_certificate_sha256">SHA-256:\n%1$s</string>
+    <string name="config_viewer_certificate_subject">Владелец: %1$s</string>
+    <string name="config_viewer_certificate_issuer">Издатель: %1$s</string>
+    <string name="config_viewer_certificate_validity">Действителен с %1$s до %2$s</string>
+    <string name="config_viewer_certificate_trusted">Цепочка сертификата, срок действия и имя сервера прошли обычную проверку TLS.</string>
+    <string name="config_viewer_certificate_untrusted">Подлинность сервера не подтверждена. Сверьте отпечаток с администратором по независимому доверенному каналу.</string>
+    <string name="config_viewer_certificate_replacing">Этот сертификат отличается от сохранённого отпечатка. Принимайте его только после независимого подтверждения замены у администратора.</string>
+    <string name="config_viewer_certificate_confirmation">При использовании отпечатка Xray доверяет именно этому сертификату вместо обычной проверки центра сертификации, имени и срока действия. При смене сертификата подключение блокируется, пока вы явно не обновите отпечаток. Отпечаток будет добавлен в черновик; сохраните конфигурацию для применения.</string>
+    <string name="config_viewer_certificate_use">Использовать этот отпечаток</string>
 </resources>

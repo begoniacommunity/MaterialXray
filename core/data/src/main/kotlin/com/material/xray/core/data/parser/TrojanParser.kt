@@ -3,6 +3,7 @@ package com.material.xray.core.data.parser
 import com.material.xray.core.common.text.decodeUriComponentLeniently
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.parseCertificateFingerprints
 import java.net.URI
 
 object TrojanParser {
@@ -32,6 +33,7 @@ object TrojanParser {
                 sni = params["sni"].orEmpty(),
                 fingerprint = params["fp"].orEmpty(),
                 alpn = params["alpn"]?.split(",").orEmpty(),
+                pinnedPeerCertSha256 = parseCertificateFingerprints(params["pcs"] ?: params["pinnedPeerCertSha256"].orEmpty()),
             ),
             rawUri = uri,
         )

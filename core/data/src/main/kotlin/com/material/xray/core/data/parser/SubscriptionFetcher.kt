@@ -30,6 +30,7 @@ import com.material.xray.core.model.SubscriptionMetadata
 import com.material.xray.core.model.SubscriptionRequestIdentity
 import com.material.xray.core.model.SubscriptionRouting
 import com.material.xray.core.model.SubscriptionUserAgentMode
+import com.material.xray.core.model.parseCertificateFingerprints
 import com.material.xray.core.network.AppHttpClient
 import java.io.IOException
 import java.security.SecureRandom
@@ -362,7 +363,7 @@ class SubscriptionFetcher(
         }
 
         items.mapIndexedNotNull { index, item ->
-            (item as? JsonObject)?.toServerConfig(index)
+            runCatching { (item as? JsonObject)?.toServerConfig(index) }.getOrNull()
         }
     }.getOrDefault(emptyList())
 
@@ -416,6 +417,8 @@ class SubscriptionFetcher(
             type = securityType,
             sni = parseSecurityServerName(streamSettings).orEmpty(),
             fingerprint = parseSecurityFingerprint(streamSettings).orEmpty(),
+            pinnedPeerCertSha256 = streamSettings?.findObject("tlsSettings")?.findString("pinnedPeerCertSha256")
+                ?.let(::parseCertificateFingerprints).orEmpty(),
             alpn = parseSecurityAlpn(streamSettings),
             publicKey = streamSettings
                 ?.findObject("realitySettings")

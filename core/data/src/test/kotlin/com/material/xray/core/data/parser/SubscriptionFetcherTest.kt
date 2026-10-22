@@ -40,6 +40,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SubscriptionFetcherTest {
+    @Test
+    fun `JSON profile certificate pins are preserved separately from ClientHello fingerprint`() {
+        val pin = "ab".repeat(32)
+        val fetcher = SubscriptionFetcher(DirectHttpClient(OkHttpClient()), testDeviceIdentity, testPlatform)
+        val config = fetcher.parseJsonConfig("""{"outbounds":[{"protocol":"trojan","settings":{"servers":[{"address":"example.com","port":443,"password":"secret"}]},"streamSettings":{"security":"tls","tlsSettings":{"fingerprint":"chrome","pinnedPeerCertSha256":"$pin"}}}]}""")
+        assertEquals(listOf(pin), config?.security?.pinnedPeerCertSha256)
+        assertEquals("chrome", config?.security?.fingerprint)
+    }
+
+    @Test
+    fun `one invalid certificate pin does not discard valid JSON subscription entries`() {
+        val fetcher = SubscriptionFetcher(DirectHttpClient(OkHttpClient()), testDeviceIdentity, testPlatform)
+        val pin = "ab".repeat(32)
+        val invalid = """{"outbounds":[{"protocol":"trojan","settings":{"servers":[{"address":"bad.example","port":443,"password":"secret"}]},"streamSettings":{"security":"tls","tlsSettings":{"pinnedPeerCertSha256":"bad"}}}]}"""
+        val valid = invalid.replace("bad.example", "good.example").replace("\"bad\"", "\"$pin,\"")
+        val config = fetcher.parseJsonConfig("[$invalid,$valid]")
+        assertEquals("good.example", config?.address)
+        assertEquals(listOf(pin), config?.security?.pinnedPeerCertSha256)
+    }
+
     private val testDeviceIdentity = object : SubscriptionDeviceIdentity {
         override fun appVersion(): String = "test"
 

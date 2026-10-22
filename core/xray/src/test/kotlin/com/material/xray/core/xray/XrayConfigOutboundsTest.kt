@@ -31,6 +31,20 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class XrayConfigOutboundsTest {
+    @Test
+    fun `TLS proxy profiles enforce the saved certificate pins without allowInsecure`() {
+        val pins = listOf("ab".repeat(32), "cd".repeat(32))
+        listOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN).forEach { protocol ->
+            val server = ServerConfig(protocol, "Pinned", "proxy.example", 443, "id", security = ServerConfig.Security(type = "tls", fingerprint = "chrome", pinnedPeerCertSha256 = pins))
+            val tls = buildProxyOutbound(server, 0, null, "proxy").getValue("streamSettings").jsonObject.getValue("tlsSettings").jsonObject
+            assertEquals(pins.joinToString(","), tls.getValue("pinnedPeerCertSha256").jsonPrimitive.content)
+            assertEquals("chrome", tls.getValue("fingerprint").jsonPrimitive.content)
+            assertFalse("allowInsecure" in tls)
+            val normal = buildProxyOutbound(server.copy(security = server.security.copy(pinnedPeerCertSha256 = emptyList())), 0, null, "proxy")
+                .getValue("streamSettings").jsonObject.getValue("tlsSettings").jsonObject
+            assertFalse("pinnedPeerCertSha256" in normal)
+        }
+    }
 
     @Test
     fun `buildCoreOutbounds puts configured default first and app routes before fallback outbounds`() {

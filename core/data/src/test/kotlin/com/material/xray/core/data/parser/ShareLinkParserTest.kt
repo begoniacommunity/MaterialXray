@@ -12,6 +12,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShareLinkParserTest {
+    @org.junit.Test
+    fun `certificate pins survive VLESS Trojan and VMess link imports`() {
+        val pin = "ab".repeat(32)
+        val vmess = java.util.Base64.getEncoder().encodeToString("""{"add":"example.com","port":"443","id":"id","tls":"tls","pcs":"$pin"}""".toByteArray())
+        listOf("vless://id@example.com:443?security=tls&pcs=$pin", "trojan://secret@example.com:443?pcs=$pin", "vmess://$vmess").forEach { link ->
+            org.junit.Assert.assertEquals(listOf(pin), ShareLinkParser().parse(link)?.security?.pinnedPeerCertSha256)
+        }
+        org.junit.Assert.assertNull(ShareLinkParser().parse("vless://id@example.com:443?security=tls&pcs=invalid"))
+    }
 
     private val parser = ShareLinkParser()
 

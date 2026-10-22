@@ -546,7 +546,9 @@ private fun EditSectionCard(section: EditSection, drafts: Map<EditKey, TextField
             )
             section.fields.forEach { field ->
                 key(field.key) {
-                    if (field.key == EditKey.Protocol) {
+                    if (field.key == EditKey.SecurityCertificatePin) {
+                        TlsCertificateField(drafts)
+                    } else if (field.key == EditKey.Protocol) {
                         ProtocolDropdown(field, drafts.getValue(field.key))
                     } else {
                         EditFieldItem(field, drafts.getValue(field.key))
