@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="320dp" android:height="180dp" />
+            <solid android:color="#2177E8" />
+        </shape>
+    </item>
+    <item
+        android:width="90dp"
+        android:height="90dp"
+        android:left="20dp"
+        android:gravity="center_vertical"
+        android:drawable="@drawable/material_xray_monochrome" />
+    <item>
+        <bitmap
+            android:src="@drawable/tv_wordmark"
+            android:gravity="fill"
+            android:tint="#FFFFFF" />
+    </item>
+</layer-list>

@@ -9,12 +9,12 @@
     </background>
     <foreground>
         <inset
-            android:drawable="@drawable/ic_launcher_material_foreground"
-            android:inset="22%" />
+            android:drawable="@drawable/material_xray_monochrome"
+            android:inset="26%" />
     </foreground>
     <monochrome>
         <inset
-            android:drawable="@drawable/ic_launcher_material_monochrome"
-            android:inset="22%" />
+            android:drawable="@drawable/material_xray_monochrome"
+            android:inset="26%" />
     </monochrome>
 </adaptive-icon>

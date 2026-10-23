@@ -4,5 +4,5 @@
         android:width="@dimen/splash_logo_size"
         android:height="@dimen/splash_logo_size"
         android:gravity="center"
-        android:drawable="@drawable/ic_launcher_material_foreground" />
+        android:drawable="@drawable/material_xray_monochrome" />
 </layer-list>

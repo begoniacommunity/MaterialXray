@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="48dp" android:height="48dp" />
+            <gradient android:startColor="#1A73E8" android:endColor="#2278E9" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <item
+        android:width="32dp"
+        android:height="32dp"
+        android:gravity="center"
+        android:drawable="@drawable/material_xray_monochrome" />
+</layer-list>

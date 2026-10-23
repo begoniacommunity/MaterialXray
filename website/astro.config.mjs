@@ -17,8 +17,8 @@ export default defineConfig({
 		starlight({
 			title: 'Material Xray',
 			description: 'An Android proxy client powered by Xray-core, with a Material Design 3 interface.',
-			logo: { src: './src/assets/icon.png', alt: 'Material Xray' },
-			favicon: '/favicon.png',
+			logo: { light: './src/assets/icon.svg', dark: './src/assets/icon-monochrome.svg', alt: 'Material Xray' },
+			favicon: '/favicon.svg',
 			defaultLocale: 'root',
 			locales: {
 				root: { label: 'English', lang: 'en' },

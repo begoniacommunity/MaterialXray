@@ -53,7 +53,7 @@ Geodata downloads, subscription refreshes, app update checks and Xray version-li
 The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. The active tab label smoothly changes to semibold weight. Detail screens, including DNS and Xray-core settings, use the same directional fade-and-slide as the tabs, moving both the outgoing page and the incoming page. Predictive Back follows the same motion and can be cancelled; on wide windows, the detail sheet uses that transition and dims the controls beneath it.
 
 - **App language**: English or Russian, or follow the system.
-- **App icon**: the default icon or a Material-style alternative.
+- **App icon**: the default icon or a Material-style alternative. Both use the vector logo, with padding that keeps it inside adaptive launcher masks. The default uses the brand colors on white; the alternative and themed icons use the monochrome shape. The splash screen uses brand colors in light mode and monochrome in dark mode. The optional title-bar logo is always monochrome and matches the title text color in either theme. Notification icons always use monochrome.
 - **Floating connect button**: a small corner button instead of the large power button. A check mark indicates an active always-on VPN connection; tapping it opens Android's VPN settings.
 - **Notification fields**: pick what the connection notification shows and how often it updates.
   Hold a field's handle, then drag to reorder it. Haptic feedback marks the long press before any movement, and each subsequent change of position. Neighboring fields slide smoothly into place.

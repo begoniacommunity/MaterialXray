@@ -162,7 +162,7 @@ class XrayCoreUpdateNotifier(private val context: Context) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_launcher_default_monochrome)
+            .setSmallIcon(R.drawable.material_xray_monochrome)
             .setContentIntent(openIntent)
             .setAutoCancel(true)
             .build()

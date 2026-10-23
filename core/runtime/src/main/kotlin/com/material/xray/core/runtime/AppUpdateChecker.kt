@@ -83,7 +83,7 @@ class AppUpdateNotifier(
             .setContentTitle(context.localizedString(R.string.notification_app_update_title))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setSmallIcon(R.drawable.ic_launcher_default_monochrome)
+            .setSmallIcon(R.drawable.material_xray_monochrome)
             .setContentIntent(openIntent)
             .setAutoCancel(true)
             .build()

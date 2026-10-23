@@ -90,8 +90,6 @@ body {
 	height: 2.5rem;
 	width: 2.5rem;
 	padding: 0.25rem;
-	border-radius: var(--md-shape-md);
-	background: #fff;
 }
 
 site-search button[data-open-modal] {

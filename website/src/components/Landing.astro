@@ -33,7 +33,7 @@ const structuredData = {
 	description,
 	url: pageUrl,
 	inLanguage: lang,
-	image: new URL('/icon.png', site).href,
+	image: new URL('/icon.svg', site).href,
 	screenshot: ogImage,
 	downloadUrl: latest,
 	operatingSystem: 'Android 7.0+',
@@ -84,7 +84,7 @@ const modes = { rootless: t.modes.rootlessItems, rootful: t.modes.rootfulItems }
 		<meta property="og:image:alt" content={t.ogImageAlt} />
 		<meta name="twitter:card" content="summary_large_image" />
 		<script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
-		<link rel="icon" href="/favicon.png" type="image/png" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
@@ -116,7 +116,7 @@ const modes = { rootless: t.modes.rootlessItems, rootful: t.modes.rootfulItems }
 	<body>
 		<header class="top-bar" data-top-bar>
 			<a class="brand" href={`${base}/`}>
-				<span class="brand-icon"><img src="/icon.png" alt="" width="40" height="40" /></span>
+				<span class="brand-icon"><img class="logo-light" src="/icon.svg" alt="" width="40" height="40" /><img class="logo-dark" src="/icon-monochrome.svg" alt="" width="40" height="40" /></span>
 				<span>Material Xray</span>
 			</a>
 			<nav class="top-nav">
@@ -305,7 +305,7 @@ const modes = { rootless: t.modes.rootlessItems, rootful: t.modes.rootfulItems }
 
 		<footer class="footer">
 			<div class="footer-brand">
-				<span class="brand-icon"><img src="/icon.png" alt="" width="32" height="32" /></span>
+				<span class="brand-icon"><img class="logo-light" src="/icon.svg" alt="" width="32" height="32" /><img class="logo-dark" src="/icon-monochrome.svg" alt="" width="32" height="32" /></span>
 				<span>Material Xray</span>
 			</div>
 			<nav>

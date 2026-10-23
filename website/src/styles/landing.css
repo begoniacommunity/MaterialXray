@@ -189,12 +189,19 @@ p {
 .brand-icon {
 	display: grid;
 	place-items: center;
-	background: #fff;
-	border-radius: var(--md-shape-md);
 	padding: 0.2rem;
 }
 
 .brand-icon img {
+	display: block;
+}
+
+.brand-icon .logo-dark,
+[data-theme='dark'] .brand-icon .logo-light {
+	display: none;
+}
+
+[data-theme='dark'] .brand-icon .logo-dark {
 	display: block;
 }
 

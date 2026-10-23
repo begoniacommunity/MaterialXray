@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -166,8 +167,9 @@ fun AppBarTitle(title: String, showLogo: Boolean) {
                 slideOutHorizontally(tween(180)) { -it },
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_launcher_default_monochrome),
+                painter = painterResource(R.drawable.material_xray_monochrome),
                 contentDescription = null,
+                tint = LocalContentColor.current,
                 modifier = Modifier.padding(horizontal = 8.dp).size(24.dp),
             )
         }
