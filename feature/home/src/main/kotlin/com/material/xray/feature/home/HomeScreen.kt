@@ -73,7 +73,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
@@ -2324,7 +2323,7 @@ private fun SubscriptionHeader(
             Box(modifier = controlsModifier) {
                 TooltipIconButton(tooltip = stringResource(R.string.home_subscription_menu_content_description), onClick = { showMenu = true }, enabled = !reordering) {
                     Icon(
-                        Icons.Default.MoreVert,
+                        painterResource(R.drawable.more_horiz_24px),
                         contentDescription = stringResource(R.string.home_subscription_menu_content_description),
                     )
                 }

@@ -16,7 +16,7 @@ internal fun logExportSnapshot(entries: List<LogEntry>, selectedIds: Set<Long>, 
 internal fun logExportFileName(source: LogSource?, selected: Boolean): String {
     val suffix = when {
         selected -> "selected"
-        source == LogSource.APP -> "app-only"
+        source == LogSource.APP -> "internal-only"
         source == LogSource.XRAY -> "core-only"
         else -> "all"
     }
@@ -26,6 +26,6 @@ internal fun logExportFileName(source: LogSource?, selected: Boolean): String {
 internal fun formatLogEntries(entries: List<LogEntry>): String {
     val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     return entries.joinToString("\n") { entry ->
-        "${timeFormat.format(Date(entry.timestamp))} [${entry.source.name}] ${entry.displayMessage}"
+        "${timeFormat.format(Date(entry.timestamp))} [${entry.source.tag}] ${entry.displayMessage}"
     }
 }

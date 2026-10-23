@@ -13,6 +13,7 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -24,11 +25,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,10 +41,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,7 +53,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -65,7 +63,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -75,6 +72,7 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -87,6 +85,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -97,13 +96,19 @@ import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.AppBarTitle
-import com.material.xray.core.ui.components.AppTopBarHeight
 import com.material.xray.core.ui.components.FloatingButtonShadow
+import com.material.xray.core.ui.components.FloatingTab
+import com.material.xray.core.ui.components.FloatingTabFadeHeight
+import com.material.xray.core.ui.components.FloatingTabRow
 import com.material.xray.core.ui.components.LocalBottomBarVisibility
 import com.material.xray.core.ui.components.ScrollFadeEdges
-import com.material.xray.core.ui.components.SegmentedTabRow
+import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SearchTabsPanel
+import com.material.xray.core.ui.components.TabsPanelState
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.rememberLazyListSelectionGesture
+import com.material.xray.core.ui.components.searchPanelFraction
+import com.material.xray.core.ui.components.tabsPanelState
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -113,8 +118,8 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private enum class LogFilter(@param:StringRes val labelRes: Int, val source: LogSource?) {
     ALL(R.string.logs_filter_all, null),
-    APP(R.string.logs_filter_app, LogSource.APP),
-    XRAY(R.string.logs_filter_xray, LogSource.XRAY),
+    INTERNAL(R.string.logs_filter_internal, LogSource.APP),
+    CORE(R.string.logs_filter_core, LogSource.XRAY),
 }
 
 internal enum class LogSeverity { ERROR, WARNING, NORMAL }
@@ -157,6 +162,10 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { LogFilter.entries.size })
     val coroutineScope = rememberCoroutineScope()
+    val listStates = LogFilter.entries.map { rememberLazyListState() }
+    val followTailStates = listStates.map { it.rememberFollowTail() }
+    val density = LocalDensity.current
+    var tabsPanelHeight by remember { mutableStateOf(0.dp) }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -176,8 +185,15 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
     var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
     val selectedEntries = remember(allEntries, selectedIds) { allEntries.filter { it.id in selectedIds } }
     val selectionMode = selectedIds.isNotEmpty()
+    val bottomPanelTransition = updateTransition(
+        tabsPanelState(searching, selectionMode),
+        label = "logsBottomPanel",
+    )
+    val searchFraction by bottomPanelTransition.searchPanelFraction()
     val selectedFilter by remember { derivedStateOf { LogFilter.entries[pagerState.targetPage] } }
     val visibleEntries = remember(allEntries, selectedFilter, query) { visibleLogEntries(allEntries, selectedFilter.source, query) }
+    val activePage = pagerState.currentPage
+    val activeEntries = remember(allEntries, activePage, query) { visibleLogEntries(allEntries, LogFilter.entries[activePage].source, query) }
 
     fun closeSearch() {
         searchClosing = imeBottom > 0
@@ -255,75 +271,93 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
             searchRequested = true
         },
     )
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            AnimatedContent(
-                targetState = LogsHeaderState(
-                    selectionMode,
-                    searching,
-                    query.isBlank(),
-                    selectedEntries,
-                    visibleEntries.size,
-                    areAllLogEntriesSelected(visibleEntries, selectedIds),
-                ),
-                contentKey = { Triple(it.selecting, it.searching, it.emptyQuery) },
-                transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
-                label = "logsHeader",
-            ) { header ->
-                LogsTopBar(showTitleBarLogo, header, isExporting, actions)
-            }
-        },
-        bottomBar = {
-            // Only this container owns IME padding. Animate the small panels inside it,
-            // so AnimatedContent never animates a keyboard-height spacer.
-            Box(modifier = Modifier.fillMaxWidth().imePadding()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
                 AnimatedContent(
-                    targetState = searching,
-                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
-                    label = "logsBottomPanel",
-                ) { search ->
-                    if (search) {
-                        LogSearchPanel(state = searchQuery, open = searchRequested)
-                    } else {
-                        SegmentedTabRow(
-                            labels = LogFilter.entries.map { stringResource(it.labelRes) },
-                            selectedIndex = LogFilter.entries.indexOf(selectedFilter),
-                            onSelected = { index -> coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                    targetState = LogsHeaderState(
+                        selectionMode,
+                        searching,
+                        query.isBlank(),
+                        selectedEntries,
+                        visibleEntries.size,
+                        areAllLogEntriesSelected(visibleEntries, selectedIds),
+                    ),
+                    contentKey = { Triple(it.selecting, it.searching, it.emptyQuery) },
+                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+                    label = "logsHeader",
+                ) { header ->
+                    LogsTopBar(showTitleBarLogo, header, isExporting, actions)
+                }
+            },
+            bottomBar = {
+                SearchTabsPanel(
+                    transition = bottomPanelTransition,
+                    state = searchQuery,
+                    requested = searchRequested,
+                    hint = stringResource(R.string.logs_search),
+                ) {
+                    FloatingTabRow(
+                        tabs = listOf(
+                            FloatingTab(stringResource(LogFilter.ALL.labelRes), R.drawable.notes_24px),
+                            FloatingTab(stringResource(LogFilter.INTERNAL.labelRes), R.drawable.android_24px),
+                            FloatingTab(stringResource(LogFilter.CORE.labelRes), R.drawable.manufacturing_24px),
+                        ),
+                        pagerState = pagerState,
+                        onSelected = { index -> coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                        modifier = Modifier.onSizeChanged { tabsPanelHeight = with(density) { it.height.toDp() } },
+                    )
+                }
+            },
+        ) { padding ->
+            val viewportBottom = padding.calculateBottomPadding() * searchFraction
+            val bottomPadding = padding.calculateBottomPadding() - viewportBottom
+            Box(modifier = Modifier.fillMaxSize().padding(PaddingValues(top = padding.calculateTopPadding(), bottom = viewportBottom))) {
+                HorizontalPager(state = pagerState, userScrollEnabled = !searching && !selectionMode, modifier = Modifier.fillMaxSize()) { page ->
+                    val pageFilter = LogFilter.entries[page]
+                    val entries = remember(allEntries, pageFilter, query) {
+                        visibleLogEntries(allEntries, pageFilter.source, query)
+                    }
+                    LogEntriesList(
+                        entries = entries,
+                        listState = listStates[page],
+                        followTail = followTailStates[page],
+                        contentBottomPadding = bottomPadding,
+                        selectedIds = selectedIds,
+                        searching = searching,
+                        searchQuery = query,
+                        onSelectionChange = { selectedIds = it },
+                        onSelect = { entry ->
+                            selectedIds = if (entry.id in selectedIds) selectedIds - entry.id else selectedIds + entry.id
+                        },
+                    )
+                    if (searching && query.isNotBlank() && entries.isEmpty()) {
+                        Text(
+                            stringResource(R.string.logs_search_no_matches),
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
+                ScrollFadeEdges(bottom = searching, top = !selectionMode)
             }
-        },
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                val pageFilter = LogFilter.entries[page]
-                val entries = remember(allEntries, pageFilter, query) {
-                    visibleLogEntries(allEntries, pageFilter.source, query)
-                }
-                LogEntriesList(
-                    entries = entries,
-                    selectedIds = selectedIds,
-                    searching = searching,
-                    searchQuery = query,
-                    onSelectionChange = { selectedIds = it },
-                    onSelect = { entry ->
-                        selectedIds = if (entry.id in selectedIds) selectedIds - entry.id else selectedIds + entry.id
-                    },
-                )
-                if (searching && query.isNotBlank() && entries.isEmpty()) {
-                    Text(
-                        stringResource(R.string.logs_search_no_matches),
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            ScrollFadeEdges()
         }
+        // Paint above the Scaffold, including its bottom-bar gradient, without changing its size.
+        ScrollToBottomButton(
+            visible = !followTailStates[activePage].value && activeEntries.isNotEmpty() && bottomPanelTransition.targetState == TabsPanelState.Tabs,
+            onClick = {
+                coroutineScope.launch {
+                    listStates[activePage].animateScrollToItem(activeEntries.lastIndex)
+                    followTailStates[activePage].value = true
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomEnd)
+                .padding(bottom = (tabsPanelHeight - FloatingTabFadeHeight - 16.dp).coerceAtLeast(0.dp)),
+        )
     }
+
     if (confirmClear) {
         AppAlertDialog(
             onDismissRequest = { confirmClear = false },
@@ -362,40 +396,42 @@ private fun LogsTopBar(
     val emptyQuery = header.emptyQuery
     val searchHasResults = !emptyQuery && header.resultCount > 0
     val entries = header.selectedEntries
-    TopAppBar(
+    ScrolledTopAppBar(
+        scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
+        highlighted = selecting,
         title = { LogsTitle(showLogo, header) },
         navigationIcon = {
             if (searching) {
                 TooltipIconButton(tooltip = stringResource(R.string.logs_close_search), onClick = actions.onCancel) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_close_search), modifier = Modifier.size(24.dp))
+                    Icon(painterResource(R.drawable.close_24px), contentDescription = stringResource(R.string.logs_close_search), modifier = Modifier.size(24.dp))
                 }
             } else if (selecting) {
                 TooltipIconButton(tooltip = stringResource(R.string.logs_cancel_selection), onClick = actions.onCancel) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.logs_cancel_selection), modifier = Modifier.size(24.dp))
+                    Icon(painterResource(R.drawable.close_24px), contentDescription = stringResource(R.string.logs_cancel_selection), modifier = Modifier.size(24.dp))
                 }
             }
         },
-        expandedHeight = AppTopBarHeight,
-        windowInsets = TopAppBarDefaults.windowInsets,
         actions = {
-            if (selecting || !searching || searchHasResults) {
-                if (selecting && header.resultCount > 1) {
-                    LogSelectionButton(header.allSelected, actions)
-                }
-                if (selecting) {
-                    LogsExportMenu(exporting, actions, entries.mapTo(mutableSetOf(), LogEntry::id))
-                    TooltipIconButton(tooltip = stringResource(R.string.logs_copy_selected), onClick = { actions.onCopy(entries) }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.logs_copy_selected), modifier = Modifier.size(24.dp))
+            Row(modifier = Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (selecting || !searching || searchHasResults) {
+                    if (selecting && header.resultCount > 1) {
+                        LogSelectionButton(header.allSelected, actions)
                     }
-                } else {
-                    if (!searching) {
-                        TooltipIconButton(tooltip = stringResource(R.string.logs_search), onClick = actions.onSearch) {
-                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.logs_search), modifier = Modifier.size(24.dp))
+                    if (selecting) {
+                        LogsExportMenu(exporting, actions, entries.mapTo(mutableSetOf(), LogEntry::id))
+                        TooltipIconButton(tooltip = stringResource(R.string.logs_copy_selected), onClick = { actions.onCopy(entries) }) {
+                            Icon(painterResource(R.drawable.content_copy_24px), contentDescription = stringResource(R.string.logs_copy_selected), modifier = Modifier.size(24.dp))
                         }
-                    }
-                    LogsExportMenu(exporting, actions)
-                    TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = actions.onClear) {
-                        Icon(painterResource(R.drawable.delete_24px), contentDescription = stringResource(R.string.logs_clear), modifier = Modifier.size(24.dp))
+                    } else {
+                        TooltipIconButton(tooltip = stringResource(R.string.logs_clear), onClick = actions.onClear) {
+                            Icon(painterResource(R.drawable.delete_24px), contentDescription = stringResource(R.string.logs_clear), modifier = Modifier.size(24.dp))
+                        }
+                        if (!searching) {
+                            TooltipIconButton(tooltip = stringResource(R.string.logs_search), onClick = actions.onSearch) {
+                                Icon(painterResource(R.drawable.find_in_page_24px), contentDescription = stringResource(R.string.logs_search), modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        LogsExportMenu(exporting, actions)
                     }
                 }
             }
@@ -438,7 +474,7 @@ private fun LogsTitle(showLogo: Boolean, header: LogsHeaderState) {
 private fun LogsExportMenu(exporting: Boolean, actions: LogsActions, selectedIds: Set<Long> = emptySet()) {
     val exportLabel = stringResource(if (selectedIds.isEmpty()) R.string.logs_export else R.string.logs_export_selected)
     var expanded by remember { mutableStateOf(false) }
-    Box {
+    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
         TooltipIconButton(tooltip = exportLabel, enabled = !exporting, onClick = { expanded = true }) {
             Icon(painterResource(R.drawable.upload_24px), contentDescription = exportLabel, modifier = Modifier.size(24.dp))
         }
@@ -525,15 +561,15 @@ private fun FollowLatestLogEntry(state: LazyListState, entries: List<LogEntry>, 
 @Composable
 private fun LogEntriesList(
     entries: List<LogEntry>,
+    listState: LazyListState,
+    followTail: MutableState<Boolean>,
+    contentBottomPadding: Dp,
     selectedIds: Set<Long>,
     searching: Boolean,
     searchQuery: String,
     onSelectionChange: (Set<Long>) -> Unit,
     onSelect: (LogEntry) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val currentEntries by rememberUpdatedState(entries)
     val selectionGesture = rememberLazyListSelectionGesture(
         listState = listState,
         keys = remember(entries) { entries.map(LogEntry::id) },
@@ -541,10 +577,8 @@ private fun LogEntriesList(
         onSelectionChange = onSelectionChange,
     )
 
-    var followTail by listState.rememberFollowTail()
-
     val selectionMode = selectedIds.isNotEmpty()
-    val autoScroll = followTail && !selectionMode && !selectionGesture.dragging && !searching
+    val autoScroll = followTail.value && !selectionMode && !selectionGesture.dragging && !searching
     FollowLatestLogEntry(listState, entries, autoScroll)
 
     ScrollToFirstSearchResult(listState, searchQuery, searching, entries.isNotEmpty())
@@ -554,7 +588,7 @@ private fun LogEntriesList(
             modifier = Modifier
                 .fillMaxSize()
                 .then(selectionGesture.modifier),
-            contentPadding = PaddingValues(vertical = 4.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = contentBottomPadding),
         ) {
             itemsIndexed(
                 items = entries,
@@ -570,17 +604,6 @@ private fun LogEntriesList(
                 )
             }
         }
-        ScrollToBottomButton(
-            visible = !followTail && entries.isNotEmpty() && !searching,
-            onClick = {
-                coroutineScope.launch {
-                    listState.animateScrollToItem(currentEntries.lastIndex)
-                    followTail = true
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd),
-        )
     }
 }
 
@@ -676,7 +699,7 @@ private fun LogEntryRow(
             },
     ) {
         Text(
-            text = "$time [${entry.source.name}] ${entry.displayMessage}",
+            text = "$time [${entry.source.tag}] ${entry.displayMessage}",
             fontFamily = FontFamily.Monospace,
             fontSize = 11.sp,
             lineHeight = 13.sp,

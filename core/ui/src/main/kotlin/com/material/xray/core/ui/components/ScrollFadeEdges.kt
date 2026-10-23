@@ -1,5 +1,7 @@
 package com.material.xray.core.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -7,10 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 /**
@@ -21,19 +25,23 @@ import androidx.compose.ui.unit.dp
  * Defaults to the screen's surface colour; dialogs can supply their own container colour.
  */
 @Composable
-fun BoxScope.ScrollFadeEdges(fadeColor: Color = MaterialTheme.colorScheme.surface) {
+fun BoxScope.ScrollFadeEdges(fadeColor: Color = MaterialTheme.colorScheme.surface, bottom: Boolean = true, top: Boolean = true) {
+    val topAlpha by animateFloatAsState(if (top) 1f else 0f, tween(180), label = "scrollTopFade")
     Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth()
             .height(8.dp)
+            .graphicsLayer { alpha = topAlpha }
             .background(Brush.verticalGradient(listOf(fadeColor, fadeColor.copy(alpha = 0f)))),
     )
-    Box(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .height(12.dp)
-            .background(Brush.verticalGradient(listOf(fadeColor.copy(alpha = 0f), fadeColor))),
-    )
+    if (bottom) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(12.dp)
+                .background(Brush.verticalGradient(listOf(fadeColor.copy(alpha = 0f), fadeColor))),
+        )
+    }
 }

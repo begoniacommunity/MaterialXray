@@ -15,7 +15,7 @@ class LogExportScopeTest {
     @Test
     fun `filenames identify all app xray and selected exports`() {
         assertEquals("material-xray-logs-all.txt", logExportFileName(null, false))
-        assertEquals("material-xray-logs-app-only.txt", logExportFileName(LogSource.APP, false))
+        assertEquals("material-xray-logs-internal-only.txt", logExportFileName(LogSource.APP, false))
         assertEquals("material-xray-logs-core-only.txt", logExportFileName(LogSource.XRAY, false))
         assertEquals("material-xray-logs-selected.txt", logExportFileName(null, true))
         assertEquals("material-xray-logs-selected.txt", logExportFileName(LogSource.XRAY, true))

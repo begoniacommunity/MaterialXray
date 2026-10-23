@@ -11,7 +11,7 @@ data class LogEntry(
     val message: String,
 )
 
-enum class LogSource { APP, XRAY }
+enum class LogSource(val tag: String) { APP("INTERNAL"), XRAY("CORE") }
 
 val xrayTimestampPrefix = Regex(
     "^\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?\\s+",
@@ -94,7 +94,7 @@ class LogBuffer(private val echo: LogEcho) {
     fun formatAll(): String = _entries.value.joinToString("\n") { entry ->
         val time = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US)
             .format(java.util.Date(entry.timestamp))
-        "$time [${entry.source.name}] ${entry.displayMessage}"
+        "$time [${entry.source.tag}] ${entry.displayMessage}"
     }
 
     companion object {

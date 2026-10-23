@@ -16,8 +16,8 @@ class LogBufferTest {
         assertEquals("[Warning] retrying", entries[1].displayMessage)
         assertEquals("2026/09/26 12:34:58 app message", entries[2].displayMessage)
         val formattedLines = buffer.formatAll().lines()
-        assertEquals("2026/09/26 12:34:58 app message", formattedLines.last().substringAfter("[APP] "))
-        assertEquals("[Info] accepted tcp", formattedLines.first().substringAfter("[XRAY] "))
+        assertEquals("2026/09/26 12:34:58 app message", formattedLines.last().substringAfter("[INTERNAL] "))
+        assertEquals("[Info] accepted tcp", formattedLines.first().substringAfter("[CORE] "))
     }
 
     @Test

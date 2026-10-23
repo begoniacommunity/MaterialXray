@@ -1,6 +1,7 @@
 package com.material.xray.navigation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -78,6 +79,17 @@ internal fun TabChrome(state: TabChromeState, modifier: Modifier = Modifier, con
     val useRail = useNavigationRail()
     val bottomBarVisible = remember { mutableStateOf(true) }
     val bottomInset = with(LocalDensity.current) { NavigationBarDefaults.windowInsets.getBottom(this).toDp() }
+    val contentInsets = if (useRail && bottomBarVisible.value) {
+        WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
+    } else {
+        WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
+    }
+    val safeBottomInset = with(LocalDensity.current) { contentInsets.getBottom(this).toDp() }
+    val navigationHeight by animateDpAsState(
+        targetValue = if (!useRail && bottomBarVisible.value) CompactNavigationBarHeight + bottomInset else safeBottomInset,
+        animationSpec = tween(220),
+        label = "navigationHeight",
+    )
     Row(modifier = modifier.fillMaxSize()) {
         if (useRail) {
             AppNavigationRail(state = state, modifier = Modifier)
@@ -87,15 +99,9 @@ internal fun TabChrome(state: TabChromeState, modifier: Modifier = Modifier, con
                 modifier = Modifier.fillMaxSize(),
                 // During search the screen alone owns IME padding. Keep cutouts and system
                 // navigation safe, including in rail layouts.
-                contentWindowInsets = if (useRail && bottomBarVisible.value) {
-                    WindowInsets.safeDrawing.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
-                } else {
-                    WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End + WindowInsetsSides.Bottom)
-                },
+                contentWindowInsets = contentInsets,
                 bottomBar = {
-                    if (!useRail && bottomBarVisible.value) {
-                        Spacer(Modifier.height(CompactNavigationBarHeight + bottomInset))
-                    }
+                    if (navigationHeight > 0.dp) Spacer(Modifier.height(navigationHeight))
                 },
             ) { innerPadding ->
                 Box(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).clipToBounds()) {
@@ -107,8 +113,7 @@ internal fun TabChrome(state: TabChromeState, modifier: Modifier = Modifier, con
                     }
                 }
             }
-            // Fade as an overlay: an outgoing bar must not reserve a changing height while
-            // the search panel follows the keyboard's animated insets.
+            // Draw the bar as an overlay while its reserved height eases with the search panel.
             androidx.compose.animation.AnimatedVisibility(
                 visible = !useRail && bottomBarVisible.value,
                 modifier = Modifier.align(Alignment.BottomCenter),

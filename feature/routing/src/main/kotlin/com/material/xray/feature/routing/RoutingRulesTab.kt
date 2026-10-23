@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,13 +28,12 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,6 +53,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
@@ -62,6 +61,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.material.xray.core.data.parser.ProfileRoutingRule
@@ -69,8 +69,6 @@ import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.model.reorderedBy
 import com.material.xray.core.ui.R
-import com.material.xray.core.ui.components.ScrollFadeEdges
-import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.rememberLazyListSelectionGesture
 import com.material.xray.core.xray.ProviderGeoDataNotice
 
@@ -102,6 +100,7 @@ internal fun RoutingRulesTab(
     selectedRuleIds: Set<String>,
     onSelectionChange: (Set<String>) -> Unit,
     actions: RoutingRuleActions,
+    contentBottomPadding: Dp = 16.dp,
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -170,12 +169,11 @@ internal fun RoutingRulesTab(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        RoutingSearchField(state = searchQuery, hint = stringResource(R.string.routing_search_rules))
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().then(selectionGesture.modifier),
-                contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = contentBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 if (providerManaged) item(key = "providerRoutingBanner") { ProviderManagedBanner(customRules.isNotEmpty(), providerName) }
@@ -190,7 +188,7 @@ internal fun RoutingRulesTab(
                                 .onPlaced { drag.placed(headerKey, it.positionInParent().y, it.size.height) }
                                 .graphicsLayer { translationY = drag.offset(headerKey) }
                                 .combinedClickable(onClick = {}, onLongClick = { actions.onScopeLongClick(scope) })
-                                .padding(start = 4.dp, top = 12.dp, end = 4.dp, bottom = 6.dp),
+                                .padding(horizontal = 4.dp).heightIn(min = 48.dp),
                         ) {
                             Text(stringResource(scope.titleResource()), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                             if (selectionMode) RoutingDragHandle(headerKey, stringResource(R.string.routing_reorder_category), stringResource(R.string.routing_move_up), stringResource(R.string.routing_move_down), drag)
@@ -219,7 +217,6 @@ internal fun RoutingRulesTab(
                     }
                 }
             }
-            ScrollFadeEdges()
         }
     }
 }
@@ -229,17 +226,14 @@ private fun RoutingScopeResetButton(scope: RoutingRuleScope, serverId: Long?, su
     if (scope == RoutingRuleScope.Custom) return
     val label = stringResource(if (scope == RoutingRuleScope.Profile) R.string.routing_reset_server_rules else R.string.routing_reset_subscription_rules)
     val available = if (scope == RoutingRuleScope.Profile) serverId != null else subscriptionAvailable
-    val iconSize = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.fontSize.toDp() }
-    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-        TooltipIconButton(
-            tooltip = label,
-            enabled = !selecting && available,
-            onClick = { onReset(scope) },
-            // The symbol has 1/8 of its viewport inset at each edge.
-            modifier = Modifier.size(iconSize).offset(x = iconSize / 8),
-        ) {
-            Icon(painterResource(R.drawable.settings_backup_restore_24px), contentDescription = label, modifier = Modifier.size(iconSize))
-        }
+    TextButton(
+        enabled = !selecting && available,
+        onClick = { onReset(scope) },
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        modifier = Modifier.semantics { contentDescription = label },
+    ) {
+        Icon(painterResource(R.drawable.settings_backup_restore_24px), contentDescription = null, modifier = Modifier.size(18.dp))
+        Text(stringResource(R.string.routing_reset_rules_confirm), modifier = Modifier.padding(start = 4.dp))
     }
 }
 
@@ -297,7 +291,8 @@ private fun RoutingRuleCard(row: RuleRow, shape: RoundedCornerShape, selected: B
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(profile?.name ?: routingRuleDisplayName(requireNotNull(rule)), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(profile?.let { profileRoutingRuleContentText(it) } ?: routingRuleContentText(requireNotNull(rule)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                profile?.target?.let { Text(it.displayText(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                val target = profile?.target?.displayText() ?: rule?.let { stringResource(R.string.routing_rule_target_outbound, it.outboundTag) }
+                target?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (row.orphaned) Text(stringResource(R.string.routing_profile_rule_orphaned), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
             }
             AnimatedContent(targetState = selectionMode, transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) using null }, label = "routingRuleControl") { selecting ->

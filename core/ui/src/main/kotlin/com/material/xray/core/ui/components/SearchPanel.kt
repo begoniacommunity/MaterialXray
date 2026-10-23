@@ -1,4 +1,4 @@
-package com.material.xray.feature.logs
+package com.material.xray.core.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -26,16 +26,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.material.xray.core.ui.R
 
 @Composable
-internal fun LogSearchPanel(state: TextFieldState, open: Boolean) {
+fun SearchPanel(state: TextFieldState, open: Boolean, hint: String) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    LaunchedEffect(open) {
+    LaunchedEffect(open, state) {
         if (open) {
             withFrameNanos { }
             focusRequester.requestFocus()
@@ -55,13 +53,10 @@ internal fun LogSearchPanel(state: TextFieldState, open: Boolean) {
                 cursorBrush = SolidColor(if (WindowInsets.ime.getBottom(LocalDensity.current) > 0) MaterialTheme.colorScheme.primary else Color.Transparent),
                 lineLimits = TextFieldLineLimits.SingleLine,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                // Search stays open when the IME action is pressed.
                 onKeyboardAction = { },
                 decorator = { innerTextField ->
                     Box(contentAlignment = Alignment.CenterStart) {
-                        if (state.text.isEmpty()) {
-                            Text(stringResource(R.string.logs_search), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        if (state.text.isEmpty()) Text(hint, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         innerTextField()
                     }
                 },

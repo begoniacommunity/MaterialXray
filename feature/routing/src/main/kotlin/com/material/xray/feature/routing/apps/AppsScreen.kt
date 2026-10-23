@@ -5,28 +5,28 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
@@ -36,7 +36,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -54,9 +53,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,8 +63,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
@@ -76,26 +75,19 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.ui.R
-import com.material.xray.core.ui.components.AnimatedDropdownMenu
 import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.OptionFocusHighlight
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SelectableOptionRow
 import com.material.xray.core.ui.components.SettingsFieldSpacing
-import com.material.xray.core.ui.components.TooltipIconButton
-import com.material.xray.feature.routing.RoutingSearchField
+import com.material.xray.core.ui.components.ToolbarAction
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()) {
+fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel(), contentBottomPadding: Dp = 16.dp) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsStateWithLifecycle()
-    // The view model only receives the query, so the field is seeded from it once.
-    val searchQuery = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState(viewModel.searchQuery.value) }
-    LaunchedEffect(searchQuery) {
-        snapshotFlow { searchQuery.text.toString() }.collect(viewModel::setSearchQuery)
-    }
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
     val appLoadProgress by viewModel.appLoadProgress.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
@@ -158,25 +150,37 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                 return@Column
             }
 
-            RoutingSearchField(
-                state = searchQuery,
-                hint = stringResource(R.string.apps_search),
-            )
-
             if (routingPolicyControl == RoutingPolicyControl.SubscriptionProvider) {
                 SubscriptionRoutingBanner(automaticRoutingProviderName)
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val routeWidthLimit = ((maxWidth - 32.dp) * 0.45f).coerceAtLeast(28.dp)
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = contentBottomPadding)) {
                     items(
                         items = apps,
                         key = { it.appKey },
                         contentType = { "app" },
                     ) { app ->
-                        ListItem(
-                            headlineContent = { Text(app.name) },
-                            supportingContent = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
+                                .semantics(mergeDescendants = true) {}
+                                .clickable { editingApp = app }.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
+                                app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
+                            }
+                            iconBitmap?.let { bitmap ->
+                                Image(
+                                    bitmap = bitmap,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 4.dp).size(iconSize),
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(app.name, style = MaterialTheme.typography.bodyLarge)
                                 Text(
                                     text = if (app.workProfile) {
                                         stringResource(
@@ -188,46 +192,33 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                                         app.packageName
                                     },
                                     style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                            },
-                            leadingContent = {
-                                val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
-                                    app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
-                                }
-                                iconBitmap?.let { bitmap ->
-                                    Image(
-                                        bitmap = bitmap,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(iconSize),
-                                    )
-                                }
-                            },
-                            trailingContent = {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.width(176.dp).offset(x = 7.dp),
-                                ) {
-                                    Text(
-                                        text = app.routeTitle.resolve(context),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                }
-                            },
-                            modifier = Modifier.clickable { editingApp = app },
-                        )
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.widthIn(max = routeWidthLimit).width(IntrinsicSize.Max),
+                            ) {
+                                Text(
+                                    text = app.routeTitle.resolve(context),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
                     }
                 }
-                ScrollFadeEdges()
             }
         }
         PullToRefreshDefaults.Indicator(
@@ -383,7 +374,7 @@ private fun SubscriptionRoutingBanner(providerName: String?) {
 }
 
 @Composable
-fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
+internal fun appRoutingToolbarActions(viewModel: AppsViewModel = koinViewModel()): List<ToolbarAction> {
     val showSystemApps by viewModel.showSystemApps.collectAsStateWithLifecycle()
     val showWorkProfileApps by viewModel.showWorkProfileApps.collectAsStateWithLifecycle()
     val hasWorkProfileApps by viewModel.hasWorkProfileApps.collectAsStateWithLifecycle()
@@ -392,7 +383,6 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     var pendingBulkAction by remember { mutableStateOf<BulkAppRouteAction?>(null) }
     var pendingAutomaticBulkAction by remember { mutableStateOf<BulkAppRouteAction?>(null) }
-    var appRoutingMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(routingPolicyControl) {
         if (routingPolicyControl == RoutingPolicyControl.User) {
@@ -411,66 +401,54 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
         }
     }
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        TooltipIconButton(
-            tooltip = stringResource(R.string.apps_refresh),
-            onClick = { viewModel.refreshApps() },
-            enabled = !isLoadingApps,
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.apps_refresh), modifier = Modifier.size(24.dp))
-        }
-        Box {
-            TooltipIconButton(tooltip = stringResource(R.string.apps_routing_menu), onClick = { appRoutingMenuExpanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.apps_routing_menu), modifier = Modifier.size(24.dp))
-            }
-            AnimatedDropdownMenu(
-                expanded = appRoutingMenuExpanded,
-                onDismissRequest = { appRoutingMenuExpanded = false },
-            ) {
+    val actions = listOf(
+        ToolbarAction("refreshApps", R.drawable.refresh_24px, stringResource(R.string.apps_refresh), enabled = !isLoadingApps, onClick = viewModel::refreshApps),
+        ToolbarAction("appsMenu", R.drawable.more_horiz_24px, stringResource(R.string.apps_routing_menu), menu = { closeMenu ->
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.apps_reset_to_defaults)) },
+                onClick = {
+                    closeMenu()
+                    requestBulkAction(BulkAppRouteAction.ResetToDefaults)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.apps_bypass_all)) },
+                onClick = {
+                    closeMenu()
+                    requestBulkAction(BulkAppRouteAction.BypassAllApps)
+                },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.apps_show_system)) },
+                trailingIcon = {
+                    Checkbox(
+                        checked = showSystemApps,
+                        onCheckedChange = null,
+                    )
+                },
+                onClick = {
+                    closeMenu()
+                    viewModel.setShowSystemApps(!showSystemApps)
+                },
+            )
+            if (hasWorkProfileApps) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.apps_reset_to_defaults)) },
-                    onClick = {
-                        appRoutingMenuExpanded = false
-                        requestBulkAction(BulkAppRouteAction.ResetToDefaults)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.apps_bypass_all)) },
-                    onClick = {
-                        appRoutingMenuExpanded = false
-                        requestBulkAction(BulkAppRouteAction.BypassAllApps)
-                    },
-                )
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.apps_show_system)) },
+                    text = { Text(stringResource(R.string.apps_show_work_profile)) },
                     trailingIcon = {
                         Checkbox(
-                            checked = showSystemApps,
+                            checked = showWorkProfileApps,
                             onCheckedChange = null,
                         )
                     },
                     onClick = {
-                        viewModel.setShowSystemApps(!showSystemApps)
+                        closeMenu()
+                        viewModel.setShowWorkProfileApps(!showWorkProfileApps)
                     },
                 )
-                if (hasWorkProfileApps) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.apps_show_work_profile)) },
-                        trailingIcon = {
-                            Checkbox(
-                                checked = showWorkProfileApps,
-                                onCheckedChange = null,
-                            )
-                        },
-                        onClick = {
-                            viewModel.setShowWorkProfileApps(!showWorkProfileApps)
-                        },
-                    )
-                }
             }
-        }
-    }
+        }),
+    )
 
     if (pendingAutomaticBulkAction != null) {
         AutomaticRoutingDialog(
@@ -495,6 +473,7 @@ fun AppRoutingMenuActions(viewModel: AppsViewModel = koinViewModel()) {
             },
         )
     }
+    return actions
 }
 
 private enum class BulkAppRouteAction {
@@ -649,6 +628,7 @@ private fun AppRoutePickerDialog(
             } else {
                 allServerOptions.filter { option ->
                     option.title.resolve(context).contains(trimmed, ignoreCase = true) ||
+                        option.subscriptionName.contains(trimmed, ignoreCase = true) ||
                         option.description.resolve(context).contains(trimmed, ignoreCase = true)
                 }
             }
@@ -721,24 +701,29 @@ private fun AppRoutePickerDialog(
                                     state = query,
                                     label = { Text(stringResource(R.string.apps_find_servers)) },
                                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                    shape = RoundedCornerShape(32.dp),
                                     colors = OutlinedTextFieldDefaults.colors(cursorColor = cursorColor),
                                     lineLimits = TextFieldLineLimits.SingleLine,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
-                        items(
-                            items = serverOptions,
-                            key = { it.key },
-                            contentType = { "routeOption" },
-                        ) { option ->
-                            RouteOptionRow(
-                                option = option,
-                                selected = option.key == app.routeKey ||
-                                    (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
-                                onSelected = { onSelected(option) },
-                            )
+                        serverOptions.groupBy { it.subscriptionId }.forEach { (subscriptionId, options) ->
+                            item(key = "subscription:$subscriptionId", contentType = "subscriptionHeading") {
+                                Text(
+                                    text = options.first().subscriptionName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),
+                                )
+                            }
+                            items(items = options, key = { it.key }, contentType = { "routeOption" }) { option ->
+                                RouteOptionRow(
+                                    option = option,
+                                    selected = option.key == app.routeKey ||
+                                        (singleServerRouteHidden && app.routeKind == AppRouteKind.SERVER && option.kind == AppRouteKind.DEFAULT),
+                                    onSelected = { onSelected(option) },
+                                )
+                            }
                         }
                     }
                     ScrollFadeEdges(fadeColor = AlertDialogDefaults.containerColor)

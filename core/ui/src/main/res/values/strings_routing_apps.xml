@@ -164,7 +164,10 @@
     <string name="apps_route_missing_server_description">This app is assigned to a deleted configuration.</string>
     <string name="apps_server_endpoint_unknown">%1$s &#8226; unknown</string>
     <plurals name="apps_server_multiconnect_summary">
-        <item quantity="one">multi &#8226; %1$d server</item>
-        <item quantity="other">multi &#8226; %1$d servers</item>
+        <item quantity="one">%1$d server</item>
+        <item quantity="other">%1$d servers</item>
     </plurals>
+    <string name="routing_search">Search</string>
+    <string name="routing_close_search">Close search</string>
+    <string name="routing_search_found_count">Found: %1$d</string>
 </resources>

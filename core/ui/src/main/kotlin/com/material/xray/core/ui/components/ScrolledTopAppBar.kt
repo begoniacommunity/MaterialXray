@@ -75,6 +75,25 @@ fun ScrolledTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior,
     showLogo: Boolean,
     navigationIcon: @Composable () -> Unit = {},
+    highlighted: Boolean = false,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    ScrolledTopAppBar(
+        title = { AppBarTitle(title, showLogo) },
+        scrollBehavior = scrollBehavior,
+        navigationIcon = navigationIcon,
+        highlighted = highlighted,
+        actions = actions,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScrolledTopAppBar(
+    title: @Composable () -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior,
+    navigationIcon: @Composable () -> Unit = {},
+    highlighted: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val surface = MaterialTheme.colorScheme.surface
@@ -82,15 +101,16 @@ fun ScrolledTopAppBar(
     val overlappedFraction by remember(scrollBehavior) {
         derivedStateOf { scrollBehavior.state.overlappedFraction.coerceIn(0f, 1f) }
     }
+    val targetFraction = if (highlighted) 1f else overlappedFraction
     // A pinned bar's overlap jumps straight between 0 and 1, so the tint is eased here once, the
     // way TopAppBar would ease it, and both the bar and a rail band read this one animated value.
     val animatedFraction = animateFloatAsState(
-        targetValue = overlappedFraction,
+        targetValue = targetFraction,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "topBarTint",
     )
     val fraction = remember(animatedFraction) { { animatedFraction.value } }
-    val containerColor = lerp(surface, scrolledSurface, overlappedFraction)
+    val containerColor = lerp(surface, scrolledSurface, targetFraction)
     val tint = LocalTopBarTint.current
     if (tint != null) {
         DisposableEffect(tint, fraction) {
@@ -117,7 +137,7 @@ fun ScrolledTopAppBar(
     }
 
     TopAppBar(
-        title = { AppBarTitle(title, showLogo) },
+        title = title,
         // The bar paints its own background in the draw phase instead of letting TopAppBar animate
         // the colour privately, so a rail band reading the same fraction matches it frame for frame.
         modifier = Modifier.drawBehind { drawRect(lerp(surface, scrolledSurface, fraction())) },

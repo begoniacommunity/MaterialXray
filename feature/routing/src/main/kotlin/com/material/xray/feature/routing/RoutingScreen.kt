@@ -4,8 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -29,9 +31,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -45,10 +44,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -58,16 +59,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.data.parser.ProfileRoutingRule
@@ -78,15 +82,22 @@ import com.material.xray.core.model.RoutingRuleCatalog
 import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.adaptive.TwoPaneMinWidth
-import com.material.xray.core.ui.components.AnimatedDropdownMenu
+import com.material.xray.core.ui.components.AnimatedToolbarActions
 import com.material.xray.core.ui.components.AppAlertDialog
 import com.material.xray.core.ui.components.AppBarTitle
-import com.material.xray.core.ui.components.AppTopBarHeight
-import com.material.xray.core.ui.components.SegmentedTabRow
+import com.material.xray.core.ui.components.FloatingTab
+import com.material.xray.core.ui.components.FloatingTabRow
+import com.material.xray.core.ui.components.LocalBottomBarVisibility
+import com.material.xray.core.ui.components.ScrolledTopAppBar
+import com.material.xray.core.ui.components.SearchTabsPanel
+import com.material.xray.core.ui.components.ToolbarAction
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.searchPanelFraction
+import com.material.xray.core.ui.components.tabsPanelState
 import com.material.xray.core.xray.ProviderGeoDataNotice
 import com.material.xray.feature.routing.apps.AppBypassContent
-import com.material.xray.feature.routing.apps.AppRoutingMenuActions
+import com.material.xray.feature.routing.apps.AppsViewModel
+import com.material.xray.feature.routing.apps.appRoutingToolbarActions
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -113,10 +124,6 @@ private sealed interface ProviderRoutingRuleAction {
 
 private val defaultRoutingRulesById = RoutingRuleCatalog.defaults().associateBy(RoutingRule::id)
 
-private data class RoutingHeaderState(val selectedIds: Set<String>, val appsTabSelected: Boolean) {
-    val selecting: Boolean get() = selectedIds.isNotEmpty()
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutingScreen(
@@ -136,6 +143,16 @@ fun RoutingScreen(
     val providerGeoDataNotice by viewModel.providerGeoDataNotice.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { RoutingTab.entries.size })
     val rulesSearchQuery = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
+    val appsViewModel = koinViewModel<AppsViewModel>()
+    val appsSearchQuery = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
+    LaunchedEffect(appsSearchQuery) { snapshotFlow { appsSearchQuery.text.toString() }.collect(appsViewModel::setSearchQuery) }
+    val rulesQuery = rulesSearchQuery.text.toString()
+    val ruleResultCount = rules.count { it.matchesSearch(rulesQuery, routingRuleDisplayName(it)) } +
+        subscriptionRules.count { it.matchesSearch(rulesQuery, routingRuleDisplayName(it)) } +
+        profileRouting?.rules.orEmpty().count { it.matchesSearch(rulesQuery) }
+    val apps by appsViewModel.apps.collectAsStateWithLifecycle()
+    val search = rememberRoutingSearch(pagerState, rulesSearchQuery, appsSearchQuery, ruleResultCount, apps.size)
+
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
     var selectedRuleIds by remember { mutableStateOf(emptySet<String>()) }
@@ -225,8 +242,9 @@ fun RoutingScreen(
         previousTab = selectedTab
     }
 
-    val rulesTab: @Composable () -> Unit = {
+    val rulesTab: @Composable (Dp) -> Unit = { bottomPadding ->
         RoutingRulesTab(
+            contentBottomPadding = bottomPadding,
             searchQuery = rulesSearchQuery,
             scopeOrder = scopeOrder,
             customRules = rules,
@@ -298,8 +316,8 @@ fun RoutingScreen(
             ),
         )
     }
-    val ruleActions: @Composable (Set<String>) -> Unit = { headerSelectedIds ->
-        RuleActions(
+    val ruleActions: @Composable (Set<String>) -> List<ToolbarAction?> = { headerSelectedIds ->
+        ruleToolbarActions(
             selectionMode = headerSelectedIds.isNotEmpty(),
             selectedRuleIds = headerSelectedIds,
             rules = rules,
@@ -315,6 +333,7 @@ fun RoutingScreen(
         onSelectTab = { index -> coroutineScope.launch { pagerState.animateScrollToPage(index) } },
         ruleActions = ruleActions,
         rulesTab = rulesTab,
+        search = search,
     )
 
     if (pendingProviderAction != null) {
@@ -368,108 +387,192 @@ fun RoutingScreen(
 }
 
 @Composable
+private fun rememberRoutingSearch(
+    pagerState: PagerState,
+    rulesSearchQuery: TextFieldState,
+    appsSearchQuery: TextFieldState,
+    ruleResultCount: Int,
+    appResultCount: Int,
+): RoutingSearchState {
+    var searchRequested by rememberSaveable { mutableStateOf(false) }
+    var searchTab by rememberSaveable { mutableIntStateOf(pagerState.currentPage) }
+    var searchClosing by remember { mutableStateOf(false) }
+    val searching = searchRequested || searchClosing
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val searchQuery = if (searchTab == RoutingTab.Apps.ordinal) appsSearchQuery else rulesSearchQuery
+    LaunchedEffect(pagerState.currentPage) { searchTab = pagerState.currentPage }
+    fun closeSearch() {
+        searchClosing = imeBottom > 0
+        searchRequested = false
+        rulesSearchQuery.edit { replace(0, length, "") }
+        appsSearchQuery.edit { replace(0, length, "") }
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
+    val bottomBarVisibility = LocalBottomBarVisibility.current
+    DisposableEffect(bottomBarVisibility, searching) {
+        bottomBarVisibility?.value = !searching
+        onDispose { bottomBarVisibility?.value = true }
+    }
+    var keyboardSeen by remember { mutableStateOf(false) }
+    LaunchedEffect(searching, imeBottom) {
+        if (searching && imeBottom > 0) keyboardSeen = true
+        if (imeBottom == 0 && keyboardSeen) {
+            keyboardSeen = false
+            searchClosing = false
+            if (searchRequested && searchQuery.text.isBlank()) closeSearch()
+        }
+    }
+    BackHandler(enabled = searchRequested) {
+        if (imeBottom > 0 && searchQuery.text.isNotBlank()) {
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+        } else {
+            closeSearch()
+        }
+    }
+
+    return RoutingSearchState(
+        query = searchQuery,
+        tab = searchTab,
+        requested = searchRequested,
+        visible = searching,
+        resultCount = if (searchTab == RoutingTab.Apps.ordinal) appResultCount else ruleResultCount,
+        open = { target ->
+            searchTab = target
+            pagerState.requestScrollToPage(target)
+            searchRequested = true
+        },
+        close = ::closeSearch,
+    )
+}
+
+private data class RoutingSearchState(
+    val query: TextFieldState,
+    val tab: Int,
+    val requested: Boolean,
+    val visible: Boolean,
+    val resultCount: Int,
+    val open: (Int) -> Unit,
+    val close: () -> Unit,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun RoutingLayout(
     pagerState: PagerState,
     showTitleBarLogo: Boolean,
     selectedRuleIds: Set<String>,
     onClearSelection: () -> Unit,
     onSelectTab: (Int) -> Unit,
-    ruleActions: @Composable (Set<String>) -> Unit,
-    rulesTab: @Composable () -> Unit,
+    ruleActions: @Composable (Set<String>) -> List<ToolbarAction?>,
+    rulesTab: @Composable (Dp) -> Unit,
+    search: RoutingSearchState,
 ) {
     val selectedTab = pagerState.currentPage
+    val bottomPanelTransition = updateTransition(
+        tabsPanelState(search.visible, selectedRuleIds.isNotEmpty()),
+        label = "routingBottomPanel",
+    )
+    val searchFraction by bottomPanelTransition.searchPanelFraction()
+    val rulesScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val appsScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     BoxWithConstraints {
-        // With the width for it, rules and apps sit side by side, each with its own actions, so
-        // neither has to be paged away to reach the other.
         val sideBySide = maxWidth >= TwoPaneMinWidth
-        val headerState = RoutingHeaderState(selectedRuleIds, selectedTab == RoutingTab.Apps.ordinal)
+        val appsSelected = selectedTab == RoutingTab.Apps.ordinal
+        val scrollBehavior = if (!sideBySide && appsSelected) appsScrollBehavior else rulesScrollBehavior
+        val rulesActions = ruleActions(selectedRuleIds)
+        val appsActions = appRoutingToolbarActions()
+        val selecting = selectedRuleIds.isNotEmpty() && (sideBySide || !appsSelected)
+        val searchLabel = stringResource(R.string.routing_search)
+        fun toolbarActions(tab: RoutingTab): List<ToolbarAction?> {
+            val actions = if (tab == RoutingTab.Apps) appsActions else rulesActions
+            val selectingRules = selecting && tab == RoutingTab.Rules
+            if (search.visible && search.tab == tab.ordinal && !selectingRules) return listOf(null, null, null)
+            val searchAction = if (selectingRules) {
+                null
+            } else {
+                ToolbarAction(
+                    "search",
+                    R.drawable.find_in_page_24px,
+                    searchLabel,
+                    onClick = { search.open(tab.ordinal) },
+                )
+            }
+            return listOf(actions[0], searchAction, actions[1])
+        }
+        val searchHint = stringResource(if (search.tab == RoutingTab.Apps.ordinal) R.string.apps_search else R.string.routing_search_rules)
         Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                AnimatedContent(
-                    targetState = headerState,
-                    contentKey = { it.selecting to it.appsTabSelected },
-                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
-                    label = "routingHeader",
-                ) { header ->
-                    RoutingTopBar(
-                        showTitleBarLogo = showTitleBarLogo,
-                        selectionCount = header.selectedIds.size.takeIf { header.selecting && (sideBySide || !header.appsTabSelected) },
-                        onClearSelection = onClearSelection,
-                        modifier = Modifier.blockInactiveToolbar(header.selecting == headerState.selecting && header.appsTabSelected == headerState.appsTabSelected),
-                        actions = {
-                            // Side by side, each pane carries its own actions instead.
-                            if (!sideBySide) {
-                                PagedTabActions(appsTabSelected = header.appsTabSelected, ruleActions = { ruleActions(header.selectedIds) })
-                            }
-                        },
-                    )
-                }
+                RoutingTopBar(
+                    scrollBehavior = scrollBehavior,
+                    showTitleBarLogo = showTitleBarLogo,
+                    selectionCount = selectedRuleIds.size.takeIf { selecting },
+                    onClearSelection = onClearSelection,
+                    searching = search.visible,
+                    searchResultCount = search.resultCount.takeIf { search.query.text.isNotBlank() },
+                    onCloseSearch = search.close,
+                    actions = {
+                        if (!sideBySide) {
+                            AnimatedToolbarActions(toolbarActions(RoutingTab.entries[selectedTab]))
+                        }
+                    },
+                )
             },
             bottomBar = {
-                if (!sideBySide) {
-                    SegmentedTabRow(
-                        labels = RoutingTab.entries.map { stringResource(it.titleResource) },
-                        selectedIndex = selectedTab,
-                        onSelected = onSelectTab,
-                    )
+                SearchTabsPanel(
+                    transition = bottomPanelTransition,
+                    state = search.query,
+                    requested = search.requested,
+                    hint = searchHint,
+                ) {
+                    if (!sideBySide) {
+                        FloatingTabRow(
+                            tabs = listOf(
+                                FloatingTab(stringResource(RoutingTab.Rules.titleResource), R.drawable.rule_24px),
+                                FloatingTab(stringResource(RoutingTab.Apps.titleResource), R.drawable.apps_24px),
+                            ),
+                            pagerState = pagerState,
+                            onSelected = onSelectTab,
+                        )
+                    }
                 }
             },
         ) { padding ->
             if (sideBySide) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                ) {
+                Row(modifier = Modifier.fillMaxSize().padding(padding)) {
                     RoutingPane(
                         title = stringResource(RoutingTab.Rules.titleResource),
-                        actions = {
-                            AnimatedContent(
-                                targetState = selectedRuleIds,
-                                contentKey = { it.isNotEmpty() },
-                                contentAlignment = Alignment.CenterEnd,
-                                transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
-                                label = "routingPaneActions",
-                            ) { ids ->
-                                Row(modifier = Modifier.blockInactiveToolbar(ids.isNotEmpty() == selectedRuleIds.isNotEmpty())) { ruleActions(ids) }
-                            }
-                        },
+                        actions = { AnimatedToolbarActions(toolbarActions(RoutingTab.Rules)) },
                         modifier = Modifier.weight(1f),
-                        content = rulesTab,
+                        content = { rulesTab(16.dp) },
                     )
                     VerticalDivider()
                     RoutingPane(
                         title = stringResource(RoutingTab.Apps.titleResource),
-                        actions = { AppRoutingMenuActions() },
+                        actions = { AnimatedToolbarActions(toolbarActions(RoutingTab.Apps)) },
                         modifier = Modifier.weight(1f),
-                    ) {
-                        AppBypassContent(active = true)
-                    }
+                    ) { AppBypassContent(active = true) }
                 }
             } else {
+                val viewportBottom = padding.calculateBottomPadding() * searchFraction
+                val bottomPadding = padding.calculateBottomPadding() - viewportBottom
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    userScrollEnabled = !search.visible && !selecting,
+                    modifier = Modifier.fillMaxSize().padding(PaddingValues(top = padding.calculateTopPadding(), bottom = viewportBottom)),
                 ) { page ->
                     when (RoutingTab.entries[page]) {
-                        RoutingTab.Rules -> rulesTab()
-                        RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal)
+                        RoutingTab.Rules -> rulesTab(bottomPadding)
+                        RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal, contentBottomPadding = bottomPadding)
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PagedTabActions(appsTabSelected: Boolean, ruleActions: @Composable () -> Unit) {
-    if (appsTabSelected) {
-        AppRoutingMenuActions()
-    } else {
-        ruleActions()
     }
 }
 
@@ -504,131 +607,110 @@ private fun RoutingPane(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RoutingTopBar(
+    scrollBehavior: TopAppBarScrollBehavior,
     showTitleBarLogo: Boolean,
     selectionCount: Int?,
     onClearSelection: () -> Unit,
-    modifier: Modifier,
+    searching: Boolean,
+    searchResultCount: Int?,
+    onCloseSearch: () -> Unit,
     actions: @Composable RowScope.() -> Unit,
 ) {
-    TopAppBar(
-        modifier = modifier,
-        title = {
-            AppBarTitle(
-                if (selectionCount != null) {
-                    pluralStringResource(R.plurals.routing_rules_selected, selectionCount, selectionCount)
-                } else {
-                    stringResource(R.string.routing_title)
-                },
-                showTitleBarLogo && selectionCount == null,
-            )
-        },
-        navigationIcon = {
-            if (selectionCount != null) {
-                TooltipIconButton(tooltip = stringResource(R.string.routing_clear_selection), onClick = onClearSelection) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = stringResource(R.string.routing_clear_selection),
-                        modifier = Modifier.size(24.dp),
-                    )
+    val title = when {
+        selectionCount != null -> pluralStringResource(R.plurals.routing_rules_selected, selectionCount, selectionCount)
+        searching -> searchResultCount?.let { stringResource(R.string.routing_search_found_count, it) }.orEmpty()
+        else -> stringResource(R.string.routing_title)
+    }
+    val closeLabel = when {
+        selectionCount != null -> stringResource(R.string.routing_clear_selection)
+        searching -> stringResource(R.string.routing_close_search)
+        else -> null
+    }
+    // A navigation icon changes the title's layout inset. Crossfade complete layouts, as on
+    // Logs, so the outgoing title keeps its original position. Tab changes keep this key.
+    AnimatedContent(
+        targetState = Triple(title, showTitleBarLogo && selectionCount == null && !searching, closeLabel),
+        contentKey = { it.third != null },
+        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+        label = "routingHeaderLayout",
+    ) { (text, logo, label) ->
+        ScrolledTopAppBar(
+            scrollBehavior = scrollBehavior,
+            highlighted = selectionCount != null,
+            title = {
+                AnimatedContent(
+                    targetState = text to logo,
+                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using null },
+                    label = "routingTitle",
+                ) { (titleText, showLogo) -> AppBarTitle(titleText, showLogo) }
+            },
+            navigationIcon = {
+                if (label != null) {
+                    TooltipIconButton(
+                        tooltip = label,
+                        onClick = {
+                            if (closeLabel == label) {
+                                if (selectionCount != null) onClearSelection() else onCloseSearch()
+                            }
+                        },
+                    ) {
+                        Icon(painterResource(R.drawable.close_24px), contentDescription = label, modifier = Modifier.size(24.dp))
+                    }
                 }
-            }
-        },
-        expandedHeight = AppTopBarHeight,
-        windowInsets = TopAppBarDefaults.windowInsets,
-        actions = actions,
-    )
+            },
+            actions = actions,
+        )
+    }
 }
 
 @Composable
-private fun RuleActions(
+private fun ruleToolbarActions(
     selectionMode: Boolean,
     selectedRuleIds: Set<String>,
     rules: List<RoutingRule>,
     onRuleAction: (RoutingRuleAction) -> Unit,
-) {
-    var rulesMenuExpanded by remember { mutableStateOf(false) }
-    val canRemoveSelected = selectionMode && selectedRuleIds.isNotEmpty() && selectedRuleIds.all { it.startsWith("custom:") }
-    if (!selectionMode) {
-        TooltipIconButton(tooltip = stringResource(R.string.routing_add_rule), onClick = { onRuleAction(RoutingRuleAction.Add) }) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = stringResource(R.string.routing_add_rule),
-                modifier = Modifier.size(24.dp),
-            )
-        }
-        Box {
-            TooltipIconButton(tooltip = stringResource(R.string.routing_rules_menu), onClick = { rulesMenuExpanded = true }) {
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = stringResource(R.string.routing_rules_menu),
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            AnimatedDropdownMenu(
-                expanded = rulesMenuExpanded,
-                onDismissRequest = { rulesMenuExpanded = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.routing_enable_all)) },
-                    enabled = rules.any { !it.enabled },
-                    onClick = {
-                        rulesMenuExpanded = false
-                        onRuleAction(RoutingRuleAction.EnableAll)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.routing_disable_all)) },
-                    enabled = rules.any { it.enabled },
-                    onClick = {
-                        rulesMenuExpanded = false
-                        onRuleAction(RoutingRuleAction.DisableAll)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.routing_reset_to_default)) },
-                    onClick = {
-                        rulesMenuExpanded = false
-                        onRuleAction(RoutingRuleAction.ResetToDefault)
-                    },
-                )
-            }
-        }
-    }
+): List<ToolbarAction?> {
+    val canRemoveSelected = selectedRuleIds.isNotEmpty() && selectedRuleIds.all { it.startsWith("custom:") }
     if (selectionMode) {
-        Box(
-            modifier = Modifier.size(48.dp).blockInactiveToolbar(canRemoveSelected),
-            contentAlignment = Alignment.Center,
-        ) {
-            AnimatedVisibility(
-                visible = canRemoveSelected,
-                enter = fadeIn(tween(300)),
-                exit = fadeOut(tween(300)),
-            ) {
-                TooltipIconButton(
-                    tooltip = stringResource(R.string.routing_remove_selected_rules),
-                    onClick = {
-                        if (canRemoveSelected) onRuleAction(RoutingRuleAction.Delete(selectedRuleIds.mapTo(mutableSetOf()) { it.removePrefix("custom:") }))
-                    },
-                ) {
-                    Icon(
-                        painterResource(R.drawable.delete_24px),
-                        contentDescription = stringResource(R.string.routing_remove_selected_rules),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-        }
+        return listOf(
+            null,
+            if (canRemoveSelected) {
+                ToolbarAction("deleteRules", R.drawable.delete_24px, stringResource(R.string.routing_remove_selected_rules), onClick = {
+                    onRuleAction(RoutingRuleAction.Delete(selectedRuleIds.mapTo(mutableSetOf()) { it.removePrefix("custom:") }))
+                })
+            } else {
+                null
+            },
+        )
     }
-}
-
-private fun Modifier.blockInactiveToolbar(active: Boolean): Modifier = then(
-    if (active) Modifier else Modifier.clearAndSetSemantics {},
-).pointerInput(active) {
-    if (!active) {
-        awaitPointerEventScope {
-            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
-        }
-    }
+    return listOf(
+        ToolbarAction("addRule", R.drawable.ic_add_24, stringResource(R.string.routing_add_rule), onClick = { onRuleAction(RoutingRuleAction.Add) }),
+        ToolbarAction("rulesMenu", R.drawable.more_horiz_24px, stringResource(R.string.routing_rules_menu), menu = { close ->
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.routing_enable_all)) },
+                enabled = rules.any { !it.enabled },
+                onClick = {
+                    close()
+                    onRuleAction(RoutingRuleAction.EnableAll)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.routing_disable_all)) },
+                enabled = rules.any { it.enabled },
+                onClick = {
+                    close()
+                    onRuleAction(RoutingRuleAction.DisableAll)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.routing_reset_to_default)) },
+                onClick = {
+                    close()
+                    onRuleAction(RoutingRuleAction.ResetToDefault)
+                },
+            )
+        }),
+    )
 }
 
 @Composable

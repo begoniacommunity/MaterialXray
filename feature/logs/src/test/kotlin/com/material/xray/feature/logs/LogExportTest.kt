@@ -29,6 +29,6 @@ class LogExportTest {
     @Test
     fun `export uses displayed messages and one line per record`() {
         val snapshot = logExportSnapshot(entries, setOf(10L, 30L))
-        assertEquals(listOf("[APP] First", "[XRAY] Second"), formatLogEntries(snapshot).lines().map { it.substringAfter(' ') })
+        assertEquals(listOf("[INTERNAL] First", "[CORE] Second"), formatLogEntries(snapshot).lines().map { it.substringAfter(' ') })
     }
 }

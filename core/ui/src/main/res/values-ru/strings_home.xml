@@ -76,10 +76,10 @@
     <string name="home_stats_ping_value">%1$d мс</string>
     <string name="home_server_endpoint_unknown">неизвестно</string>
     <plurals name="home_server_multiconnect_summary">
-        <item quantity="one">multi &#8226; %1$d сервер</item>
-        <item quantity="few">multi &#8226; %1$d сервера</item>
-        <item quantity="many">multi &#8226; %1$d серверов</item>
-        <item quantity="other">multi &#8226; %1$d сервера</item>
+        <item quantity="one">%1$d сервер</item>
+        <item quantity="few">%1$d сервера</item>
+        <item quantity="many">%1$d серверов</item>
+        <item quantity="other">%1$d сервера</item>
     </plurals>
     <string name="home_no_active_xray_config">Активный файл конфигурации Xray не найден.</string>
     <string name="home_connection_connected">Подключено</string>

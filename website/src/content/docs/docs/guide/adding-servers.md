@@ -22,6 +22,8 @@ Subscriptions can carry more: HTTP, SOCKS and WireGuard lines, plus raw Xray JSO
 
 ## Subscription options
 
+Subscription menus on Home use the horizontal three-dot icon, matching Routing.
+
 Hold the name in a subscription header and drag to reorder subscriptions, whether collapsed or expanded. Other cards slide into their new positions with a short, smooth transition. Haptic feedback marks the start of dragging and each change of position. This movement applies only when their order changes; expanding and collapsing a card keeps the usual reveal animation. While dragging, header controls fade into a centered drag handle. The subscription name and used traffic counter remain in place without fading or being replaced. The list scrolls near its edges, and the new order is saved when you release. Screen readers offer **Move up** and **Move down** actions on each header.
 
 Each subscription has its own settings, set when you add it manually or later by editing the subscription. Expand **Advanced** to show the fetch type, User-Agent, custom headers and insecure-update options; the dialog resizes smoothly and keeps its fields scrollable. Both dialogs move above the keyboard when it opens and return to the center when it closes, including with **Advanced** collapsed. Custom User-Agent and header fields use the same smooth expansion and collapse.
@@ -43,3 +45,5 @@ Server rows show a filled pencil for an edited configuration, a filled lock for 
 ## Hardware ID
 
 Some providers require a device identifier (HWID). Material Xray sends one by default. You can turn it off under **Settings → Send hardware ID (HWID)**. If a subscription [requires HWID](/docs/providers/response-headers/#subscription-always-hwid-enable) while sending is off, the app asks before adding it. **Cancel** leaves it unadded. **Proceed** permits HWID for that subscription and fetches it again with HWID; your global choice stays unchanged. The warning explains that HWID can help link traffic to your device and reduce anonymity. Selecting a subscription that requires HWID forces the Settings switch on and locks it. Switching to another subscription restores your saved choice.
+
+For an automatic multi-server profile, Home shows only the number of servers it connects.

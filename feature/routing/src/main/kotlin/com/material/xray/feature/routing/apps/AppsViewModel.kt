@@ -97,6 +97,8 @@ data class AppRouteOption(
     val description: AppRouteText,
     val kind: AppRouteKind,
     val serverId: Long? = null,
+    val subscriptionId: Long? = null,
+    val subscriptionName: String = "",
 )
 
 private data class AppListFilters(
@@ -206,6 +208,9 @@ class AppsViewModel(
             if (showAdvancedOptions && rootConnectionBackend == RootConnectionBackend.Tun) add(BYPASS_ROUTE_OPTION)
             servers.forEach { server -> add(server.toRouteOption()) }
         }
+    }.combine(subscriptionDao.observeAll()) { options, subscriptions ->
+        val byId = subscriptions.associateBy { it.id }
+        options.map { option -> option.copy(subscriptionName = byId[option.subscriptionId]?.name.orEmpty()) }
     }
         // Building a route option parses each server's config JSON.
         .flowOn(defaultDispatcher)
@@ -512,6 +517,7 @@ class AppsViewModel(
             description = description,
             kind = AppRouteKind.SERVER,
             serverId = id,
+            subscriptionId = subscriptionId,
         )
     }
 
