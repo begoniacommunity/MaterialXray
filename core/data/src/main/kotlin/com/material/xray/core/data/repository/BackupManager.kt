@@ -311,7 +311,7 @@ class BackupManager(
     }
 
     private suspend fun applyExternalSettings() {
-        launcherIconSwitcher.apply(settingsRepository.launcherIcon.first())
+        launcherIconSwitcher.apply(settingsRepository.launcherIcon.first(), settingsRepository.launcherName.first())
         appUpdateScheduler.setEnabled(
             settingsRepository.appUpdateChecksEnabled.first(),
             settingsRepository.appUpdateInterval.first(),

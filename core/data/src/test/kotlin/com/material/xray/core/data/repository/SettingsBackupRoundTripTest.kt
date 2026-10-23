@@ -121,6 +121,7 @@ class SettingsBackupRoundTripTest {
             "xray_log_level" to "debug",
             "default_outbound" to "direct",
             "launcher_icon" to "default",
+            "launcher_name" to "material_xray",
             "show_title_bar_logo" to false,
             "floating_connect_button" to true,
             "show_advanced_options" to true,

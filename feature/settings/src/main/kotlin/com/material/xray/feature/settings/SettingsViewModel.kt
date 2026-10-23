@@ -19,6 +19,7 @@ import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LauncherIcon
+import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.NotificationField
 import com.material.xray.core.model.NotificationStyle
 import com.material.xray.core.model.OtherVpnMode
@@ -310,6 +311,9 @@ class SettingsViewModel(
         if (icon == currentSettings().launcherIcon) return@launch
         settingsRuntimeManager.setLauncherIcon(icon)
     }
+    fun setLauncherName(name: LauncherName) = viewModelScope.launch {
+        if (name != currentSettings().launcherName) settingsRuntimeManager.setLauncherName(name)
+    }
     fun setShowTitleBarLogo(enabled: Boolean) = viewModelScope.launch {
         if (enabled == currentSettings().showTitleBarLogo) return@launch
         settingsRepo.setShowTitleBarLogo(enabled)
@@ -588,7 +592,7 @@ class SettingsViewModel(
                 runCatching {
                     settingsRuntimeManager.updateGeoDataAsset(asset, url)
                 }.onSuccess {
-                    _geoDataUpdateFeedback.update { it + (asset to ActionFeedback(successful = true)) }
+                    _geoDataUpdateFeedback.update { feedback -> feedback + (asset to ActionFeedback(successful = true)) }
                     _assetUpdateEvents.send(AssetUpdateMessage(successMessageResId))
                 }.onFailure { error ->
                     if (error is CancellationException) throw error

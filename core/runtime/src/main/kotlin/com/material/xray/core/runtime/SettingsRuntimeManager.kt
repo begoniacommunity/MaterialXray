@@ -12,6 +12,7 @@ import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.LauncherIcon
+import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.RootConnectionBackend
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.TproxyCompatibility
@@ -47,6 +48,7 @@ class SettingsRuntimeManager(
     private val _xrayCoreVersion = MutableStateFlow(XrayCoreVersion())
     private val diagnosticsMutex = Mutex()
     private val rootAccessMutex = Mutex()
+    private val launcherMutex = Mutex()
     private var diagnosticsLoaded = false
     private val geoDataUpdateBatch = GeoDataUpdateBatch(::reloadActiveConnectionIfConnected)
 
@@ -55,9 +57,14 @@ class SettingsRuntimeManager(
     /** The version of the core the next connection starts, the bundled one or one the user installed. */
     val xrayCoreVersion: StateFlow<XrayCoreVersion> = _xrayCoreVersion.asStateFlow()
 
-    suspend fun setLauncherIcon(icon: LauncherIcon) {
+    suspend fun setLauncherIcon(icon: LauncherIcon) = launcherMutex.withLock {
         settingsRepository.setLauncherIcon(icon)
-        launcherIconManager.apply(icon)
+        launcherIconManager.apply(icon, settingsRepository.launcherName.first())
+    }
+
+    suspend fun setLauncherName(name: LauncherName) = launcherMutex.withLock {
+        settingsRepository.setLauncherName(name)
+        launcherIconManager.apply(settingsRepository.launcherIcon.first(), name)
     }
 
     suspend fun setAppUpdateChecksEnabled(enabled: Boolean) {

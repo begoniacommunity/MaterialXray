@@ -2,6 +2,7 @@ package com.material.xray.feature.settings
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
@@ -19,6 +20,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -89,6 +91,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -98,6 +101,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
@@ -121,6 +125,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -135,6 +140,7 @@ import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LauncherIcon
+import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.NotificationField
 import com.material.xray.core.model.NotificationSettings
 import com.material.xray.core.model.NotificationStyle
@@ -493,11 +499,26 @@ private fun SettingsScreenContent(
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
+                                    LauncherIconPreview(icon)
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(stringResource(icon.labelResource), style = MaterialTheme.typography.bodyLarge)
                                     }
                                     RadioButton(selected = icon == launcherIcon, onClick = null)
                                 }
+                            }
+                        }
+                    }
+                    SettingsNestedSection(title = stringResource(R.string.settings_shortcut_name_title)) {
+                        LauncherName.entries.forEach { name ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    .selectable(selected = name == settings.launcherName, role = Role.RadioButton, onClick = { viewModel.setLauncherName(name) })
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(name.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                RadioButton(selected = name == settings.launcherName, onClick = null)
                             }
                         }
                     }
@@ -2441,12 +2462,28 @@ private fun ReorderableFieldList(
 private fun notificationFieldSummary(settings: NotificationSettings, rootMode: Boolean): String {
     val enabledFields = settings.normalizedFieldOrder(rootMode)
         .filter(settings::isFieldEnabled)
-        .map { stringResource(it.labelResource) }
-    return if (enabledFields.isEmpty()) {
-        stringResource(R.string.settings_no_custom_notification_fields)
-    } else {
-        enabledFields.joinToString(stringResource(R.string.settings_notification_field_separator))
+    val locale = LocalResources.current.configuration.locales[0]
+    val labels = enabledFields.take(3).mapIndexed { index, field ->
+        val label = stringResource(field.labelResource)
+        if (index == 0 || field == NotificationField.RamUsage) label else label.replaceFirstChar { it.lowercase(locale) }
     }
+    return when {
+        enabledFields.isEmpty() -> stringResource(R.string.settings_no_custom_notification_fields)
+        enabledFields.size > 3 -> stringResource(R.string.settings_notification_fields_more, labels.joinToString(", "), enabledFields.size - 3)
+        labels.size == 1 -> labels.first()
+        else -> stringResource(R.string.settings_notification_fields_join, labels.dropLast(1).joinToString(", "), labels.last())
+    }
+}
+
+@Composable
+private fun LauncherIconPreview(icon: LauncherIcon) {
+    val context = LocalContext.current
+    val size = with(LocalDensity.current) { 32.dp.roundToPx() }
+    val bitmap = remember(context, icon, size) {
+        context.packageManager.getActivityInfo(ComponentName(context, "${context.packageName}.${icon.aliasClassName}"), PackageManager.MATCH_DISABLED_COMPONENTS)
+            .loadIcon(context.packageManager).toBitmap(size, size).asImageBitmap()
+    }
+    Image(bitmap, contentDescription = null, modifier = Modifier.size(32.dp))
 }
 
 private fun digitsOnly(maxLength: Int) = InputTransformation.byValue { _, proposed ->

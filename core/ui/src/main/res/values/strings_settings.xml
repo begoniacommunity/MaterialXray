@@ -161,7 +161,7 @@
     <string name="settings_other_vpn_mode_help">About %1$s</string>
     <string name="settings_understand">Understand</string>
     <string name="settings_tunnel_tethered_clients_title">Tunnel tethered clients</string>
-    <string name="settings_tunnel_tethered_clients_description">Route Wi-Fi hotspot and USB tethering traffic through Xray.</string>
+    <string name="settings_tunnel_tethered_clients_description">Route Wi-Fi hotspot and USB tethering traffic through Xray</string>
     <string name="settings_tproxy_unsupported">TPROXY is unsupported on this device</string>
     <string name="settings_retry_compatibility_check">Retry compatibility check</string>
     <string name="settings_unavailable">Unavailable</string>
@@ -192,7 +192,6 @@
     <string name="settings_notification_fields_reorder_instructions">Drag the handle to reorder how fields appear in the notification.</string>
     <string name="settings_drag_to_reorder">Drag to reorder</string>
     <string name="settings_no_custom_notification_fields">No fields selected; shows connection status</string>
-    <string name="settings_notification_field_separator" translatable="false">" • "</string>
     <string name="settings_geoip_updated">GeoIP updated</string>
     <string name="settings_geosite_updated">GeoSite updated</string>
     <string name="settings_update_geoip">Update GeoIP</string>
@@ -205,4 +204,7 @@
     <string name="settings_asset_update_failed_with_detail">Update failed: %1$s</string>
     <string name="settings_xray_core_title">Choose Xray-core version</string>
     <string name="settings_xray_core_versions">Versions</string>
+    <string name="settings_shortcut_name_title">Shortcut name</string>
+    <string name="settings_notification_fields_join">%1$s and %2$s</string>
+    <string name="settings_notification_fields_more">%1$s, and %2$d more</string>
 </resources>

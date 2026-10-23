@@ -5,30 +5,32 @@ import android.content.Context
 import android.content.pm.PackageManager
 import com.material.xray.core.data.platform.LauncherIconSwitcher
 import com.material.xray.core.model.LauncherIcon
+import com.material.xray.core.model.LauncherName
 import org.koin.core.annotation.Singleton
 
 @Singleton(binds = [LauncherIconSwitcher::class])
 class LauncherIconManager(
     private val context: Context,
 ) : LauncherIconSwitcher {
-    override fun apply(icon: LauncherIcon) {
+    override fun apply(icon: LauncherIcon, name: LauncherName) {
         val packageManager = context.packageManager
         packageManager.setComponentEnabledSetting(
-            icon.componentName(),
+            componentName(name.aliasClassName(icon)),
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
             PackageManager.DONT_KILL_APP,
         )
 
-        LauncherIcon.entries
-            .filterNot { it == icon }
-            .forEach { disabledIcon ->
+        val selected = name.aliasClassName(icon)
+        LauncherName.entries.flatMap { launcherName -> LauncherIcon.entries.map(launcherName::aliasClassName) }
+            .filterNot { it == selected }
+            .forEach { alias ->
                 packageManager.setComponentEnabledSetting(
-                    disabledIcon.componentName(),
+                    componentName(alias),
                     PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                     PackageManager.DONT_KILL_APP,
                 )
             }
     }
 
-    private fun LauncherIcon.componentName(): ComponentName = ComponentName(context, "${context.packageName}.$aliasClassName")
+    private fun componentName(alias: String): ComponentName = ComponentName(context, "${context.packageName}.$alias")
 }

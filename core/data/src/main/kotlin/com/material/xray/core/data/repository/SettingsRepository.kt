@@ -15,6 +15,7 @@ import com.material.xray.core.model.DnsPreset
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LauncherIcon
+import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.NotificationField
 import com.material.xray.core.model.NotificationSettings
 import com.material.xray.core.model.NotificationStyle
@@ -62,6 +63,7 @@ data class SettingsSnapshot(
     val xrayLogLevel: XrayLogLevel,
     val defaultOutbound: XrayOutbound,
     val launcherIcon: LauncherIcon,
+    val launcherName: LauncherName = LauncherName.default,
     val showTitleBarLogo: Boolean,
     val floatingConnectButton: Boolean,
     val showAdvancedOptions: Boolean,
@@ -121,6 +123,7 @@ class SettingsRepository(
         val LAST_XRAY_LOG_LEVEL = stringPreferencesKey("last_xray_log_level")
         val DEFAULT_OUTBOUND = stringPreferencesKey("default_outbound")
         val LAUNCHER_ICON = stringPreferencesKey("launcher_icon")
+        val LAUNCHER_NAME = stringPreferencesKey("launcher_name")
         val SHOW_TITLE_BAR_LOGO = booleanPreferencesKey("show_title_bar_logo")
         val FLOATING_CONNECT_BUTTON = booleanPreferencesKey("floating_connect_button")
         val SHOW_ADVANCED_OPTIONS = booleanPreferencesKey("show_advanced_options")
@@ -208,6 +211,7 @@ class SettingsRepository(
     val launcherIcon: Flow<LauncherIcon> = store.data.map { prefs ->
         LauncherIcon.fromValue(prefs[LAUNCHER_ICON])
     }
+    val launcherName: Flow<LauncherName> = store.data.map { LauncherName.fromValue(it[LAUNCHER_NAME]) }
     val showTitleBarLogo: Flow<Boolean> = store.data.map { prefs ->
         prefs[SHOW_TITLE_BAR_LOGO] ?: true
     }
@@ -377,6 +381,7 @@ class SettingsRepository(
             xrayLogLevel = resolveXrayLogLevel(prefs[XRAY_LOG_LEVEL], prefs[LAST_XRAY_LOG_LEVEL]),
             defaultOutbound = XrayOutbound.fromTag(prefs[DEFAULT_OUTBOUND]),
             launcherIcon = LauncherIcon.fromValue(prefs[LAUNCHER_ICON]),
+            launcherName = LauncherName.fromValue(prefs[LAUNCHER_NAME]),
             showTitleBarLogo = prefs[SHOW_TITLE_BAR_LOGO] ?: true,
             floatingConnectButton = prefs[FLOATING_CONNECT_BUTTON] ?: false,
             showAdvancedOptions = showAdvancedOptions,
@@ -488,6 +493,7 @@ class SettingsRepository(
     suspend fun setLauncherIcon(icon: LauncherIcon) = store.edit { prefs ->
         prefs[LAUNCHER_ICON] = icon.value
     }
+    suspend fun setLauncherName(name: LauncherName) = store.edit { prefs -> prefs[LAUNCHER_NAME] = name.value }
     suspend fun setShowTitleBarLogo(enabled: Boolean) = store.edit { prefs ->
         prefs[SHOW_TITLE_BAR_LOGO] = enabled
     }
@@ -748,6 +754,7 @@ class SettingsRepository(
             }
             map["default_outbound"]?.let { prefs[DEFAULT_OUTBOUND] = XrayOutbound.fromTag(it).tag }
             map["launcher_icon"]?.let { prefs[LAUNCHER_ICON] = LauncherIcon.fromValue(it).value }
+            map["launcher_name"]?.let { prefs[LAUNCHER_NAME] = LauncherName.fromValue(it).value }
             map["show_title_bar_logo"]?.toBooleanStrictOrNull()?.let { prefs[SHOW_TITLE_BAR_LOGO] = it }
             map["floating_connect_button"]?.toBooleanStrictOrNull()?.let { prefs[FLOATING_CONNECT_BUTTON] = it }
             showAdvancedOptions?.let { prefs[SHOW_ADVANCED_OPTIONS] = it }

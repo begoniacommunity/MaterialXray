@@ -31,8 +31,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.UploadFile
@@ -70,6 +68,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -322,7 +321,8 @@ fun xrayCoreSummary(viewModel: XrayCoreViewModel = koinViewModel()): String {
     val selected = state.installed.firstOrNull { it.id == state.selectedId }
     val bundledVersion = state.bundledVersion
     return when {
-        selected != null -> stringResource(R.string.settings_xray_core_summary_custom, normalizeXrayVersion(selected.version))
+        selected?.source == XrayCoreSource.File && isRecommendedXrayVersion(selected.version) -> stringResource(R.string.settings_xray_core_summary_custom, normalizeXrayVersion(selected.version))
+        selected != null -> versionLabel(selected.version)
         bundledVersion != null -> stringResource(R.string.settings_xray_core_summary_built_in, normalizeXrayVersion(bundledVersion))
         !state.loaded -> stringResource(R.string.settings_xray_core_version_detecting)
         else -> stringResource(R.string.settings_xray_core_version_unknown)
@@ -513,13 +513,13 @@ private fun CoreEntryRow(
                     installed != null && !selected -> {
                         val label = stringResource(R.string.settings_xray_core_delete, versionLabel(installed.version))
                         TooltipIconButton(tooltip = label, onClick = { onDelete(installed.id) }) {
-                            Icon(Icons.Filled.Delete, contentDescription = label)
+                            Icon(painterResource(R.drawable.delete_24px), contentDescription = label)
                         }
                     }
                     release != null && installed == null -> {
                         val label = stringResource(R.string.settings_xray_core_release_install, versionLabel(release.tag))
                         TooltipIconButton(tooltip = label, onClick = { onInstall(release) }, enabled = !state.isBusy) {
-                            Icon(Icons.Filled.Download, contentDescription = label)
+                            Icon(painterResource(R.drawable.download_24px), contentDescription = label)
                         }
                     }
                 }

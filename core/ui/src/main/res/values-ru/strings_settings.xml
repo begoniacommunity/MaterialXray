@@ -169,7 +169,7 @@
     <string name="settings_other_vpn_mode_help">Подробнее о режиме «%1$s»</string>
     <string name="settings_understand">Понятно</string>
     <string name="settings_tunnel_tethered_clients_title">Туннелировать подключённые устройства</string>
-    <string name="settings_tunnel_tethered_clients_description">Направлять трафик точки доступа Wi-Fi и USB-модема через Xray.</string>
+    <string name="settings_tunnel_tethered_clients_description">Направлять трафик точки доступа Wi-Fi и USB-модема через Xray</string>
     <string name="settings_tproxy_unsupported">TPROXY не поддерживается на этом устройстве</string>
     <string name="settings_retry_compatibility_check">Повторить проверку совместимости</string>
     <string name="settings_unavailable">Недоступно</string>
@@ -208,4 +208,7 @@
     <string name="settings_asset_update_failed_with_detail">Не удалось обновить: %1$s</string>
     <string name="settings_xray_core_title">Выбрать версию Xray-core</string>
     <string name="settings_xray_core_versions">Версии</string>
+    <string name="settings_shortcut_name_title">Название ярлыка</string>
+    <string name="settings_notification_fields_join">%1$s и %2$s</string>
+    <string name="settings_notification_fields_more">%1$s и ещё %2$d</string>
 </resources>

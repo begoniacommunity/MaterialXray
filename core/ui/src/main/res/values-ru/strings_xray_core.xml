@@ -39,7 +39,7 @@
     <string name="settings_xray_core_follow_requirements">Следовать требованиям провайдера к ядру</string>
     <string name="settings_xray_core_follow_requirements_description">Если подписка требует другие версии Xray, при подключении переключаться на новейшую подходящую и при необходимости скачивать её</string>
     <string name="settings_xray_core_summary_built_in">v%1$s (встроенное)</string>
-    <string name="settings_xray_core_summary_custom">v%1$s · Своё</string>
+    <string name="settings_xray_core_summary_custom">v%1$s (своё)</string>
     <string name="notification_channel_xray_core_updates">Обновления ядра Xray</string>
     <string name="notification_xray_core_update_title">Доступно новое ядро Xray</string>
     <string name="notification_xray_core_update_text">Вышел Xray %1$s. Нажмите, чтобы открыть Material Xray.</string>

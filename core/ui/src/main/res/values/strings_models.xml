@@ -18,7 +18,7 @@
     <string name="routing_policy_subscription_provider_description">Apply routing rules and per-app routing from the selected subscription provider</string>
 
     <string name="root_connection_backend_tun_label">TUN interface</string>
-    <string name="root_connection_backend_tun_description">Creates a virtual network interface and routes app traffic through it into the core.</string>
+    <string name="root_connection_backend_tun_description">Creates a virtual network interface and routes app traffic through it into the core</string>
     <string name="root_connection_backend_tproxy_label">Transparent proxy</string>
     <string name="ipv6_session_enabled">Now: IPv6 on</string>
     <string name="ipv6_session_enabled_until_reconnect">Now: IPv6 on, but it failed the check through the server, so the next connection uses IPv4 only</string>
@@ -38,7 +38,7 @@
     <string name="other_vpn_mode_tunnel_in_tunnel_dropdown_description">App traffic will be routed through another active VPN, while Material Xray proxies the VPN app itself. This could be useful for apps like Tailscale that use Android’s built-in VPN service and have trouble connecting directly.\n\nThe other VPN app should be configured to use a proxy in Routing.</string>
     <string name="other_vpn_mode_stand_down_label">Stand down</string>
     <string name="other_vpn_mode_stand_down_description">Prioritize another VPN while it is connected. Material Xray stays running and resumes automatically once that VPN disconnects.</string>
-    <string name="root_connection_backend_tproxy_description">Intercepts traffic without interfaces via routing rules. Experimental and may not work on old devices.</string>
+    <string name="root_connection_backend_tproxy_description">Intercepts traffic without interfaces via routing rules; experimental and may not work on old devices</string>
     <string name="xray_outbound_proxy_label">proxy</string>
     <string name="xray_outbound_proxy_description">Send traffic through the selected proxy server.</string>
     <string name="xray_outbound_direct_label">direct</string>

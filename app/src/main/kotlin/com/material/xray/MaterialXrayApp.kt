@@ -132,7 +132,7 @@ class MaterialXrayApp : Application() {
             networkServerManager.start(appScope)
             runCatching { startupDiagnosticsLogger.logIfMissing() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to record startup diagnostics", error) }
-            launcherIconManager.apply(settingsRepository.launcherIcon.first())
+            launcherIconManager.apply(settingsRepository.launcherIcon.first(), settingsRepository.launcherName.first())
             appUpdateScheduler.setEnabled(
                 settingsRepository.appUpdateChecksEnabled.first(),
                 settingsRepository.appUpdateInterval.first(),

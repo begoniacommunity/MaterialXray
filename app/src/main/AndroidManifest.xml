@@ -49,7 +49,7 @@
 
         <activity-alias
             android:name=".DefaultLauncherAlias"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:banner="@drawable/tv_banner"
             android:icon="@mipmap/ic_launcher"
@@ -70,6 +70,38 @@
             android:banner="@drawable/tv_banner_material"
             android:icon="@mipmap/ic_launcher_material"
             android:label="@string/launcher_name"
+            android:roundIcon="@mipmap/ic_launcher_material_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".DefaultFullNameLauncherAlias"
+            android:enabled="true"
+            android:exported="true"
+            android:banner="@drawable/tv_banner"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MaterialFullNameLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:banner="@drawable/tv_banner_material"
+            android:icon="@mipmap/ic_launcher_material"
+            android:label="@string/app_name"
             android:roundIcon="@mipmap/ic_launcher_material_round"
             android:targetActivity=".MainActivity">
             <intent-filter>
