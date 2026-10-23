@@ -43,18 +43,24 @@ class ConnectionRuntimeManager(
         onProgressFinished = stateCoordinator::endConnectionProgress,
     )
 
-    suspend fun reconcileState() = stepExecutor.execute(
+    suspend fun reconcileState(verifyRecordedRuntime: Boolean = false) = stepExecutor.execute(
         ConnectionStep(
             label = "Reconcile Xray runtime state",
             progress = ConnectionProgress.InspectingSavedRuntime,
             reported = false,
-            action = { reconcileStateOnce() },
+            action = { reconcileStateOnce(verifyRecordedRuntime) },
         ),
     )
 
-    private suspend fun reconcileStateOnce() {
+    private suspend fun reconcileStateOnce(verifyRecordedRuntime: Boolean) {
         when (val detection = detectRuntime()) {
             is RuntimeDetection.Observed -> {
+                // Automatic server selection must wait until the service has loaded the saved config.
+                val needsVerification = verifyRecordedRuntime && detection.state is ConnectionState.Connected && detection.state.corePid > 0
+                if (needsVerification && stateCoordinator.markRestoringRecordedRuntime()) {
+                    XrayService.restoreStatus(context)
+                    return
+                }
                 val reconciledState = stateCoordinator.reconcileDetectedState(detection.state)
                 if (reconciledState is ConnectionState.Connected && reconciledState.corePid > 0) {
                     XrayService.restoreStatus(context)

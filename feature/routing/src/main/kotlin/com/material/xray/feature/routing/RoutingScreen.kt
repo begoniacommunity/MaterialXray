@@ -98,12 +98,14 @@ import com.material.xray.core.xray.ProviderGeoDataNotice
 import com.material.xray.feature.routing.apps.AppBypassContent
 import com.material.xray.feature.routing.apps.AppsViewModel
 import com.material.xray.feature.routing.apps.appRoutingToolbarActions
+import com.material.xray.feature.routing.network.NetworkRoutingContent
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 private enum class RoutingTab(@StringRes val titleResource: Int) {
     Rules(R.string.routing_tab_rules),
     Apps(R.string.routing_tab_apps),
+    Network(R.string.network_tab),
 }
 
 private sealed interface RoutingRuleAction {
@@ -479,30 +481,21 @@ private fun RoutingLayout(
     val searchFraction by bottomPanelTransition.searchPanelFraction()
     val rulesScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val appsScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+    val networkScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     BoxWithConstraints {
         val sideBySide = maxWidth >= TwoPaneMinWidth
         val appsSelected = selectedTab == RoutingTab.Apps.ordinal
-        val scrollBehavior = if (!sideBySide && appsSelected) appsScrollBehavior else rulesScrollBehavior
+        val networkSelected = selectedTab == RoutingTab.Network.ordinal
+        val scrollBehavior = when {
+            networkSelected -> networkScrollBehavior
+            !sideBySide && appsSelected -> appsScrollBehavior
+            else -> rulesScrollBehavior
+        }
         val rulesActions = ruleActions(selectedRuleIds)
         val appsActions = appRoutingToolbarActions()
-        val selecting = selectedRuleIds.isNotEmpty() && (sideBySide || !appsSelected)
+        val selecting = selectedRuleIds.isNotEmpty() && !networkSelected && (sideBySide || selectedTab == RoutingTab.Rules.ordinal)
         val searchLabel = stringResource(R.string.routing_search)
-        fun toolbarActions(tab: RoutingTab): List<ToolbarAction?> {
-            val actions = if (tab == RoutingTab.Apps) appsActions else rulesActions
-            val selectingRules = selecting && tab == RoutingTab.Rules
-            if (search.visible && search.tab == tab.ordinal && !selectingRules) return listOf(null, null, null)
-            val searchAction = if (selectingRules) {
-                null
-            } else {
-                ToolbarAction(
-                    "search",
-                    R.drawable.find_in_page_24px,
-                    searchLabel,
-                    onClick = { search.open(tab.ordinal) },
-                )
-            }
-            return listOf(actions[0], searchAction, actions[1])
-        }
+        fun toolbarActions(tab: RoutingTab) = routingToolbarActions(tab, rulesActions, appsActions, selecting, search, searchLabel)
         val searchHint = stringResource(if (search.tab == RoutingTab.Apps.ordinal) R.string.apps_search else R.string.routing_search_rules)
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -517,7 +510,7 @@ private fun RoutingLayout(
                     searchResultCount = search.resultCount.takeIf { search.query.text.isNotBlank() },
                     onCloseSearch = search.close,
                     actions = {
-                        if (!sideBySide) {
+                        if (!sideBySide || networkSelected) {
                             AnimatedToolbarActions(toolbarActions(RoutingTab.entries[selectedTab]))
                         }
                     },
@@ -530,33 +523,32 @@ private fun RoutingLayout(
                     requested = search.requested,
                     hint = searchHint,
                 ) {
-                    if (!sideBySide) {
-                        FloatingTabRow(
-                            tabs = listOf(
-                                FloatingTab(stringResource(RoutingTab.Rules.titleResource), R.drawable.rule_24px),
-                                FloatingTab(stringResource(RoutingTab.Apps.titleResource), R.drawable.apps_24px),
-                            ),
-                            pagerState = pagerState,
-                            onSelected = onSelectTab,
-                        )
-                    }
+                    FloatingTabRow(
+                        tabs = listOf(
+                            FloatingTab(stringResource(RoutingTab.Rules.titleResource), R.drawable.rule_24px),
+                            FloatingTab(stringResource(RoutingTab.Apps.titleResource), R.drawable.apps_24px),
+                            FloatingTab(stringResource(RoutingTab.Network.titleResource), R.drawable.globe_24px),
+                        ),
+                        pagerState = pagerState,
+                        onSelected = routingTabSelection(sideBySide, pagerState, onSelectTab),
+                    )
                 }
             },
         ) { padding ->
-            if (sideBySide) {
-                Row(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (sideBySide && !networkSelected) {
+                Row(modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
                     RoutingPane(
                         title = stringResource(RoutingTab.Rules.titleResource),
                         actions = { AnimatedToolbarActions(toolbarActions(RoutingTab.Rules)) },
                         modifier = Modifier.weight(1f),
-                        content = { rulesTab(16.dp) },
+                        content = { rulesTab(padding.calculateBottomPadding()) },
                     )
                     VerticalDivider()
                     RoutingPane(
                         title = stringResource(RoutingTab.Apps.titleResource),
                         actions = { AnimatedToolbarActions(toolbarActions(RoutingTab.Apps)) },
                         modifier = Modifier.weight(1f),
-                    ) { AppBypassContent(active = true) }
+                    ) { AppBypassContent(active = true, contentBottomPadding = padding.calculateBottomPadding()) }
                 }
             } else {
                 val viewportBottom = padding.calculateBottomPadding() * searchFraction
@@ -569,11 +561,41 @@ private fun RoutingLayout(
                     when (RoutingTab.entries[page]) {
                         RoutingTab.Rules -> rulesTab(bottomPadding)
                         RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal, contentBottomPadding = bottomPadding)
+                        RoutingTab.Network -> NetworkRoutingContent(contentBottomPadding = bottomPadding)
                     }
                 }
             }
         }
     }
+}
+
+private fun routingToolbarActions(
+    tab: RoutingTab,
+    rulesActions: List<ToolbarAction?>,
+    appsActions: List<ToolbarAction>,
+    selecting: Boolean,
+    search: RoutingSearchState,
+    searchLabel: String,
+): List<ToolbarAction?> {
+    if (tab == RoutingTab.Network) return listOf(null, null, null)
+    val actions = if (tab == RoutingTab.Apps) appsActions else rulesActions
+    val selectingRules = selecting && tab == RoutingTab.Rules
+    if (search.visible && search.tab == tab.ordinal && !selectingRules) return listOf(null, null, null)
+    val searchAction = if (selectingRules) {
+        null
+    } else {
+        ToolbarAction(
+            "search",
+            R.drawable.find_in_page_24px,
+            searchLabel,
+            onClick = { search.open(tab.ordinal) },
+        )
+    }
+    return listOf(actions[0], searchAction, actions[1])
+}
+
+private fun routingTabSelection(sideBySide: Boolean, pagerState: PagerState, onSelectTab: (Int) -> Unit): (Int) -> Unit = { index ->
+    if (sideBySide) pagerState.requestScrollToPage(index) else onSelectTab(index)
 }
 
 @Composable

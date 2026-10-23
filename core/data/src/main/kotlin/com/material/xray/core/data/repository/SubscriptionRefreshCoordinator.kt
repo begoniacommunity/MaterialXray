@@ -24,6 +24,7 @@ class SubscriptionRefreshCoordinator(
     private val connectionShutdown: ConnectionShutdown,
     private val serverSelectionCoordinator: ServerSelectionCoordinator,
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
+    private val networkServerRepository: NetworkServerRepository,
 ) {
     private val operationMutex = Mutex()
 
@@ -133,6 +134,8 @@ class SubscriptionRefreshCoordinator(
             val result = subscriptionRepository.commitRefresh(prepared) ?: return@withContext null
             syncSelectedServerAfterRefresh(selectedBeforeRefresh, result)
             syncAppRoutesAfterRefresh(result)
+            val available = serverRepository.observeAll().first().mapTo(mutableSetOf()) { it.id }
+            networkServerRepository.replaceAfterRefresh(result.serverIdReplacements, available)
             if (selectedBeforeRefresh?.subscriptionId == result.subscriptionId) {
                 providerRoutingCoordinator.refreshSelectedServer()
             }

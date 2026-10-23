@@ -7,6 +7,7 @@ import com.material.xray.core.android.app.AppInventory
 import com.material.xray.core.android.data.AndroidSubscriptionDeviceIdentity
 import com.material.xray.core.android.data.ContentResolverBackupStorage
 import com.material.xray.core.android.launcher.LauncherIconManager
+import com.material.xray.core.android.network.AndroidNetworkEnvironmentMonitor
 import com.material.xray.core.android.network.AndroidNetworkLinkProbe
 import com.material.xray.core.android.platform.AndroidAppBuildInfo
 import com.material.xray.core.android.platform.AndroidPlatformInfo
@@ -37,6 +38,7 @@ import com.material.xray.core.data.repository.BackupSection
 import com.material.xray.core.data.repository.SettingsDataStore
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.network.CoreTrafficRoutingSetting
+import com.material.xray.core.network.NetworkEnvironmentMonitor
 import com.material.xray.core.network.NetworkLinkProbe
 import com.material.xray.core.runtime.AppUpdateScheduler
 import com.material.xray.core.runtime.ConnectionShutdownManager
@@ -129,6 +131,7 @@ class KoinGraphTest {
             PlatformDns::class to AndroidPlatformDns::class,
             VpnTransportProbe::class to AndroidVpnTransportProbe::class,
             NetworkLinkProbe::class to AndroidNetworkLinkProbe::class,
+            NetworkEnvironmentMonitor::class to AndroidNetworkEnvironmentMonitor::class,
             AppBuildInfo::class to AndroidAppBuildInfo::class,
             SubscriptionDeviceIdentity::class to AndroidSubscriptionDeviceIdentity::class,
             BackupStorage::class to ContentResolverBackupStorage::class,

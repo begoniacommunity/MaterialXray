@@ -8,6 +8,7 @@ import com.material.xray.core.android.telemetry.diagnosticsConsentMirror
 import com.material.xray.core.android.telemetry.initializeSentryTelemetry
 import com.material.xray.core.common.di.ApplicationScope
 import com.material.xray.core.data.repository.BackupManager
+import com.material.xray.core.data.repository.NetworkServerRepository
 import com.material.xray.core.data.repository.ProviderGeoDataManager
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
@@ -15,7 +16,9 @@ import com.material.xray.core.database.DatabaseOpenChecker
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.runtime.AppUpdateScheduler
+import com.material.xray.core.runtime.ConnectionRuntimeManager
 import com.material.xray.core.runtime.GeoDataUpdateScheduler
+import com.material.xray.core.runtime.NetworkServerManager
 import com.material.xray.core.runtime.OemAutostartManager
 import com.material.xray.core.runtime.StartupDiagnosticsLogger
 import com.material.xray.core.runtime.SubscriptionUpdateScheduler
@@ -68,6 +71,9 @@ class MaterialXrayApp : Application() {
     private val serverRepository: ServerRepository by inject()
 
     private val ipv6Detector: Ipv6Detector by inject()
+    private val networkServerManager: NetworkServerManager by inject()
+    private val networkServerRepository: NetworkServerRepository by inject()
+    private val connectionRuntimeManager: ConnectionRuntimeManager by inject()
 
     private val appScope: CoroutineScope by inject(named<ApplicationScope>())
 
@@ -121,6 +127,9 @@ class MaterialXrayApp : Application() {
             if (!databaseOpenChecker.canRead()) return@launch
             runCatching { backupManager.recoverInterruptedRestore() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to recover interrupted backup restore", error) }
+            // Account for a root runtime that survived this process before changing its server.
+            if (networkServerRepository.policy.first().enabled) connectionRuntimeManager.reconcileState(verifyRecordedRuntime = true)
+            networkServerManager.start(appScope)
             runCatching { startupDiagnosticsLogger.logIfMissing() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to record startup diagnostics", error) }
             launcherIconManager.apply(settingsRepository.launcherIcon.first())

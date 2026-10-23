@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_tab">Сеть</string>
+    <string name="network_server_enable">Использовать отдельный сервер для каждой сети</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_mobile">Мобильная сеть</string>
+    <string name="network_server_unchanged">Последний для этого типа сети</string>
+    <string name="network_server_unavailable">Назначенный сервер недоступен. Выберите другой.</string>
+    <string name="network_ssid_active">Для SSID %1$s активно отдельное правило Wi-Fi.</string>
+    <string name="network_ssid_rules">Правила для Wi-Fi сетей</string>
+    <string name="network_ssid_permission_description">Для чтения SSID, используемых в правилах Wi-Fi, Android требует включённое местоположение и разрешение точной геолокации. Для автоматического переключения в фоне разрешите доступ к местоположению «Всегда» в разрешениях приложения.\n\nОбщие настройки Wi-Fi и мобильной сети работают без этих разрешений.</string>
+    <string name="network_grant_location">Разрешить точную геолокацию</string>
+    <string name="network_background_location">Разрешить геолокацию всегда</string>
+    <string name="network_enable_location">Включить местоположение</string>
+    <string name="network_add_ssid">Добавить Wi-Fi сеть</string>
+    <string name="network_remove_ssid">Удалить правило Wi-Fi</string>
+    <string name="network_ssid">Имя сети (SSID)</string>
+    <string name="network_use_current">Использовать текущую Wi-Fi сеть</string>
+    <string name="network_pick_server">Выбор сервера</string>
+    <string name="network_blocked_override">Автопереключение приостановлено, пока сохранён вручную отредактированный активный конфиг.</string>
+    <string name="network_blocked_core">Назначенному серверу нужна другая версия ядра. Выберите совместимое ядро или другой сервер.</string>
+    <string name="network_open_permissions">Открыть разрешения геолокации</string>
+</resources>

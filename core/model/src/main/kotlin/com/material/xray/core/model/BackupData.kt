@@ -17,7 +17,18 @@ data class BackupData(
     val activeConfigOverride: String? = null,
     /** State owned by optional modules, keyed by the module's section name. */
     val sections: Map<String, JsonElement> = emptyMap(),
+    val networkServers: BackupNetworkServers? = null,
 ) {
+    @Serializable
+    data class BackupNetworkServers(
+        val enabled: Boolean = false,
+        val wifiServerKey: String? = null,
+        val mobileServerKey: String? = null,
+        val ssidServers: Map<String, String> = emptyMap(),
+        val lastWifiServerKey: String? = null,
+        val lastMobileServerKey: String? = null,
+    )
+
     @Serializable
     data class BackupSubscription(
         val key: String? = null,
@@ -63,6 +74,6 @@ data class BackupData(
         const val APP_ROUTES_VERSION = 3
         const val SPARSE_SETTINGS_VERSION = 4
         const val COMPLETE_STATE_VERSION = 5
-        const val CURRENT_VERSION = COMPLETE_STATE_VERSION
+        const val CURRENT_VERSION = 6
     }
 }

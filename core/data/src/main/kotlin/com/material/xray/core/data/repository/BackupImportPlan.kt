@@ -59,6 +59,12 @@ internal object BackupImportPlanner {
             "Unsupported backup version ${backup.version}"
         }
         settingsDefaultsRevisionFromBackup(backup.settings, backup.version)
+        backup.networkServers?.let { policy ->
+            val keys = backup.servers.mapNotNull { it.key }.toSet()
+            val references = listOfNotNull(policy.wifiServerKey, policy.mobileServerKey, policy.lastWifiServerKey, policy.lastMobileServerKey) + policy.ssidServers.values
+            require(references.all(keys::contains)) { "Network rule references an unknown server" }
+            require(policy.ssidServers.keys.all { it.isNotEmpty() }) { "Network rule has an empty SSID" }
+        }
 
         val subscriptions = backup.subscriptions.mapIndexed { index, subscription ->
             val key = if (backup.version >= BackupData.STABLE_RELATIONSHIP_KEYS_VERSION) {

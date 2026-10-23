@@ -86,6 +86,7 @@ import com.material.xray.core.network.ServerLatencyTester
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.runtime.AlwaysOnVpnState
 import com.material.xray.core.runtime.ConnectionManagerFactory
+import com.material.xray.core.runtime.NetworkServerManager
 import com.material.xray.core.runtime.SettingsRuntimeManager
 import com.material.xray.core.runtime.StartupDiagnosticsLogger
 import com.material.xray.core.runtime.XRAY_LOG_FILE_NAME
@@ -141,6 +142,7 @@ class XrayService(
     private val appBypassDao: AppBypassDao by inject()
 
     private val serverRepository: ServerRepository by inject()
+    private val networkServerManager: NetworkServerManager by inject()
 
     private val subscriptionRepository: SubscriptionRepository by inject()
 
@@ -492,7 +494,7 @@ class XrayService(
                 val configJson = intent.getStringExtra(EXTRA_SERVER_CONFIG) ?: return START_NOT_STICKY
                 launchConnectionCommand {
                     // Home and the tile both connect the selected server.
-                    val config = Json.decodeFromString<ServerConfig>(configJson)
+                    val config = (networkServerManager.selectForConnection() ?: Json.decodeFromString<ServerConfig>(configJson))
                         .withProfileDnsOverride(settingsRepo.lastServerId.first())
                     connectionLifecycle.updateActiveConfig(config)
                     connectWithCurrentSettings(config)
@@ -1194,6 +1196,9 @@ class XrayService(
     }
 
     private suspend fun loadLastServerConfig(): ServerConfig? {
+        if (connectionStateCoordinator.state.value !is ConnectionState.Connected) {
+            networkServerManager.selectForConnection()
+        }
         val lastServerId = settingsRepo.lastServerId.first()
         return loadServerConfig(lastServerId)
     }

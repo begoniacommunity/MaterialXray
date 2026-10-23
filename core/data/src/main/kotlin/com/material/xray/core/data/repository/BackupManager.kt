@@ -14,6 +14,8 @@ import com.material.xray.core.database.entity.toAppBypassEntity
 import com.material.xray.core.database.withWriteTransaction
 import com.material.xray.core.model.BackupData
 import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.NetworkServerHistory
+import com.material.xray.core.model.NetworkServerPolicy
 import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.model.appKey
 import com.material.xray.core.xray.ActiveConfigOverrideStore
@@ -44,6 +46,7 @@ class BackupManager(
     private val connectionStateCoordinator: ConnectionStateCoordinator,
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
     private val sections: List<BackupSection>,
+    private val serverSelectionCoordinator: ServerSelectionCoordinator,
 ) {
     private val json = Json {
         encodeDefaults = true
@@ -57,8 +60,10 @@ class BackupManager(
     private val journalStore = BackupRestoreJournalStore(xrayPaths.filesDir, json)
 
     suspend fun export(locator: String): BackupSummary = operationMutex.withLock {
-        recoverInterruptedRestoreLocked()
-        val snapshot = createSnapshot()
+        val snapshot = serverSelectionCoordinator.withSelectionLock {
+            recoverInterruptedRestoreLocked()
+            createSnapshot()
+        }
         val output = backupStorage.openOutput(locator)
             ?: throw IOException("Unable to open the selected backup destination")
         output.use { stream ->
@@ -74,28 +79,31 @@ class BackupManager(
     }
 
     suspend fun restore(prepared: PreparedBackupImport) = operationMutex.withLock {
-        recoverInterruptedRestoreLocked()
+        serverSelectionCoordinator.withSelectionLock { recoverInterruptedRestoreLocked() }
+        // A queued connection command may itself need the selection lock before it can stop.
         disconnectActiveConnection()
-        val previous = createSnapshot()
-        journalStore.write(BackupRestoreJournal(previous))
+        serverSelectionCoordinator.withSelectionLock {
+            val previous = createSnapshot()
+            journalStore.write(BackupRestoreJournal(previous))
 
-        val result = runCatching {
-            applyPlan(prepared.plan)
-            applyExternalSettings()
-            journalStore.delete()
-        }
-        result.exceptionOrNull()?.let { error ->
-            if (error is CancellationException) {
-                rollbackAfterFailure(previous, error)
-                throw error
+            val result = runCatching {
+                applyPlan(prepared.plan)
+                applyExternalSettings()
+                journalStore.delete()
             }
-            rollbackAfterFailure(previous, error)
-            throw IOException("Unable to restore the backup", error)
+            result.exceptionOrNull()?.let { error ->
+                if (error is CancellationException) {
+                    rollbackAfterFailure(previous, error)
+                    throw error
+                }
+                rollbackAfterFailure(previous, error)
+                throw IOException("Unable to restore the backup", error)
+            }
         }
     }
 
     suspend fun recoverInterruptedRestore(): Boolean = operationMutex.withLock {
-        recoverInterruptedRestoreLocked()
+        serverSelectionCoordinator.withSelectionLock { recoverInterruptedRestoreLocked() }
     }
 
     private suspend fun recoverInterruptedRestoreLocked(): Boolean {
@@ -118,6 +126,8 @@ class BackupManager(
         val selectedServerKey = settings[LAST_SERVER_ID_SETTING]
             ?.toLongOrNull()
             ?.let(serverKeyById::get)
+        val networkPolicy = decodeNetworkServerPolicy(settings[NETWORK_SERVER_POLICY_KEY])
+        val networkHistory = decodeNetworkServerHistory(settings[NETWORK_SERVER_HISTORY_KEY])
 
         return BackupData(
             version = BackupData.CURRENT_VERSION,
@@ -155,6 +165,8 @@ class BackupManager(
                 .filter { it.routeAssignment().mode == com.material.xray.core.database.entity.AppRouteMode.Bypass }
                 .map { appKey(it.profileId, it.packageName) },
             settings = settings.toMutableMap().apply {
+                remove(NETWORK_SERVER_POLICY_KEY)
+                remove(NETWORK_SERVER_HISTORY_KEY)
                 val source = remove("provider_routing_source_id")?.toLongOrNull()?.let(subscriptionKeyById::get)
                 source?.let { put("provider_routing_source_id", it) }
             },
@@ -170,6 +182,14 @@ class BackupManager(
                 )
             },
             selectedServerKey = selectedServerKey,
+            networkServers = BackupData.BackupNetworkServers(
+                enabled = networkPolicy.enabled,
+                wifiServerKey = networkPolicy.wifiServerId?.let(serverKeyById::get),
+                mobileServerKey = networkPolicy.mobileServerId?.let(serverKeyById::get),
+                ssidServers = networkPolicy.ssidServers.mapNotNull { (ssid, id) -> serverKeyById[id]?.let { ssid to it } }.toMap(),
+                lastWifiServerKey = networkHistory.wifiServerId?.let(serverKeyById::get),
+                lastMobileServerKey = networkHistory.mobileServerId?.let(serverKeyById::get),
+            ),
             activeConfigOverride = activeConfigOverrideStore.read(),
             sections = sections.associate { section -> section.key to section.export() },
         )
@@ -239,6 +259,27 @@ class BackupManager(
 
         settingsRepository.restoreFromMap(
             plan.source.settings.toMutableMap().apply {
+                val policy = plan.source.networkServers
+                put(
+                    NETWORK_SERVER_HISTORY_KEY,
+                    encodeNetworkServerHistory(
+                        NetworkServerHistory(
+                            wifiServerId = policy?.lastWifiServerKey?.let(serverIdByKey::getValue),
+                            mobileServerId = policy?.lastMobileServerKey?.let(serverIdByKey::getValue),
+                        ),
+                    ),
+                )
+                put(
+                    NETWORK_SERVER_POLICY_KEY,
+                    encodeNetworkServerPolicy(
+                        NetworkServerPolicy(
+                            enabled = policy?.enabled == true,
+                            wifiServerId = policy?.wifiServerKey?.let(serverIdByKey::getValue),
+                            mobileServerId = policy?.mobileServerKey?.let(serverIdByKey::getValue),
+                            ssidServers = policy?.ssidServers.orEmpty().mapValues { (_, key) -> serverIdByKey.getValue(key) },
+                        ),
+                    ),
+                )
                 put(LAST_SERVER_ID_SETTING, selectedServerId.toString())
                 remove("provider_routing_source_id")
                 routingSourceId?.let { put("provider_routing_source_id", it.toString()) }

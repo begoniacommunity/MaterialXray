@@ -709,6 +709,8 @@ class SettingsRepository(
             val diagnosticsEnabled = prefs[DIAGNOSTICS_ENABLED]
             val diagnosticsNoticeShown = prefs[DIAGNOSTICS_NOTICE_SHOWN]
             prefs.clear()
+            map[NETWORK_SERVER_POLICY_KEY]?.let { prefs[stringPreferencesKey(NETWORK_SERVER_POLICY_KEY)] = encodeNetworkServerPolicy(decodeNetworkServerPolicy(it)) }
+            map[NETWORK_SERVER_HISTORY_KEY]?.let { prefs[stringPreferencesKey(NETWORK_SERVER_HISTORY_KEY)] = encodeNetworkServerHistory(decodeNetworkServerHistory(it)) }
             map["tun_name"]?.let { prefs[TUN_NAME] = it }
             map["dns_servers"]?.let { prefs[DNS_SERVERS] = it }
             map["domestic_dns_servers"]?.let { prefs[DOMESTIC_DNS_SERVERS] = it }
