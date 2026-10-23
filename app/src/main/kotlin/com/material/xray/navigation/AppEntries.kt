@@ -50,6 +50,7 @@ internal fun appEntryProvider(
     navigator: Navigator,
     homeViewModel: HomeViewModel,
     settings: State<SettingsSnapshot>,
+    routingSearchRevision: State<Int>,
     pendingSubscriptionLink: State<String?>,
     onSubscriptionLinkHandled: State<() -> Unit>,
     addSubscriptionFocusRequester: FocusRequester,
@@ -73,6 +74,7 @@ internal fun appEntryProvider(
             showTitleBarLogo = settings.value.showTitleBarLogo,
             onViewRule = { request -> navigator.openDetail(RoutingRuleViewerKey(Json.encodeToString(request))) },
             onEditRule = { rule -> navigator.openDetail(RoutingRuleEditorKey(Json.encodeToString(rule))) },
+            searchRevision = routingSearchRevision.value,
             viewModel = activityRoutingViewModel(),
         )
     }

@@ -3,7 +3,7 @@ title: Per-app proxy
 description: Choose how each app's traffic is routed.
 ---
 
-Open **Routing → Apps** to choose a route for each app. Tap the toolbar search icon to search by name in a compact panel above the keyboard, as on Logs. You can also show system apps and include work-profile apps when you have one.
+Open **Routing → Apps** to choose a route for each app. Tap the toolbar search icon to search by name in a compact panel above the keyboard, as on Logs. Tapping an app clears search-field focus and dismisses the keyboard before opening its route picker; a nonempty search query is preserved. You can also show system apps and include work-profile apps when you have one.
 
 App rows keep consistent vertical spacing when package names wrap onto multiple lines; long names remain fully readable. Route indicators use the width of their visible label, with an 8 dp gap to the app details. Long labels wrap within a limited part of the row.
 

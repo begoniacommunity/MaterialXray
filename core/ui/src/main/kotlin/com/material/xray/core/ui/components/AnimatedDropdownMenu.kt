@@ -45,6 +45,7 @@ import androidx.compose.ui.window.PopupProperties
 fun AnimatedDropdownMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
+    focusable: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val state = remember { MutableTransitionState(false) }
@@ -66,7 +67,7 @@ fun AnimatedDropdownMenu(
     Popup(
         popupPositionProvider = positionProvider,
         onDismissRequest = onDismissRequest,
-        properties = PopupProperties(focusable = true),
+        properties = PopupProperties(focusable = focusable),
     ) {
         Box(
             modifier = Modifier

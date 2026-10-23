@@ -132,6 +132,7 @@ fun RoutingScreen(
     showTitleBarLogo: Boolean,
     onViewRule: (RoutingRuleViewerRequest) -> Unit,
     onEditRule: (EditableRoutingRule) -> Unit,
+    searchRevision: Int = 0,
     viewModel: RoutingViewModel = koinViewModel(),
 ) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
@@ -153,7 +154,7 @@ fun RoutingScreen(
         subscriptionRules.count { it.matchesSearch(rulesQuery, routingRuleDisplayName(it)) } +
         profileRouting?.rules.orEmpty().count { it.matchesSearch(rulesQuery) }
     val apps by appsViewModel.apps.collectAsStateWithLifecycle()
-    val search = rememberRoutingSearch(pagerState, rulesSearchQuery, appsSearchQuery, ruleResultCount, apps.size)
+    val search = rememberRoutingSearch(pagerState, rulesSearchQuery, appsSearchQuery, ruleResultCount, apps.size, searchRevision)
 
     val coroutineScope = rememberCoroutineScope()
     var previousTab by remember { mutableIntStateOf(pagerState.currentPage) }
@@ -395,11 +396,14 @@ private fun rememberRoutingSearch(
     appsSearchQuery: TextFieldState,
     ruleResultCount: Int,
     appResultCount: Int,
+    searchRevision: Int,
 ): RoutingSearchState {
     var searchRequested by rememberSaveable { mutableStateOf(false) }
     var searchTab by rememberSaveable { mutableIntStateOf(pagerState.currentPage) }
+    var savedSearchRevision by rememberSaveable { mutableIntStateOf(searchRevision) }
     var searchClosing by remember { mutableStateOf(false) }
-    val searching = searchRequested || searchClosing
+    val currentSearch = savedSearchRevision == searchRevision
+    val searching = currentSearch && (searchRequested || searchClosing)
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
@@ -412,6 +416,16 @@ private fun rememberRoutingSearch(
         appsSearchQuery.edit { replace(0, length, "") }
         focusManager.clearFocus(force = true)
         keyboard?.hide()
+    }
+    LaunchedEffect(searchRevision) {
+        if (!currentSearch) {
+            // Another tab may own input focus while this saved search is being reset.
+            searchRequested = false
+            searchClosing = false
+            rulesSearchQuery.edit { replace(0, length, "") }
+            appsSearchQuery.edit { replace(0, length, "") }
+            savedSearchRevision = searchRevision
+        }
     }
     val bottomBarVisibility = LocalBottomBarVisibility.current
     DisposableEffect(bottomBarVisibility, searching) {
@@ -427,7 +441,7 @@ private fun rememberRoutingSearch(
             if (searchRequested && searchQuery.text.isBlank()) closeSearch()
         }
     }
-    BackHandler(enabled = searchRequested) {
+    BackHandler(enabled = currentSearch && searchRequested) {
         if (imeBottom > 0 && searchQuery.text.isNotBlank()) {
             focusManager.clearFocus(force = true)
             keyboard?.hide()
@@ -439,7 +453,7 @@ private fun rememberRoutingSearch(
     return RoutingSearchState(
         query = searchQuery,
         tab = searchTab,
-        requested = searchRequested,
+        requested = currentSearch && searchRequested,
         visible = searching,
         resultCount = if (searchTab == RoutingTab.Apps.ordinal) appResultCount else ruleResultCount,
         open = { target ->

@@ -72,10 +72,12 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -204,7 +206,7 @@ fun LogsScreen(showTitleBarLogo: Boolean, viewModel: LogsViewModel = koinViewMod
     }
 
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
-    LogSearchNavigation(searchRequested, searching, searchQuery.text.isNotEmpty(), imeBottom, ::closeSearch) {
+    LogSearchNavigation(searchRequested, searching, searchQuery.text.isNotEmpty(), selectionMode, imeBottom, ::closeSearch) {
         searchClosing = false
     }
     LaunchedEffect(allEntries) {
@@ -418,7 +420,7 @@ private fun LogsTopBar(
                         LogSelectionButton(header.allSelected, actions)
                     }
                     if (selecting) {
-                        LogsExportMenu(exporting, actions, entries.mapTo(mutableSetOf(), LogEntry::id))
+                        LogsExportMenu(exporting, actions, entries.mapTo(mutableSetOf(), LogEntry::id), searching)
                         TooltipIconButton(tooltip = stringResource(R.string.logs_copy_selected), onClick = { actions.onCopy(entries) }) {
                             Icon(painterResource(R.drawable.content_copy_24px), contentDescription = stringResource(R.string.logs_copy_selected), modifier = Modifier.size(24.dp))
                         }
@@ -431,7 +433,7 @@ private fun LogsTopBar(
                                 Icon(painterResource(R.drawable.find_in_page_24px), contentDescription = stringResource(R.string.logs_search), modifier = Modifier.size(24.dp))
                             }
                         }
-                        LogsExportMenu(exporting, actions)
+                        LogsExportMenu(exporting, actions, searching = searching)
                     }
                 }
             }
@@ -471,14 +473,18 @@ private fun LogsTitle(showLogo: Boolean, header: LogsHeaderState) {
 }
 
 @Composable
-private fun LogsExportMenu(exporting: Boolean, actions: LogsActions, selectedIds: Set<Long> = emptySet()) {
+private fun LogsExportMenu(exporting: Boolean, actions: LogsActions, selectedIds: Set<Long> = emptySet(), searching: Boolean = false) {
     val exportLabel = stringResource(if (selectedIds.isEmpty()) R.string.logs_export else R.string.logs_export_selected)
+    // A touch menu leaves input focus and the IME with search. Keyboard navigation still
+    // needs a focusable popup; nonfocusable popups need their own Back handler.
+    val focusable = !searching || LocalInputModeManager.current.inputMode == InputMode.Keyboard
     var expanded by remember { mutableStateOf(false) }
+    BackHandler(enabled = expanded && !focusable) { expanded = false }
     Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
         TooltipIconButton(tooltip = exportLabel, enabled = !exporting, onClick = { expanded = true }) {
             Icon(painterResource(R.drawable.upload_24px), contentDescription = exportLabel, modifier = Modifier.size(24.dp))
         }
-        AnimatedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        AnimatedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, focusable = focusable) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.logs_save_to_file)) },
                 leadingIcon = { Icon(painterResource(R.drawable.file_save_24px), contentDescription = null, modifier = Modifier.size(24.dp)) },
@@ -519,14 +525,16 @@ private fun LogSearchNavigation(
     searchRequested: Boolean,
     searching: Boolean,
     hasQuery: Boolean,
+    selecting: Boolean,
     imeBottom: Int,
     onClose: () -> Unit,
     onClosed: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val hasQueryOrSelection = hasQuery || selecting
     BackHandler(enabled = searchRequested) {
-        if (imeBottom > 0 && hasQuery) {
+        if (imeBottom > 0 && hasQueryOrSelection) {
             focusManager.clearFocus(force = true)
             keyboard?.hide()
         } else {
@@ -539,7 +547,8 @@ private fun LogSearchNavigation(
         if (imeBottom == 0 && keyboardSeen) {
             keyboardSeen = false
             onClosed()
-            if (searchRequested && !hasQuery) onClose()
+            // A focusable export menu can hide the IME without ending the selection.
+            if (searchRequested && !hasQueryOrSelection) onClose()
         }
     }
 }

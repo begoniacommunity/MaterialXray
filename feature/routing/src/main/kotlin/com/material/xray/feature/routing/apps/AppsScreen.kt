@@ -61,7 +61,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -93,6 +95,8 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
     val automaticRoutingProviderName by viewModel.automaticRoutingProviderName.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val iconSize = 40.dp
     val iconPixelSize = remember(density) { with(density) { iconSize.roundToPx() } }
@@ -165,7 +169,11 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
                         Row(
                             modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
                                 .semantics(mergeDescendants = true) {}
-                                .clickable { editingApp = app }.padding(horizontal = 16.dp, vertical = 8.dp),
+                                .clickable {
+                                    focusManager.clearFocus(force = true)
+                                    keyboard?.hide()
+                                    editingApp = app
+                                }.padding(horizontal = 16.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

@@ -11,9 +11,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -42,6 +44,7 @@ import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.scene.rememberNavigationEventState
 import androidx.navigation3.scene.rememberSceneState
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.compose.NavigationBackHandler as NavigationEventBackHandler
 import com.material.xray.core.navigation.HomeKey
 import com.material.xray.core.navigation.LogsKey
 import com.material.xray.core.navigation.NavigationState
@@ -81,6 +84,7 @@ fun MainNavigation(
     }
     val currentTab = navigator.currentTopLevelKey
     var previousTab by remember { mutableStateOf(currentTab) }
+    var routingSearchRevision by rememberSaveable { mutableIntStateOf(0) }
 
     // This owner belongs to the Activity, outside NavDisplay's per-scene lifecycle. Switching
     // tabs must not repeat runtime reconciliation or resume an APK installation.
@@ -103,6 +107,7 @@ fun MainNavigation(
 
     LaunchedEffect(currentTab) {
         if (previousTab == RoutingKey && currentTab != RoutingKey) {
+            routingSearchRevision++
             viewModel.onLeavingRoutingTab()
         }
         previousTab = currentTab
@@ -115,6 +120,7 @@ fun MainNavigation(
     }
 
     val settingsState = rememberUpdatedState(loadedSettings)
+    val routingSearchRevisionState = rememberUpdatedState(routingSearchRevision)
     val subscriptionLinkState = rememberUpdatedState(pendingSubscriptionLink)
     val onSubscriptionLinkHandledState = rememberUpdatedState(onSubscriptionLinkHandled)
     val topBarTint = remember { TopBarTint() }
@@ -130,6 +136,7 @@ fun MainNavigation(
             navigator = navigator,
             homeViewModel = homeViewModel,
             settings = settingsState,
+            routingSearchRevision = routingSearchRevisionState,
             pendingSubscriptionLink = subscriptionLinkState,
             onSubscriptionLinkHandled = onSubscriptionLinkHandledState,
             addSubscriptionFocusRequester = addSubscriptionFocusRequester,
@@ -189,7 +196,12 @@ fun MainNavigation(
                 // Only the visible page may handle Back. The outer page owns detail gestures,
                 // while a screen's own editor handler still takes precedence over navigation.
                 // Home exits the app even when another tab is retained under its tap animation.
-                if (!hasDetail && currentTab != navigationState.startKey) NavigationBackHandler(tabScene, tabBack, onBackCompleted = navigator::goBack)
+                // Keep registration stable so returning from a detail cannot change Back priority.
+                NavigationEventBackHandler(
+                    state = tabBack,
+                    isBackEnabled = !hasDetail && currentTab != navigationState.startKey && tabScene.currentScene.previousEntries.isNotEmpty(),
+                    onBackCompleted = navigator::goBack,
+                )
                 NavDisplay(
                     sceneState = tabScene,
                     navigationEventState = tabBack,
