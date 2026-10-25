@@ -232,4 +232,10 @@
     <string name="home_core_requirement_cancel">Cancel</string>
     <string name="home_core_requirement_installing">Installing Xray v%1$s for this profile…</string>
     <string name="home_core_requirement_failed">Could not switch to Xray v%1$s</string>
+    <string name="home_vpn_consent_unavailable_title">VPN permission unavailable</string>
+    <string name="home_vpn_consent_unavailable_body">This device can\'t show Android\'s VPN permission prompt, so Material Xray can\'t ask to start a VPN here. The root service doesn\'t need this permission.</string>
+    <string name="home_vpn_consent_unavailable_details">Android grants VPN access through a system confirmation dialog. The manufacturer removed that dialog from this device\'s firmware, so the request fails before you can answer it.\n\nIf you can connect to the device over ADB, grant the permission directly with the command below, then tap Connect again. It stays granted until the app is uninstalled.</string>
+    <string name="home_vpn_consent_unavailable_copy">Copy command</string>
+    <string name="home_vpn_consent_unavailable_copied">Command copied</string>
+    <string name="home_vpn_consent_unavailable_close">Close</string>
 </resources>

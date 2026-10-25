@@ -248,4 +248,10 @@
     <string name="home_core_requirement_cancel">Отмена</string>
     <string name="home_core_requirement_installing">Установка Xray v%1$s для этого профиля…</string>
     <string name="home_core_requirement_failed">Не удалось переключиться на Xray v%1$s</string>
+    <string name="home_vpn_consent_unavailable_title">Разрешение VPN недоступно</string>
+    <string name="home_vpn_consent_unavailable_body">Это устройство не может показать системный запрос разрешения VPN, поэтому Material Xray не может запустить VPN. Режиму root это разрешение не нужно.</string>
+    <string name="home_vpn_consent_unavailable_details">Android выдаёт доступ к VPN через системный диалог подтверждения. Производитель удалил этот диалог из прошивки устройства, поэтому запрос завершается ошибкой ещё до того, как вы сможете ответить.\n\nЕсли к устройству можно подключиться по ADB, выдайте разрешение напрямую командой ниже и снова нажмите «Подключиться». Разрешение сохранится до удаления приложения.</string>
+    <string name="home_vpn_consent_unavailable_copy">Скопировать команду</string>
+    <string name="home_vpn_consent_unavailable_copied">Команда скопирована</string>
+    <string name="home_vpn_consent_unavailable_close">Закрыть</string>
 </resources>

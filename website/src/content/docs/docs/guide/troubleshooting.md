@@ -30,6 +30,9 @@ The subscription may need a hardware ID or a specific User-Agent. Make sure **Se
 **Routing rules were skipped.**
 The provider's geodata couldn't be downloaded, so the app is in compatibility mode. Tap the banner on the Routing tab to retry.
 
+**Connecting shows "VPN permission unavailable".**
+Some TV firmwares (for example VIDAA) remove Android's VPN confirmation dialog, so the app can't ask for VPN access. If you can reach the device over ADB, grant it once with `adb shell appops set com.material.xray ACTIVATE_VPN allow`, then tap Connect again. The root service doesn't need this permission.
+
 **Rootful mode falls back to rootless.**
 Android's always-on VPN forces rootless mode. Turn it off for Material Xray if you want rootful.
 

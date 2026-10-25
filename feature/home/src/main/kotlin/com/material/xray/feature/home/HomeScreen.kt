@@ -2,6 +2,7 @@ package com.material.xray.feature.home
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -73,6 +74,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
@@ -157,6 +159,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -245,6 +248,7 @@ fun HomeScreen(
 
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showQrScanner by remember { mutableStateOf(false) }
+    var showVpnConsentUnavailable by remember { mutableStateOf(false) }
     var keepQrScannerDialog by remember { mutableStateOf(false) }
     var editingSubscriptionId by rememberSaveable { mutableStateOf<Long?>(null) }
     val editingSubscription = uiState.subscriptions?.find { it.id == editingSubscriptionId }
@@ -309,7 +313,12 @@ fun HomeScreen(
     val startRootlessConnection = {
         val vpnPermissionIntent = VpnService.prepare(context)
         if (vpnPermissionIntent != null) {
-            vpnPermissionLauncher.launch(vpnPermissionIntent)
+            // Some TV firmwares (VIDAA) strip the system VPN consent dialog.
+            try {
+                vpnPermissionLauncher.launch(vpnPermissionIntent)
+            } catch (_: ActivityNotFoundException) {
+                showVpnConsentUnavailable = true
+            }
         } else {
             viewModel.connect()
         }
@@ -644,6 +653,10 @@ fun HomeScreen(
         onDismiss = viewModel::dismissInstallPermissionRationale,
         onConfirm = viewModel::confirmInstallPermissionRationale,
     )
+    VpnConsentUnavailableDialogHost(
+        visible = showVpnConsentUnavailable,
+        onDismiss = { showVpnConsentUnavailable = false },
+    )
     DiscardEditedActiveConfigDialogHost(
         visible = uiState.pendingServerSelection != null,
         onDismiss = viewModel::dismissDiscardEditedActiveConfig,
@@ -744,6 +757,83 @@ private fun HwidRequiredDialogHost(
             },
         )
     }
+}
+
+@Composable
+private fun VpnConsentUnavailableDialogHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+) {
+    if (!visible) return
+
+    val context = LocalContext.current
+    val command = "adb shell appops set ${context.packageName} ACTIVATE_VPN allow"
+    val copiedMessage = stringResource(R.string.home_vpn_consent_unavailable_copied)
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.home_vpn_consent_unavailable_title)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.home_vpn_consent_unavailable_body))
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_advanced),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Start,
+                    )
+                    ExpansionArrow(
+                        expanded = expanded,
+                        contentDescription = stringResource(
+                            if (expanded) R.string.home_collapse_advanced else R.string.home_expand_advanced,
+                        ),
+                    )
+                }
+                AnimatedOptionContent(visible = expanded) {
+                    Column {
+                        Text(stringResource(R.string.home_vpn_consent_unavailable_details))
+                        Spacer(modifier = Modifier.height(SettingsFieldSpacing))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                SelectionContainer(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = command,
+                                        modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
+                                        fontFamily = FontFamily.Monospace,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                TooltipIconButton(
+                                    tooltip = stringResource(R.string.home_vpn_consent_unavailable_copy),
+                                    onClick = {
+                                        context.getSystemService(ClipboardManager::class.java)
+                                            ?.setPrimaryClip(ClipData.newPlainText(command, command))
+                                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                    },
+                                ) {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = stringResource(R.string.home_vpn_consent_unavailable_copy),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.home_vpn_consent_unavailable_close))
+            }
+        },
+    )
 }
 
 @Composable
