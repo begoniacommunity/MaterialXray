@@ -405,6 +405,7 @@ private fun ServerConfig.transportSection(): ParamSection? = section(R.string.co
 private fun ServerConfig.securitySection(): ParamSection? = section(R.string.config_viewer_section_security) {
     row(R.string.config_viewer_field_security_type, security.type)
     row(R.string.config_viewer_field_security_sni, security.sni)
+    row(R.string.config_viewer_certificate_pin, security.pinnedPeerCertSha256.joinToString(", "))
     row(R.string.config_viewer_field_security_fingerprint, security.fingerprint)
     row(R.string.config_viewer_field_security_alpn, security.alpn.joinToString(", "))
     row(R.string.config_viewer_field_security_public_key, security.publicKey)

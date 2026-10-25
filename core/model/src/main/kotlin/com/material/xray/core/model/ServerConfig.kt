@@ -49,6 +49,7 @@ data class ServerConfig(
         val alpn: List<String> = emptyList(),
         val publicKey: String = "",
         val shortId: String = "",
+        val pinnedPeerCertSha256: List<String> = emptyList(),
     )
 }
 

@@ -27,7 +27,7 @@
     <string name="config_viewer_field_transport_mode">Mode</string>
     <string name="config_viewer_field_security_type">Type</string>
     <string name="config_viewer_field_security_sni">SNI</string>
-    <string name="config_viewer_field_security_fingerprint">Fingerprint</string>
+    <string name="config_viewer_field_security_fingerprint">TLS ClientHello fingerprint</string>
     <string name="config_viewer_field_security_alpn">ALPN</string>
     <string name="config_viewer_field_security_public_key">Public key</string>
     <string name="config_viewer_field_security_short_id">Short ID</string>
@@ -58,4 +58,20 @@
     <string name="config_viewer_save_failed">Could not save the config.</string>
     <string name="config_viewer_save_failed_gone">This server was replaced by a subscription update. Your changes were not saved.</string>
     <string name="config_viewer_override_discarded">Your edited active config was discarded in favour of this change.</string>
+    <string name="config_viewer_certificate_pin">Certificate fingerprint (SHA-256)</string>
+    <string name="config_viewer_certificate_pin_help">Optional. Paste a SHA-256 fingerprint from your administrator, or fetch the certificate and verify it before use. Separate multiple fingerprints with commas.</string>
+    <string name="config_viewer_certificate_invalid_pin">A SHA-256 fingerprint must contain 64 hexadecimal digits. Colons are allowed; separate multiple fingerprints with commas.</string>
+    <string name="config_viewer_certificate_fetch">Fetch certificate</string>
+    <string name="config_viewer_certificate_fetch_failed">Could not fetch the TLS certificate. Check the address, port and SNI, then try again.</string>
+    <string name="config_viewer_certificate_title">Server certificate</string>
+    <string name="config_viewer_certificate_endpoint">Server: %1$s:%2$d\nSNI / expected name: %3$s</string>
+    <string name="config_viewer_certificate_sha256">SHA-256:\n%1$s</string>
+    <string name="config_viewer_certificate_subject">Subject: %1$s</string>
+    <string name="config_viewer_certificate_issuer">Issuer: %1$s</string>
+    <string name="config_viewer_certificate_validity">Valid from %1$s to %2$s</string>
+    <string name="config_viewer_certificate_trusted">The certificate chain, validity period and server name passed the usual TLS checks.</string>
+    <string name="config_viewer_certificate_untrusted">Server identity could not be verified. Compare this fingerprint with your administrator through a separate trusted channel.</string>
+    <string name="config_viewer_certificate_replacing">This certificate differs from the saved fingerprint. Accept it only after independently confirming the change with your administrator.</string>
+    <string name="config_viewer_certificate_confirmation">Using this fingerprint makes Xray trust this exact certificate in place of the usual CA, name and expiry checks. A changed certificate blocks connections until you explicitly update the fingerprint. The fingerprint is filled into the draft; save the configuration to apply it.</string>
+    <string name="config_viewer_certificate_use">Use this fingerprint</string>
 </resources>

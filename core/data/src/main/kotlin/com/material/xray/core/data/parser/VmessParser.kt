@@ -2,6 +2,7 @@ package com.material.xray.core.data.parser
 
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.model.parseCertificateFingerprints
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -38,6 +39,7 @@ object VmessParser {
                 sni = str("sni"),
                 fingerprint = str("fp"),
                 alpn = str("alpn").let { if (it.isNotEmpty()) it.split(",") else emptyList() },
+                pinnedPeerCertSha256 = parseCertificateFingerprints(str("pcs").ifBlank { str("pinnedPeerCertSha256") }),
             ),
             extra = buildMap {
                 str("aid").takeIf { it.isNotEmpty() }?.let { put("alterId", it) }
