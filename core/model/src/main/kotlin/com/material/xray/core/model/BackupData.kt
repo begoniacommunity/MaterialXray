@@ -47,6 +47,7 @@ data class BackupData(
         val metadata: SubscriptionMetadata? = null,
         val appRouting: SubscriptionAppRouting? = null,
         val routing: SubscriptionRouting? = null,
+        val local: Boolean = false,
     )
 
     @Serializable

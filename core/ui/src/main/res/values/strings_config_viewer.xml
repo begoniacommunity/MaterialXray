@@ -74,4 +74,7 @@
     <string name="config_viewer_certificate_replacing">This certificate differs from the saved fingerprint. Accept it only after independently confirming the change with your administrator.</string>
     <string name="config_viewer_certificate_confirmation">Using this fingerprint makes Xray trust this exact certificate in place of the usual CA, name and expiry checks. A changed certificate blocks connections until you explicitly update the fingerprint. The fingerprint is filled into the draft; save the configuration to apply it.</string>
     <string name="config_viewer_certificate_use">Use this fingerprint</string>
+    <string name="config_viewer_delete_server">Delete</string>
+    <string name="config_viewer_delete_server_title">Delete server?</string>
+    <string name="config_viewer_delete_server_message">%1$s will be removed from Manual servers. If it is connected, the VPN disconnects.</string>
 </resources>

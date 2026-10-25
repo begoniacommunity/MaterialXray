@@ -92,13 +92,9 @@ class SubscriptionRepository(
     ): Long? {
         val trimmedName = name.trim()
         val trimmedUrl = url.trim()
-        shareLinkParser.parse(trimmedUrl)?.let { config ->
-            return addServerConfig(
-                name = trimmedName,
-                sourceLink = trimmedUrl,
-                preferJson = preferJson,
-                config = config,
-            )
+        parseShareLinks(trimmedUrl)?.let { configs ->
+            val named = if (configs.size == 1 && trimmedName.isNotEmpty()) listOf(configs.single().copy(name = trimmedName)) else configs
+            return addLocalServers(named)
         }
 
         val draft = SubscriptionEntity(
@@ -128,42 +124,64 @@ class SubscriptionRepository(
 
     suspend fun addLink(link: String, confirmHardwareId: suspend () -> Boolean = { false }): Long? = add(name = "", url = link, confirmHardwareId = confirmHardwareId)
 
-    private suspend fun addServerConfig(
-        name: String,
-        sourceLink: String,
-        preferJson: Boolean,
-        config: ServerConfig,
-    ): Long {
-        val subscriptionName = name.trim()
-            .ifEmpty { config.name.trim() }
-            .ifEmpty { nextFallbackName() }
-        val id = subscriptionDao.insertAtEnd(
-            SubscriptionEntity(
-                name = subscriptionName,
-                url = sourceLink,
-                preferJson = preferJson,
-                lastUpdated = System.currentTimeMillis(),
-                autoUpdateIntervalHours = 0,
-            ),
-        )
-        serverDao.insertAll(
-            listOf(
-                ServerEntity(
-                    subscriptionId = id,
-                    name = config.name,
-                    protocol = config.protocol.name,
-                    address = config.address,
-                    port = config.port,
-                    configJson = json.encodeToString(config),
-                    sortOrder = 0,
-                ),
-            ),
-        )
-        return id
+    /** Every separated piece must be a share link; anything else is a subscription URL. */
+    private fun parseShareLinks(text: String): List<ServerConfig>? {
+        val links = text.split(SHARE_LINK_SEPARATOR).map { it.trim().trimEnd(',', ';', '|') }.filter(String::isNotEmpty)
+        if (links.isEmpty()) return null
+        return links.map { shareLinkParser.parse(it) ?: return null }
     }
 
+    private suspend fun addLocalServers(configs: List<ServerConfig>): Long = database.withWriteTransaction {
+        val localId = subscriptionDao.getLocal()?.id ?: subscriptionDao.insertAtEnd(newLocalGroup())
+        val firstSortOrder = (serverDao.getMaxSortOrder(localId) ?: -1) + 1
+        serverDao.insertAll(configs.mapIndexed { index, config -> config.withFallbackName().toServerEntity(localId, firstSortOrder + index) })
+        localId
+    }
+
+    /**
+     * Share links used to become one never-refreshing subscription each. Moves their servers, ids
+     * intact, into the local group and drops the emptied rows. Only rows that cannot be a real
+     * subscription match: the URL is itself a share link, auto-update is off and at most one server.
+     */
+    suspend fun consolidateLocalServers() = database.withWriteTransaction {
+        val legacy = subscriptionDao.getAll().filter { sub ->
+            !sub.isLocal &&
+                sub.autoUpdateIntervalHours == 0 &&
+                shareLinkParser.parse(sub.url.trim()) != null &&
+                serverDao.getBySubscription(sub.id).size <= 1
+        }
+        if (legacy.isEmpty()) return@withWriteTransaction
+        val localId = subscriptionDao.getLocal()?.id
+            ?: subscriptionDao.insert(newLocalGroup().copy(sortOrder = legacy.first().sortOrder))
+        var sortOrder = (serverDao.getMaxSortOrder(localId) ?: -1) + 1
+        legacy.forEach { sub ->
+            serverDao.getBySubscription(sub.id).forEach { server ->
+                serverDao.moveToSubscription(server.id, localId, sortOrder++)
+                // The group title was the only name shown for the link; keep it unless it was automatic.
+                val title = sub.name.trim().takeUnless { it.isEmpty() || it.isFallbackSubscriptionName() }
+                val name = title ?: server.name.trim().ifEmpty { "${server.address}:${server.port}" }
+                if (name != server.name) {
+                    val configJson = runCatching { json.encodeToString(json.decodeFromString<ServerConfig>(server.configJson).copy(name = name)) }
+                        .getOrDefault(server.configJson)
+                    serverDao.rename(server.id, name, configJson)
+                }
+            }
+            subscriptionDao.delete(sub)
+        }
+    }
+
+    private fun ServerConfig.withFallbackName() = if (name.isBlank()) copy(name = "$address:$port") else this
+
+    private fun newLocalGroup() = SubscriptionEntity(
+        name = "",
+        url = "",
+        lastUpdated = System.currentTimeMillis(),
+        autoUpdateIntervalHours = 0,
+        isLocal = true,
+    )
+
     internal suspend fun prepareRefresh(subId: Long, url: String): PreparedRefresh? {
-        val existing = subscriptionDao.getById(subId) ?: return null
+        val existing = subscriptionDao.getById(subId)?.takeUnless { it.isLocal } ?: return null
         val identity = existing.requestIdentity(settingsRepository.subscriptionSendHardwareId.first() || existing.requiresHardwareId)
         val preferJson = existing.preferJson ?: settingsRepository.legacySubscriptionPreferJson.first()
         val fetched = fetchWithFallback(existing, url, identity, preferJson)
@@ -249,6 +267,11 @@ class SubscriptionRepository(
 
     suspend fun delete(sub: SubscriptionEntity) = withRefreshLock(sub.id) {
         subscriptionDao.delete(sub)
+    }
+
+    internal suspend fun deleteLocalServer(local: SubscriptionEntity, serverId: Long) = database.withWriteTransaction {
+        serverDao.deleteById(serverId)
+        if (serverDao.getMaxSortOrder(local.id) == null) subscriptionDao.delete(local)
     }
 
     suspend fun setAutoUpdateInterval(subId: Long, intervalHours: Int) {
@@ -388,6 +411,12 @@ class SubscriptionRepository(
 
     private companion object {
         val FALLBACK_NAME_PATTERN = Regex("""Subscription \d+""")
+
+        /**
+         * Separators count only right before the next scheme: a link may carry punctuation itself, as
+         * in `alpn=h2,http/1.1`, and `ss://` and `hy2://` names may hold raw spaces.
+         */
+        val SHARE_LINK_SEPARATOR = Regex("""[\s,;|]+(?=[A-Za-z][A-Za-z0-9+.-]*://)""")
     }
 }
 

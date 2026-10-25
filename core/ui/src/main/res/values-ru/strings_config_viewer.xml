@@ -73,4 +73,7 @@
     <string name="config_viewer_certificate_replacing">Этот сертификат отличается от сохранённого отпечатка. Принимайте его только после независимого подтверждения замены у администратора.</string>
     <string name="config_viewer_certificate_confirmation">При использовании отпечатка Xray доверяет именно этому сертификату вместо обычной проверки центра сертификации, имени и срока действия. При смене сертификата подключение блокируется, пока вы явно не обновите отпечаток. Отпечаток будет добавлен в черновик; сохраните конфигурацию для применения.</string>
     <string name="config_viewer_certificate_use">Использовать этот отпечаток</string>
+    <string name="config_viewer_delete_server">Удалить</string>
+    <string name="config_viewer_delete_server_title">Удалить сервер?</string>
+    <string name="config_viewer_delete_server_message">%1$s будет удалён из группы «Добавленные вручную». Если он подключён, VPN отключится.</string>
 </resources>

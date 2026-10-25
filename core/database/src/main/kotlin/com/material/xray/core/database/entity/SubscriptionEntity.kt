@@ -37,4 +37,6 @@ data class SubscriptionEntity(
     val appRoutingInverted: Boolean = false,
     val providerRouting: String? = null,
     val sortOrder: Int = 0,
+    /** The one group that collects share links added directly; it has no URL and never refreshes. */
+    val isLocal: Boolean = false,
 )

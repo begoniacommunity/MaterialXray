@@ -12,6 +12,7 @@ import com.material.xray.core.data.repository.NetworkServerRepository
 import com.material.xray.core.data.repository.ProviderGeoDataManager
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.database.DatabaseOpenChecker
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.network.Ipv6Detector
@@ -57,6 +58,8 @@ class MaterialXrayApp : Application() {
     private val launcherIconManager: LauncherIconManager by inject()
 
     private val backupManager: BackupManager by inject()
+
+    private val subscriptionRepository: SubscriptionRepository by inject()
 
     private val databaseOpenChecker: DatabaseOpenChecker by inject()
 
@@ -127,6 +130,8 @@ class MaterialXrayApp : Application() {
             if (!databaseOpenChecker.canRead()) return@launch
             runCatching { backupManager.recoverInterruptedRestore() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to recover interrupted backup restore", error) }
+            runCatching { subscriptionRepository.consolidateLocalServers() }
+                .onFailure { error -> Log.e(LOG_TAG, "Unable to collect share-link servers into one group", error) }
             // Account for a root runtime that survived this process before changing its server.
             if (networkServerRepository.policy.first().enabled) connectionRuntimeManager.reconcileState(verifyRecordedRuntime = true)
             networkServerManager.start(appScope)

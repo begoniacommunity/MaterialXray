@@ -636,7 +636,7 @@ private fun AppRoutePickerDialog(
             } else {
                 allServerOptions.filter { option ->
                     option.title.resolve(context).contains(trimmed, ignoreCase = true) ||
-                        option.subscriptionName.contains(trimmed, ignoreCase = true) ||
+                        option.subscriptionName.resolve(context).contains(trimmed, ignoreCase = true) ||
                         option.description.resolve(context).contains(trimmed, ignoreCase = true)
                 }
             }
@@ -718,7 +718,7 @@ private fun AppRoutePickerDialog(
                         serverOptions.groupBy { it.subscriptionId }.forEach { (subscriptionId, options) ->
                             item(key = "subscription:$subscriptionId", contentType = "subscriptionHeading") {
                                 Text(
-                                    text = options.first().subscriptionName,
+                                    text = options.first().subscriptionName.resolve(context),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),

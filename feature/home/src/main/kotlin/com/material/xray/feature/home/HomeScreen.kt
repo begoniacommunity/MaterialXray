@@ -428,7 +428,8 @@ fun HomeScreen(
                     items = subscriptions,
                     key = { it.id },
                     contentType = { "subscription" },
-                ) { subscription ->
+                ) { entry ->
+                    val subscription = if (entry.isLocal) entry.copy(name = stringResource(R.string.home_local_group_name)) else entry
                     val servers = uiState.serversBySubscription[subscription.id].orEmpty()
                     val canApplyRouting = uiState.providerRoutingBySubscription[subscription.id].canApplyManually(
                         policy = uiState.routingPolicyControl,
@@ -2222,6 +2223,45 @@ private fun SubscriptionTrafficUsage(
     }
 }
 
+/** A local group has nothing to fetch, so it gets no refresh button. */
+@Composable
+private fun SubscriptionRefreshButton(
+    subscription: SubscriptionEntity,
+    isRefreshing: Boolean,
+    refreshFeedback: ActionFeedback?,
+    reordering: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (subscription.isLocal) return
+    TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = onRefresh, modifier = modifier, enabled = !isRefreshing && !reordering) {
+        AnimatedActionIcon(
+            loading = isRefreshing,
+            feedback = refreshFeedback,
+            loadingContent = {
+                val updatingDescription = stringResource(
+                    R.string.home_subscription_updating_content_description,
+                    subscription.name,
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .semantics { contentDescription = updatingDescription },
+                    strokeWidth = 2.dp,
+                )
+            },
+        ) {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = stringResource(
+                    R.string.home_subscription_refresh_content_description,
+                    subscription.name,
+                ),
+            )
+        }
+    }
+}
+
 @Composable
 private fun SubscriptionHeader(
     subscription: SubscriptionEntity,
@@ -2362,32 +2402,7 @@ private fun SubscriptionHeader(
                     )
                 }
             }
-            TooltipIconButton(tooltip = stringResource(R.string.home_subscription_refresh_content_description, subscription.name), onClick = actions.onRefresh, modifier = controlsModifier, enabled = !isRefreshing && !reordering) {
-                AnimatedActionIcon(
-                    loading = isRefreshing,
-                    feedback = refreshFeedback,
-                    loadingContent = {
-                        val updatingDescription = stringResource(
-                            R.string.home_subscription_updating_content_description,
-                            subscription.name,
-                        )
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .semantics { contentDescription = updatingDescription },
-                            strokeWidth = 2.dp,
-                        )
-                    },
-                ) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = stringResource(
-                            R.string.home_subscription_refresh_content_description,
-                            subscription.name,
-                        ),
-                    )
-                }
-            }
+            SubscriptionRefreshButton(subscription, isRefreshing, refreshFeedback, reordering, onRefresh = actions.onRefresh, modifier = controlsModifier)
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -2418,16 +2433,18 @@ private fun SubscriptionHeader(
                     )
                 }
                 AnimatedDropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.home_action_edit)) },
-                        leadingIcon = {
-                            Icon(painterResource(R.drawable.edit_24px), contentDescription = null)
-                        },
-                        onClick = {
-                            showMenu = false
-                            actions.onEdit()
-                        },
-                    )
+                    if (!subscription.isLocal) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.home_action_edit)) },
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.edit_24px), contentDescription = null)
+                            },
+                            onClick = {
+                                showMenu = false
+                                actions.onEdit()
+                            },
+                        )
+                    }
                     if (supportUrl.isNotEmpty()) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.home_action_support)) },

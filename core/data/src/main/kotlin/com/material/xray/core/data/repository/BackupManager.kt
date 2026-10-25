@@ -47,6 +47,7 @@ class BackupManager(
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
     private val sections: List<BackupSection>,
     private val serverSelectionCoordinator: ServerSelectionCoordinator,
+    private val subscriptionRepository: SubscriptionRepository,
 ) {
     private val json = Json {
         encodeDefaults = true
@@ -88,6 +89,8 @@ class BackupManager(
 
             val result = runCatching {
                 applyPlan(prepared.plan)
+                // Older backups carry one subscription per pasted share link.
+                subscriptionRepository.consolidateLocalServers()
                 applyExternalSettings()
                 journalStore.delete()
             }
@@ -149,6 +152,7 @@ class BackupManager(
                     metadata = subscription.toSubscriptionMetadata(),
                     appRouting = subscription.toSubscriptionAppRouting(),
                     routing = subscription.toSubscriptionRouting(),
+                    local = subscription.isLocal,
                 )
             },
             servers = servers.map { server ->
@@ -219,6 +223,7 @@ class BackupManager(
                         lastUpdated = planned.value.lastUpdated,
                         lastAutoRefreshFailureAt = planned.value.lastAutoRefreshFailureAt,
                         sortOrder = sortOrder,
+                        isLocal = planned.value.local,
                     ).withSubscriptionMetadata(planned.value.metadata)
                         .withSubscriptionAppRouting(planned.value.appRouting)
                         .withSubscriptionRouting(planned.value.routing),

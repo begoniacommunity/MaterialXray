@@ -21,6 +21,9 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions WHERE id = :id")
     suspend fun getById(id: Long): SubscriptionEntity?
 
+    @Query("SELECT * FROM subscriptions WHERE isLocal = 1 ORDER BY sortOrder, id LIMIT 1")
+    suspend fun getLocal(): SubscriptionEntity?
+
     @Query(
         """
         SELECT subscriptions.requiresHardwareId

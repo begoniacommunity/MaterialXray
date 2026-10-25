@@ -86,6 +86,24 @@ class SubscriptionRefreshCoordinator(
         }
     }
 
+    /** Removes one server of the local group, and the group itself once it is empty. */
+    suspend fun deleteLocalServer(serverId: Long) = operationMutex.withLock {
+        serverSelectionCoordinator.withSelectionLock {
+            val server = serverRepository.getById(serverId) ?: return@withSelectionLock
+            val subscription = subscriptionRepository.getById(server.subscriptionId)?.takeIf { it.isLocal } ?: return@withSelectionLock
+            val selected = settingsRepository.lastServerId.first() == serverId
+            if (selected) connectionShutdown.disconnectIfRunning()
+
+            withContext(NonCancellable) {
+                subscriptionRepository.deleteLocalServer(subscription, serverId)
+                if (selected) {
+                    settingsRepository.compareAndSetLastServerId(serverId, -1)
+                    activeConfigOverrideStore.clear()
+                }
+            }
+        }
+    }
+
     private suspend fun selectedServerEntity(): ServerEntity? {
         val id = settingsRepository.lastServerId.first()
         if (id < 0) return null

@@ -34,6 +34,19 @@ interface ServerDao {
     @Query("DELETE FROM servers WHERE subscriptionId = :subId")
     suspend fun deleteBySubscription(subId: Long)
 
+    @Query("DELETE FROM servers WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT MAX(sortOrder) FROM servers WHERE subscriptionId = :subId")
+    suspend fun getMaxSortOrder(subId: Long): Int?
+
+    /** Nothing updates the target group, so a lock would only be a badge nobody can clear. */
+    @Query("UPDATE servers SET subscriptionId = :subId, sortOrder = :sortOrder, guarded = 0 WHERE id = :id")
+    suspend fun moveToSubscription(id: Long, subId: Long, sortOrder: Int)
+
+    @Query("UPDATE servers SET name = :name, configJson = :configJson WHERE id = :id")
+    suspend fun rename(id: Long, name: String, configJson: String)
+
     @Query("UPDATE servers SET latencyMs = :latency WHERE id = :id")
     suspend fun updateLatency(id: Long, latency: Int)
 

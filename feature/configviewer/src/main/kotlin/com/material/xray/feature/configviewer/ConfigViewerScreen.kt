@@ -121,6 +121,8 @@ fun ConfigViewerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val guarded by viewModel.guarded.collectAsStateWithLifecycle()
     val saveModePrompt by viewModel.saveModePrompt.collectAsStateWithLifecycle()
+    val localServer by viewModel.localServer.collectAsStateWithLifecycle()
+    var confirmDelete by remember { mutableStateOf(false) }
     val title = request.title()
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
@@ -158,6 +160,7 @@ fun ConfigViewerScreen(
             }
         }
     }
+    LaunchedEffect(viewModel) { viewModel.closed.collect { onBack() } }
 
     val editorScrollState = rememberTopAppBarState()
     val previewScrollState = rememberTopAppBarState()
@@ -228,6 +231,11 @@ fun ConfigViewerScreen(
                                     )
                                 }
                             }
+                            if (localServer) {
+                                TooltipIconButton(tooltip = stringResource(R.string.config_viewer_delete_server), onClick = { confirmDelete = true }) {
+                                    Icon(painterResource(R.drawable.delete_24px), contentDescription = stringResource(R.string.config_viewer_delete_server), modifier = Modifier.size(24.dp))
+                                }
+                            }
                             if (content.state.isEditable()) {
                                 TooltipIconButton(tooltip = stringResource(R.string.config_viewer_edit), onClick = viewModel::beginEdit) {
                                     Icon(painterResource(R.drawable.edit_24px), contentDescription = stringResource(R.string.config_viewer_edit), modifier = Modifier.size(24.dp))
@@ -277,6 +285,23 @@ fun ConfigViewerScreen(
         SaveModeDialog(
             onDismiss = viewModel::dismissSaveModePrompt,
             onConfirm = viewModel::confirmSave,
+        )
+    }
+    if (confirmDelete) {
+        AppAlertDialog(
+            icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.config_viewer_delete_server_title)) },
+            text = { Text(stringResource(R.string.config_viewer_delete_server_message, title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        viewModel.deleteServer()
+                    },
+                ) { Text(stringResource(R.string.config_viewer_delete_server)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(android.R.string.cancel)) } },
         )
     }
 }

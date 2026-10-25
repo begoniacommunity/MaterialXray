@@ -98,7 +98,7 @@ data class AppRouteOption(
     val kind: AppRouteKind,
     val serverId: Long? = null,
     val subscriptionId: Long? = null,
-    val subscriptionName: String = "",
+    val subscriptionName: AppRouteText = AppRouteText.Raw(""),
 )
 
 private data class AppListFilters(
@@ -210,7 +210,11 @@ class AppsViewModel(
         }
     }.combine(subscriptionDao.observeAll()) { options, subscriptions ->
         val byId = subscriptions.associateBy { it.id }
-        options.map { option -> option.copy(subscriptionName = byId[option.subscriptionId]?.name.orEmpty()) }
+        options.map { option ->
+            val subscription = byId[option.subscriptionId]
+            val name = if (subscription?.isLocal == true) AppRouteText.Resource(R.string.home_local_group_name) else AppRouteText.Raw(subscription?.name.orEmpty())
+            option.copy(subscriptionName = name)
+        }
     }
         // Building a route option parses each server's config JSON.
         .flowOn(defaultDispatcher)

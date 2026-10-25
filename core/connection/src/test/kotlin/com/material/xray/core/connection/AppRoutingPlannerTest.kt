@@ -297,6 +297,10 @@ class AppRoutingPlannerTest {
         override suspend fun getAll(): List<ServerEntity> = servers
         override suspend fun insertAll(servers: List<ServerEntity>): List<Long> = servers.map { it.id }
         override suspend fun deleteBySubscription(subId: Long) = Unit
+        override suspend fun deleteById(id: Long) = Unit
+        override suspend fun getMaxSortOrder(subId: Long): Int? = null
+        override suspend fun moveToSubscription(id: Long, subId: Long, sortOrder: Int) = Unit
+        override suspend fun rename(id: Long, name: String, configJson: String) = Unit
         override suspend fun updateLatency(id: Long, latency: Int) = Unit
         override suspend fun updateEditedConfig(
             id: Long,

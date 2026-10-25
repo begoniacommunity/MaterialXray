@@ -5,9 +5,9 @@ description: Paste a link, scan a QR code, add manually, or open a deeplink.
 
 Tap **Add new server or subscription** on the home screen. You can:
 
-- **Paste from clipboard**: a subscription URL or a single share link.
+- **Paste from clipboard**: a subscription URL, or one or more share links separated by new lines, spaces, commas or semicolons.
 - **Scan QR code**: the camera is used only for scanning, and you can always paste instead.
-- **Add manually**: type the link and set options yourself.
+- **Add manually**: type the link and set options yourself. For a single share link, **Name** renames the server.
 
 Material Xray also opens [`mxray://add/` deeplinks](/docs/providers/deeplinks/), so a button on your provider's site can add the subscription in one tap.
 
@@ -16,7 +16,13 @@ Material Xray also opens [`mxray://add/` deeplinks](/docs/providers/deeplinks/),
 | Input | Result |
 | --- | --- |
 | An `https://` subscription URL | A subscription that refreshes on a schedule. |
-| A single `vless://`, `vmess://`, `trojan://`, `ss://` or `hysteria2://` link | One server. |
+| One or more `vless://`, `vmess://`, `trojan://`, `ss://` or `hysteria2://` links | Servers added to **Manual servers**. |
+
+## Manual servers
+
+Share links you add directly all go into one **Manual servers** group, in the order you add them. Nothing updates this group, so it has no refresh button or subscription settings. Editing one of its servers saves straight away, without asking how the edit should survive updates, and there is no lock. Use **Delete** in a server's viewer to remove just that server; removing the last one removes the group. Removing the group from its menu deletes all of its servers.
+
+Share links added before this group existed, each shown as its own subscription, are moved into it automatically. Restoring an older backup does the same.
 
 Subscriptions can carry more: HTTP, SOCKS and WireGuard lines, plus raw Xray JSON configurations. See [subscription format](/docs/providers/subscription-format/) and [share links](/docs/reference/share-links/).
 

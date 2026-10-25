@@ -8,6 +8,7 @@ import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.data.parser.SubscriptionFetcher
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.data.repository.SubscriptionRefreshCoordinator
 import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.model.ConnectionState
@@ -128,6 +129,7 @@ class ConfigViewerViewModel(
     private val context: Application,
     private val serverRepo: ServerRepository,
     private val subscriptionRepo: SubscriptionRepository,
+    private val subscriptionCoordinator: SubscriptionRefreshCoordinator,
     private val settingsRepo: SettingsRepository,
     private val connectionRuntimeManager: ConnectionRuntimeManager,
     private val activeConfigOverrideStore: ActiveConfigOverrideStore,
@@ -141,6 +143,14 @@ class ConfigViewerViewModel(
     /** Null while the viewer is not showing a saved server, which cannot be guarded. */
     private val _guarded = MutableStateFlow<Boolean?>(null)
     val guarded: StateFlow<Boolean?> = _guarded.asStateFlow()
+
+    /** A server of the local group: nothing updates it, and it can be deleted on its own. */
+    private val _localServer = MutableStateFlow(false)
+    val localServer: StateFlow<Boolean> = _localServer.asStateFlow()
+
+    /** Fires once the shown server is gone and the viewer should close. */
+    private val _closed = Channel<Unit>(Channel.CONFLATED)
+    val closed: Flow<Unit> = _closed.receiveAsFlow()
 
     /** Set once an edit has passed validation and the save mode is up to the user. */
     private val _saveModePrompt = MutableStateFlow(false)
@@ -211,10 +221,19 @@ class ConfigViewerViewModel(
                 is ConfigViewerRequest.Server -> {
                     val config = validateServerEdit(draft) ?: return@launch
                     validatedConfig = config
-                    _saveModePrompt.value = true
+                    // No update can overwrite a local server, so there is nothing to choose.
+                    if (_localServer.value) confirmSave(ServerSaveMode.KEEP) else _saveModePrompt.value = true
                 }
                 null -> Unit
             }
+        }
+    }
+
+    fun deleteServer() {
+        val entity = serverEntity?.takeIf { _localServer.value } ?: return
+        viewModelScope.launch {
+            subscriptionCoordinator.deleteLocalServer(entity.id)
+            _closed.send(Unit)
         }
     }
 
@@ -319,7 +338,9 @@ class ConfigViewerViewModel(
         val config = runCatching { serverRepo.parseConfig(entity) }.getOrNull() ?: return SERVER_MISSING
         serverEntity = entity
         serverConfig = config
-        _guarded.value = entity.guarded
+        val local = subscriptionRepo.getById(entity.subscriptionId)?.isLocal == true
+        _localServer.value = local
+        _guarded.value = entity.guarded.takeUnless { local }
 
         // Re-parsing and tokenizing the whole document is more work than belongs on the main
         // thread once a subscription ships a multi-outbound config.
@@ -341,6 +362,7 @@ class ConfigViewerViewModel(
         serverEntity = null
         serverConfig = null
         _guarded.value = null
+        _localServer.value = false
         val raw = connectionRuntimeManager.readActiveConfig()
             ?: return ConfigViewerUiState.Message(R.string.home_no_active_xray_config)
         val overrideActive = activeConfigOverrideStore.exists()
