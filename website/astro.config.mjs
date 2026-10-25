@@ -38,7 +38,7 @@ export default defineConfig({
 					tag: 'link',
 					attrs: {
 						rel: 'stylesheet',
-						href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&family=Roboto+Flex:opsz,wght@8..144,400..800&family=Roboto+Mono:wght@400;500&display=swap',
+						href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&family=Google+Sans:opsz,wght@17..18,400..700&family=Roboto+Mono:wght@400;500&display=swap',
 					},
 				},
 			],

@@ -49,7 +49,7 @@
 	--md-shape-xxl: 48px;
 	--md-shape-full: 999px;
 
-	--md-font: 'Google Sans Flex', 'Google Sans', 'Roboto Flex', Roboto, system-ui, sans-serif;
+	--md-font: 'Google Sans Flex', 'Google Sans', Roboto, system-ui, sans-serif;
 	--md-font-code: 'Google Sans Code', 'Roboto Mono', 'JetBrains Mono', ui-monospace, monospace;
 
 	--md-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);

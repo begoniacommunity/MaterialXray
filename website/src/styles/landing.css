@@ -280,6 +280,11 @@ main {
 	font-variation-settings: 'opsz' 144;
 }
 
+/* Cyrillic falls back to Google Sans, which has no display optical size to absorb the tight tracking. */
+.hero h1:lang(ru) {
+	letter-spacing: -0.015em;
+}
+
 .hero h1 em {
 	font-style: normal;
 	color: var(--md-primary);
