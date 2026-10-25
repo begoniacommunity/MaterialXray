@@ -6,6 +6,8 @@
 
 html {
 	scroll-behavior: smooth;
+	/* Buttons draw their own pressed state, so the browser's tap flash is redundant. */
+	-webkit-tap-highlight-color: transparent;
 }
 
 body {
