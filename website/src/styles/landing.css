@@ -858,3 +858,20 @@ pre.http .c {
 .lang-select .ms:last-child {
 	right: 0.625rem;
 }
+
+/* On phones the picker shrinks to its translate icon so the top bar fits the screen. */
+@media (max-width: 480px) {
+	.lang-select select {
+		width: 2.5rem;
+		padding: 0;
+		color: transparent;
+	}
+
+	.lang-select .ms:first-child {
+		left: 0.625rem;
+	}
+
+	.lang-select .ms:last-child {
+		display: none;
+	}
+}
