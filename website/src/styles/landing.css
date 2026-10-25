@@ -53,7 +53,9 @@ p {
 	gap: 0.5rem;
 	height: 2.5rem;
 	padding: 0 1.5rem;
-	border-radius: var(--md-shape-full);
+	/* A real half-height radius, not --md-shape-full: the spring overshoots the press morph by ~10%,
+	   which from 999px dips below zero and briefly squares the corners. */
+	border-radius: 1.25rem;
 	border: none;
 	font: 500 0.875rem/1 var(--md-font);
 	letter-spacing: 0.01em;
@@ -92,6 +94,7 @@ p {
 
 .btn-large {
 	height: 3.5rem;
+	border-radius: 1.75rem;
 	padding: 0 1.75rem;
 	font-size: 1rem;
 }
