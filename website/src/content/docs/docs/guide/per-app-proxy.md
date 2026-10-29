@@ -5,6 +5,10 @@ description: Choose how each app's traffic is routed.
 
 Open **Routing → Apps** to choose a route for each app. Search by name from the toolbar. The menu can also show system apps and work-profile apps.
 
+Apps are grouped by route in the same order as the route picker, with unchanged apps last. Each group has a heading and a solid divider. **Always proxied** apps share one group, including those using a specific server; their label is **Always proxied with ServerName**. Apps within each group are sorted alphabetically.
+
+Opening search shows up to five recently installed apps, newest first, respecting the system-app and work-profile filters. Typing switches smoothly to search results; rows animate as the query changes. Clearing the query returns to recently installed apps, and closing search restores the grouped list.
+
 ## Routes
 
 | Route | Effect | Mode |

@@ -84,6 +84,7 @@ private data class RuleRow(val scope: RoutingRuleScope, val rule: RoutingRule? =
 }
 
 @OptIn(ExperimentalFoundationApi::class)
+@Suppress("LongParameterList")
 @Composable
 internal fun RoutingRulesTab(
     searchQuery: TextFieldState,

@@ -189,4 +189,8 @@
     <string name="routing_search">Поиск</string>
     <string name="routing_close_search">Закрыть поиск</string>
     <string name="routing_search_found_count">Найдено: %1$d</string>
+    <string name="apps_specific_server_section">Определённый сервер</string>
+    <string name="apps_always_proxied_with_server">Всегда через прокси с %1$s</string>
+    <string name="apps_recently_installed">Недавно установленные приложения</string>
+    <string name="apps_no_results">Приложения не найдены</string>
 </resources>

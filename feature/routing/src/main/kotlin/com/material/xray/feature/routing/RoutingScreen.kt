@@ -60,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -401,18 +402,26 @@ private fun rememberRoutingSearch(
     var searchTab by rememberSaveable { mutableIntStateOf(pagerState.currentPage) }
     var savedSearchRevision by rememberSaveable { mutableIntStateOf(searchRevision) }
     var searchClosing by remember { mutableStateOf(false) }
+    var requestRevision by remember { mutableIntStateOf(0) }
     val currentSearch = savedSearchRevision == searchRevision
     val searching = currentSearch && (searchRequested || searchClosing)
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val imeInsets = WindowInsets.ime
+    val density = LocalDensity.current
+    val keyboardVisible by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
+    }
     val searchQuery = if (searchTab == RoutingTab.Apps.ordinal) appsSearchQuery else rulesSearchQuery
     LaunchedEffect(pagerState.currentPage) { searchTab = pagerState.currentPage }
-    fun closeSearch() {
-        searchClosing = imeBottom > 0
-        searchRequested = false
+    fun clearQueries() {
         rulesSearchQuery.edit { replace(0, length, "") }
         appsSearchQuery.edit { replace(0, length, "") }
+    }
+    fun closeSearch() {
+        searchClosing = keyboardVisible
+        searchRequested = false
+        if (!keyboardVisible) clearQueries()
         focusManager.clearFocus(force = true)
         keyboard?.hide()
     }
@@ -432,16 +441,24 @@ private fun rememberRoutingSearch(
         onDispose { bottomBarVisibility?.value = true }
     }
     var keyboardSeen by remember { mutableStateOf(false) }
-    LaunchedEffect(searching, imeBottom) {
-        if (searching && imeBottom > 0) keyboardSeen = true
-        if (imeBottom == 0 && keyboardSeen) {
+    LaunchedEffect(searching, keyboardVisible, requestRevision) {
+        if (searching && keyboardVisible) keyboardSeen = true
+        if (!keyboardVisible && (keyboardSeen || searchClosing)) {
             keyboardSeen = false
-            searchClosing = false
-            if (searchRequested && searchQuery.text.isBlank()) closeSearch()
+            val dismissalRevision = requestRevision
+            // Let the final IME frame settle before rebuilding the app list and restoring bars.
+            withFrameNanos { }
+            if (dismissalRevision != requestRevision) return@LaunchedEffect
+            if (searchClosing) {
+                clearQueries()
+                searchClosing = false
+            } else if (searchRequested && searchQuery.text.isBlank()) {
+                closeSearch()
+            }
         }
     }
     BackHandler(enabled = currentSearch && searchRequested) {
-        if (imeBottom > 0 && searchQuery.text.isNotBlank()) {
+        if (keyboardVisible && searchQuery.text.isNotBlank()) {
             focusManager.clearFocus(force = true)
             keyboard?.hide()
         } else {
@@ -456,6 +473,8 @@ private fun rememberRoutingSearch(
         visible = searching,
         resultCount = if (searchTab == RoutingTab.Apps.ordinal) appResultCount else ruleResultCount,
         open = { target ->
+            requestRevision++
+            searchClosing = false
             searchTab = target
             pagerState.requestScrollToPage(target)
             searchRequested = true
@@ -561,7 +580,7 @@ private fun RoutingLayout(
                         title = stringResource(RoutingTab.Apps.titleResource),
                         actions = { AnimatedToolbarActions(toolbarActions(RoutingTab.Apps)) },
                         modifier = Modifier.weight(1f),
-                    ) { AppBypassContent(active = true, contentBottomPadding = padding.calculateBottomPadding()) }
+                    ) { AppBypassContent(active = true, contentBottomPadding = padding.calculateBottomPadding(), searching = search.visible && search.tab == RoutingTab.Apps.ordinal) }
                 }
             } else {
                 val viewportBottom = padding.calculateBottomPadding() * searchFraction
@@ -573,7 +592,7 @@ private fun RoutingLayout(
                 ) { page ->
                     when (RoutingTab.entries[page]) {
                         RoutingTab.Rules -> rulesTab(bottomPadding)
-                        RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal, contentBottomPadding = bottomPadding)
+                        RoutingTab.Apps -> AppBypassContent(active = selectedTab == RoutingTab.Apps.ordinal, contentBottomPadding = bottomPadding, searching = search.visible && search.tab == RoutingTab.Apps.ordinal)
                         RoutingTab.Network -> NetworkRoutingContent(contentBottomPadding = bottomPadding)
                     }
                 }

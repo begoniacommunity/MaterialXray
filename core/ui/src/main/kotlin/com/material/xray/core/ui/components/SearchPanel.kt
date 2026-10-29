@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
@@ -37,6 +38,11 @@ import androidx.lifecycle.compose.currentStateAsState
 fun SearchPanel(state: TextFieldState, open: Boolean, hint: String) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val imeInsets = WindowInsets.ime
+    val density = LocalDensity.current
+    val keyboardVisible by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
+    }
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     LaunchedEffect(open, state, lifecycleState) {
         if (open && lifecycleState == Lifecycle.State.RESUMED) {
@@ -52,10 +58,11 @@ fun SearchPanel(state: TextFieldState, open: Boolean, hint: String) {
         ) {
             BasicTextField(
                 state = state,
-                enabled = open,
+                // Closing search clears focus explicitly. Disabling the input connection here
+                // would interrupt the keyboard's own hide animation.
                 modifier = Modifier.weight(1f).focusRequester(focusRequester).padding(vertical = 12.dp),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(if (WindowInsets.ime.getBottom(LocalDensity.current) > 0) MaterialTheme.colorScheme.primary else Color.Transparent),
+                cursorBrush = SolidColor(if (keyboardVisible) MaterialTheme.colorScheme.primary else Color.Transparent),
                 lineLimits = TextFieldLineLimits.SingleLine,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 onKeyboardAction = { },

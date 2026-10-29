@@ -1,6 +1,8 @@
 package com.material.xray.feature.routing.apps
 
 import android.content.Context
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -87,9 +90,16 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel(), contentBottomPadding: Dp = 16.dp) {
+fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel(), contentBottomPadding: Dp = 16.dp, searching: Boolean = false) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val listMode = when {
+        !searching -> AppListMode.All
+        searchQuery.isBlank() -> AppListMode.Recent
+        else -> AppListMode.Results
+    }
+    val recentApps by viewModel.recentApps.collectAsStateWithLifecycle()
     val isLoadingApps by viewModel.isLoadingApps.collectAsStateWithLifecycle()
     val appLoadProgress by viewModel.appLoadProgress.collectAsStateWithLifecycle()
     val routingPolicyControl by viewModel.routingPolicyControl.collectAsStateWithLifecycle()
@@ -160,69 +170,100 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
 
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val routeWidthLimit = ((maxWidth - 32.dp) * 0.45f).coerceAtLeast(28.dp)
-                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = contentBottomPadding)) {
-                    items(
-                        items = apps,
-                        key = { it.appKey },
-                        contentType = { "app" },
-                    ) { app ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
-                                .semantics(mergeDescendants = true) {}
-                                .clickable {
-                                    focusManager.clearFocus(force = true)
-                                    keyboard?.hide()
-                                    editingApp = app
-                                }.padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
-                                app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
+                Crossfade(targetState = listMode, animationSpec = tween(220), label = "appsSearch") { mode ->
+                    val listState = rememberLazyListState()
+                    LaunchedEffect(mode, searchQuery) { listState.scrollToItem(0) }
+                    val visibleApps = if (mode == AppListMode.Recent) recentApps else apps
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = contentBottomPadding)) {
+                        if (mode == AppListMode.Recent) {
+                            item(key = "recentHeading", contentType = "section") {
+                                AppSectionHeading(stringResource(R.string.apps_recently_installed), showDivider = false)
                             }
-                            iconBitmap?.let { bitmap ->
-                                Image(
-                                    bitmap = bitmap,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 4.dp).size(iconSize),
+                        }
+                        if (visibleApps.isEmpty()) {
+                            item(key = "empty", contentType = "empty") {
+                                Text(
+                                    stringResource(R.string.apps_no_results),
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(app.name, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    text = if (app.workProfile) {
-                                        stringResource(
-                                            R.string.apps_package_with_profile,
-                                            app.packageName,
-                                            stringResource(R.string.apps_work_profile_label),
+                        }
+                        visibleApps.groupBy { if (mode == AppListMode.All) it.listSection else null }.forEach { (section, sectionApps) ->
+                            if (section != null) {
+                                item(key = "section:$section", contentType = "section") {
+                                    AppSectionHeading(stringResource(section.titleResource), Modifier.animateItem())
+                                }
+                            }
+                            items(
+                                items = sectionApps,
+                                key = { it.appKey },
+                                contentType = { "app" },
+                            ) { app ->
+                                Row(
+                                    modifier = Modifier.animateItem(fadeInSpec = tween(180), fadeOutSpec = tween(180)).fillMaxWidth().heightIn(min = 72.dp)
+                                        .semantics(mergeDescendants = true) {}
+                                        .clickable {
+                                            focusManager.clearFocus(force = true)
+                                            keyboard?.hide()
+                                            editingApp = app
+                                        }.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    val iconBitmap = remember(app.appKey, app.icon, iconPixelSize) {
+                                        app.icon?.toBitmap(iconPixelSize, iconPixelSize)?.asImageBitmap()
+                                    }
+                                    iconBitmap?.let { bitmap ->
+                                        Image(
+                                            bitmap = bitmap,
+                                            contentDescription = null,
+                                            modifier = Modifier.padding(end = 4.dp).size(iconSize),
                                         )
-                                    } else {
-                                        app.packageName
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.widthIn(max = routeWidthLimit).width(IntrinsicSize.Max),
-                            ) {
-                                Text(
-                                    text = app.routeTitle.resolve(context),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.End,
-                                    modifier = Modifier.weight(1f, fill = false),
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(24.dp),
-                                )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(app.name, style = MaterialTheme.typography.bodyLarge)
+                                        Text(
+                                            text = if (app.workProfile) {
+                                                stringResource(
+                                                    R.string.apps_package_with_profile,
+                                                    app.packageName,
+                                                    stringResource(R.string.apps_work_profile_label),
+                                                )
+                                            } else {
+                                                app.packageName
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.widthIn(max = routeWidthLimit).width(IntrinsicSize.Max),
+                                    ) {
+                                        Text(
+                                            text = when {
+                                                app.alwaysProxied && app.routeKind == AppRouteKind.SERVER -> stringResource(R.string.apps_always_proxied_with_server, app.routeTitle.resolve(context))
+                                                app.alwaysProxied -> stringResource(R.string.apps_route_always_proxied_title)
+                                                else -> app.routeTitle.resolve(context)
+                                            },
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.End,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -242,6 +283,18 @@ fun AppBypassContent(active: Boolean, viewModel: AppsViewModel = koinViewModel()
             onAppChange = { editingApp = it },
             viewModel = viewModel,
         )
+    }
+}
+
+@Composable
+private fun AppSectionHeading(title: String, modifier: Modifier = Modifier, showDivider: Boolean = true) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        if (showDivider) HorizontalDivider(modifier = Modifier.weight(1f))
     }
 }
 
@@ -765,3 +818,5 @@ private fun AppRouteText.resolve(context: Context): String = when (this) {
     )
     is AppRouteText.Raw -> value
 }
+
+private enum class AppListMode { All, Recent, Results }

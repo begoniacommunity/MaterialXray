@@ -171,4 +171,8 @@
     <string name="routing_search">Search</string>
     <string name="routing_close_search">Close search</string>
     <string name="routing_search_found_count">Found: %1$d</string>
+    <string name="apps_specific_server_section">Specific server</string>
+    <string name="apps_always_proxied_with_server">Always proxied with %1$s</string>
+    <string name="apps_recently_installed">Recently installed apps</string>
+    <string name="apps_no_results">No apps found</string>
 </resources>

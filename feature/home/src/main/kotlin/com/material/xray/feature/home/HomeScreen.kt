@@ -1986,6 +1986,7 @@ private data class SubscriptionCardActions(
     val onOpenServerConfig: (Long, String) -> Unit,
 )
 
+@Suppress("LongParameterList")
 @Composable
 private fun SubscriptionCard(
     modifier: Modifier = Modifier,

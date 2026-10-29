@@ -64,6 +64,7 @@ data class AppItem(
     val customRouted: Boolean,
     val routeTitle: AppRouteText,
     val routeDescription: AppRouteText,
+    val firstInstallTime: Long = 0,
 )
 
 data class AppLoadProgress(val processed: Int, val total: Int)
@@ -102,7 +103,6 @@ data class AppRouteOption(
 )
 
 private data class AppListFilters(
-    val searchQuery: String,
     val showSystemApps: Boolean,
     val showWorkProfileApps: Boolean,
 )
@@ -225,18 +225,16 @@ class AppsViewModel(
         )
 
     private val appListFilters = combine(
-        _searchQuery,
         _showSystemApps,
         _showWorkProfileApps,
-    ) { searchQuery, showSystemApps, showWorkProfileApps ->
+    ) { showSystemApps, showWorkProfileApps ->
         AppListFilters(
-            searchQuery = searchQuery,
             showSystemApps = showSystemApps,
             showWorkProfileApps = showWorkProfileApps,
         )
     }
 
-    val apps: StateFlow<List<AppItem>> = combine(
+    private val listedApps: StateFlow<List<AppItem>> = combine(
         installedApps,
         bypassedApps,
         appListFilters,
@@ -263,16 +261,8 @@ class AppsViewModel(
             }
             .filter { filters.showSystemApps || !it.systemApp }
             .filter { filters.showWorkProfileApps || !it.workProfile }
-            .filter {
-                filters.searchQuery.isEmpty() ||
-                    it.name.contains(filters.searchQuery, ignoreCase = true) ||
-                    it.packageName.contains(filters.searchQuery, ignoreCase = true) ||
-                    context.localizedString(
-                        if (it.workProfile) R.string.apps_work_profile_label else R.string.apps_personal_profile_label,
-                    ).contains(filters.searchQuery, ignoreCase = true)
-            }
             .sortedWith(
-                compareBy<AppItem> { !it.customRouted }
+                compareBy<AppItem> { it.listSection.ordinal }
                     .thenBy { it.name.lowercase() }
                     .thenBy { it.profileId }
                     .thenBy { it.packageName },
@@ -281,6 +271,25 @@ class AppsViewModel(
         // Joining assignments over every installed app and re-sorting is linear in the size of
         // the app list; keep it off the main dispatcher.
         .flowOn(defaultDispatcher)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val recentApps: StateFlow<List<AppItem>> = listedApps.map { it.recentlyInstalled() }
+        .flowOn(defaultDispatcher)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val apps: StateFlow<List<AppItem>> = combine(listedApps, _searchQuery) { apps, searchQuery ->
+        val query = searchQuery.trim()
+        if (query.isEmpty()) {
+            apps
+        } else {
+            apps.filter {
+                it.name.contains(query, ignoreCase = true) ||
+                    it.packageName.contains(query, ignoreCase = true) ||
+                    context.localizedString(if (it.workProfile) R.string.apps_work_profile_label else R.string.apps_personal_profile_label)
+                        .contains(query, ignoreCase = true)
+            }
+        }
+    }.flowOn(defaultDispatcher)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun refreshApps() {
@@ -333,6 +342,7 @@ class AppsViewModel(
                             customRouted = false,
                             routeTitle = DEFAULT_ROUTE_OPTION.title,
                             routeDescription = DEFAULT_ROUTE_OPTION.description,
+                            firstInstallTime = app.firstInstallTime,
                         )
                     }
                     .sortedBy { it.name.lowercase() }

@@ -31,6 +31,7 @@ data class InstalledApp(
     val systemApp: Boolean,
     val profileId: Int,
     val workProfile: Boolean,
+    val firstInstallTime: Long = 0,
 )
 
 data class AppInventorySnapshot(
@@ -108,6 +109,7 @@ class AppInventory(
                 rawLabel = if (includeUiMetadata) activity.label else info.packageName,
                 icon = if (includeUiMetadata) runCatching { activity.getIcon(0) }.getOrNull() else null,
                 userHandle = profile,
+                firstInstallTime = if (includeUiMetadata) activity.firstInstallTime else 0L,
                 currentProfileId = currentProfileId,
                 includeUiMetadata = includeUiMetadata,
             )
@@ -145,6 +147,11 @@ class AppInventory(
         userHandle: UserHandle = Process.myUserHandle(),
         currentProfileId: Int,
         includeUiMetadata: Boolean,
+        firstInstallTime: Long = if (includeUiMetadata) {
+            runCatching { context.packageManager.getPackageInfo(packageName, 0).firstInstallTime }.getOrDefault(0L)
+        } else {
+            0L
+        },
     ): InstalledApp {
         val profileId = userHandle.identifierOrNull() ?: profileIdForUid(uid)
         val profileUid = uidForProfile(profileId, uid)
@@ -169,6 +176,7 @@ class AppInventory(
             systemApp = flags and ApplicationInfo.FLAG_SYSTEM != 0,
             profileId = profileId,
             workProfile = workProfile,
+            firstInstallTime = firstInstallTime,
         )
     }
 
