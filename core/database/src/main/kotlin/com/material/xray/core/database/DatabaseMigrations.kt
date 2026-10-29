@@ -190,6 +190,9 @@ object DatabaseMigrations {
         23 to listOf(
             "ALTER TABLE subscriptions ADD COLUMN useProfileDnsOverride INTEGER",
         ),
+        25 to listOf(
+            "ALTER TABLE subscriptions ADD COLUMN autoUpdateIntervalSeconds INTEGER",
+        ),
         24 to listOf(
             "ALTER TABLE subscriptions ADD COLUMN isLocal INTEGER NOT NULL DEFAULT 0",
         ),

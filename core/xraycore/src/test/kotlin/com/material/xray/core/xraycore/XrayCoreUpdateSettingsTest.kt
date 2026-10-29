@@ -54,6 +54,15 @@ class XrayCoreUpdateSettingsTest {
         }
     }
 
+    @Test
+    fun `custom interval preserves seconds after reopening and toggling checks`() {
+        val store = store()
+        store.update { it.copy(periodicChecks = true, intervalSeconds = 3637) }
+        assertEquals(3637, store().settings.value.effectiveIntervalSeconds)
+        store.update { it.copy(periodicChecks = false) }
+        assertEquals(3637, store().settings.value.effectiveIntervalSeconds)
+    }
+
     private fun store() = XrayCoreUpdateSettingsStore(
         object : XrayPaths {
             override val filesDir: File = temporary.root

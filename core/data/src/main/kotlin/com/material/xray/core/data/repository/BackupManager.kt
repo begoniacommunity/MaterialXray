@@ -141,6 +141,7 @@ class BackupManager(
                     url = subscription.url,
                     preferJson = subscription.preferJson,
                     autoUpdateIntervalHours = subscription.autoUpdateIntervalHours,
+                    autoUpdateIntervalSeconds = subscription.autoUpdateIntervalSeconds,
                     descriptionHidden = subscription.descriptionHidden,
                     userAgentMode = subscription.userAgentMode,
                     customUserAgent = subscription.customUserAgent,
@@ -214,6 +215,7 @@ class BackupManager(
                         url = planned.value.url,
                         preferJson = planned.value.preferJson,
                         autoUpdateIntervalHours = planned.value.autoUpdateIntervalHours,
+                        autoUpdateIntervalSeconds = planned.value.autoUpdateIntervalSeconds,
                         descriptionHidden = planned.value.descriptionHidden,
                         userAgentMode = planned.value.userAgentMode,
                         customUserAgent = planned.value.customUserAgent,
@@ -319,7 +321,7 @@ class BackupManager(
         launcherIconSwitcher.apply(settingsRepository.launcherIcon.first(), settingsRepository.launcherName.first())
         appUpdateScheduler.setEnabled(
             settingsRepository.appUpdateChecksEnabled.first(),
-            settingsRepository.appUpdateInterval.first(),
+            settingsRepository.appUpdateIntervalSeconds.first(),
         )
     }
 

@@ -9,7 +9,6 @@ import com.material.xray.core.connection.GeoDataUpdateBatch
 import com.material.xray.core.connection.routing.TproxyCompatibilityDetector
 import com.material.xray.core.connection.routing.isConclusive
 import com.material.xray.core.data.repository.SettingsRepository
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.LauncherIcon
 import com.material.xray.core.model.LauncherName
@@ -69,12 +68,12 @@ class SettingsRuntimeManager(
 
     suspend fun setAppUpdateChecksEnabled(enabled: Boolean) {
         settingsRepository.setAppUpdateChecksEnabled(enabled)
-        appUpdateScheduler.setEnabled(enabled, settingsRepository.appUpdateInterval.first())
+        appUpdateScheduler.setEnabled(enabled, settingsRepository.appUpdateIntervalSeconds.first())
     }
 
-    suspend fun setAppUpdateInterval(interval: AppUpdateInterval) {
-        settingsRepository.setAppUpdateInterval(interval)
-        appUpdateScheduler.setEnabled(true, interval)
+    suspend fun setAppUpdateIntervalSeconds(seconds: Int) {
+        settingsRepository.setAppUpdateIntervalSeconds(seconds)
+        appUpdateScheduler.setEnabled(true, seconds)
     }
 
     suspend fun setUseRootService(enabled: Boolean): Boolean = rootAccessMutex.withLock {

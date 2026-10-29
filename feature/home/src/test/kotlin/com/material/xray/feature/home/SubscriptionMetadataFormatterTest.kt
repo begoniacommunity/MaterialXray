@@ -99,6 +99,17 @@ class SubscriptionMetadataFormatterTest {
         assertEquals("expired", segments[3].value)
     }
 
+    @Test
+    fun customIntervalMetadataShowsHoursMinutesAndSeconds() {
+        val state = buildSubscriptionMetadataUiState(
+            subscription = SubscriptionEntity(name = "Sub", url = "https://example.com", autoUpdateIntervalSeconds = 3661),
+            text = EnglishSubscriptionMetadataText,
+            clock = clock,
+            zoneId = zoneId,
+        )
+        assertEquals("Auto update every 1 hour 1 minute 1 second", state.updateIntervalText)
+    }
+
     private companion object {
         const val GIB = 1024L * 1024L * 1024L
     }
@@ -118,6 +129,7 @@ class SubscriptionMetadataFormatterTest {
                 R.string.home_subscription_expired_standalone -> "Expired"
                 R.string.home_subscription_expires_today_inline -> "expires today"
                 R.string.home_subscription_expires_today_standalone -> "Expires today"
+                R.string.home_auto_update_custom_interval -> "Auto update every %1\$s"
                 R.string.home_auto_update_manual -> "Manual update only"
                 R.string.home_gigabytes -> "%1\$s GB"
                 else -> error("Unexpected string resource: $resourceId")
@@ -127,6 +139,9 @@ class SubscriptionMetadataFormatterTest {
 
         override fun getQuantityString(resourceId: Int, quantity: Int, vararg arguments: Any): String {
             val value = when (resourceId) {
+                R.plurals.update_duration_hours -> "%1\$d hour"
+                R.plurals.update_duration_minutes -> "%1\$d minute"
+                R.plurals.update_duration_seconds -> "%1\$d second"
                 R.plurals.home_auto_update_every_hours -> if (quantity == 1) {
                     "Auto update every hour"
                 } else {

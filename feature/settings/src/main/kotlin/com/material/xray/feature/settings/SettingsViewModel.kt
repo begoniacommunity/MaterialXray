@@ -14,9 +14,7 @@ import com.material.xray.core.data.repository.ProviderRoutingCoordinator
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.model.AppUpdateCheckStatus
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
-import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LatencyTestConcurrency
 import com.material.xray.core.model.LauncherIcon
@@ -425,8 +423,8 @@ class SettingsViewModel(
         if (enabled == currentSettings().appUpdateChecksEnabled) return@launch
         settingsRuntimeManager.setAppUpdateChecksEnabled(enabled)
     }
-    fun setAppUpdateInterval(interval: AppUpdateInterval) = viewModelScope.launch {
-        settingsRuntimeManager.setAppUpdateInterval(interval)
+    fun setAppUpdateIntervalSeconds(seconds: Int) = viewModelScope.launch {
+        settingsRuntimeManager.setAppUpdateIntervalSeconds(seconds)
     }
     fun checkForAppUpdate() {
         if (_appUpdateCheckStatus.value?.isInProgress == true) return
@@ -468,15 +466,10 @@ class SettingsViewModel(
 
     fun setGeoipUrl(url: String) = viewModelScope.launch { settingsRepo.setGeoipUrl(url) }
     fun setGeositeUrl(url: String) = viewModelScope.launch { settingsRepo.setGeositeUrl(url) }
-    fun setGeoDataUpdateIntervalHours(hours: Int) = viewModelScope.launch {
-        if (
-            hours == currentSettings().geoDataUpdateIntervalHours ||
-            !GeoDataUpdateInterval.isValid(hours)
-        ) {
-            return@launch
-        }
-        settingsRepo.setGeoDataUpdateIntervalHours(hours)
+    fun setGeoDataUpdateIntervalSeconds(seconds: Int) = viewModelScope.launch {
+        settingsRepo.setGeoDataUpdateIntervalSeconds(seconds)
     }
+
     fun setLatencyCheckUrl(url: String) = viewModelScope.launch { settingsRepo.setLatencyCheckUrl(url) }
     fun setLatencyTestConcurrency(concurrency: Int) = viewModelScope.launch {
         if (!LatencyTestConcurrency.isValid(concurrency)) return@launch

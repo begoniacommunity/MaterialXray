@@ -11,14 +11,11 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.material.xray.core.android.locale.localizedString
+import com.material.xray.core.android.update.UpdateAlarmScheduler
 import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.data.repository.ServerRepository
@@ -28,11 +25,9 @@ import com.material.xray.core.model.normalizeXrayVersion
 import com.material.xray.core.ui.R
 import com.material.xray.core.xraycore.XrayCoreManager
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
-import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettings
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import org.koin.android.annotation.KoinWorker
@@ -91,17 +86,10 @@ class XrayCoreUpdater(
 
 /** Runs [XrayCoreUpdater] at the chosen interval while automatic checks are on. */
 @Singleton
-class XrayCoreUpdateScheduler(private val context: Context) {
-    fun setEnabled(enabled: Boolean, interval: XrayCoreUpdateInterval) {
-        val workManager = WorkManager.getInstance(context)
-        if (!enabled) {
-            workManager.cancelUniqueWork(WORK_NAME)
-            return
-        }
-        val request = PeriodicWorkRequestBuilder<XrayCoreUpdateWorker>(interval.hours.toLong(), TimeUnit.HOURS)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .build()
-        workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+class XrayCoreUpdateScheduler(private val context: Context, private val alarms: UpdateAlarmScheduler) {
+    fun setEnabled(enabled: Boolean, intervalSeconds: Int) {
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        alarms.schedule(WORK_NAME, if (enabled) intervalSeconds else 0, XrayCoreUpdateWorker::class.java)
     }
 
     private companion object {

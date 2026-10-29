@@ -6,7 +6,9 @@ import com.material.xray.core.data.repository.SubscriptionRefreshCoordinator
 import com.material.xray.core.data.repository.SubscriptionRepository
 import com.material.xray.core.data.repository.SubscriptionRoutingRepository
 import com.material.xray.core.database.entity.SubscriptionEntity
+import com.material.xray.core.database.entity.effectiveAutoUpdateIntervalSeconds
 import com.material.xray.core.model.SubscriptionUserAgentMode
+import com.material.xray.core.model.UpdateInterval
 import com.material.xray.core.runtime.RoutingChangeManager
 import com.material.xray.core.runtime.SubscriptionUpdateScheduler
 import java.io.IOException
@@ -64,12 +66,12 @@ class SubscriptionOperations(
         url: String,
         preferJson: Boolean,
         allowInsecureUpdates: Boolean,
-        autoUpdateIntervalHours: Int,
+        autoUpdateIntervalSeconds: Int,
         userAgentMode: SubscriptionUserAgentMode,
         customUserAgent: String,
         customHeaders: String,
     ) {
-        val normalizedIntervalHours = autoUpdateIntervalHours.coerceAtLeast(0)
+        val normalizedIntervalSeconds = UpdateInterval.normalize(autoUpdateIntervalSeconds, 3600, allowManual = true)
         val normalizedCustomUserAgent = customUserAgent.trim().ifBlank { null }
         val normalizedCustomHeaders = customHeaders.trim().ifBlank { null }
         val identityChanged = userAgentMode != SubscriptionUserAgentMode.fromValue(sub.userAgentMode) ||
@@ -80,7 +82,7 @@ class SubscriptionOperations(
             preferJson != (sub.preferJson ?: true) ||
             allowInsecureUpdates != sub.allowInsecureUpdates ||
             identityChanged
-        val hasIntervalChanges = normalizedIntervalHours != sub.autoUpdateIntervalHours
+        val hasIntervalChanges = normalizedIntervalSeconds != sub.effectiveAutoUpdateIntervalSeconds
 
         if (hasSubscriptionChanges) {
             try {
@@ -88,7 +90,8 @@ class SubscriptionOperations(
                     sub.copy(
                         preferJson = preferJson,
                         allowInsecureUpdates = allowInsecureUpdates,
-                        autoUpdateIntervalHours = normalizedIntervalHours,
+                        autoUpdateIntervalSeconds = normalizedIntervalSeconds,
+                        autoUpdateIntervalHours = (normalizedIntervalSeconds + 3599) / 3600,
                         userAgentMode = userAgentMode.value,
                         customUserAgent = normalizedCustomUserAgent,
                         customHeaders = normalizedCustomHeaders,
@@ -100,7 +103,8 @@ class SubscriptionOperations(
                 if (hasIntervalChanges) subscriptionUpdateScheduler.enqueueDueCheckNow()
             }
         } else if (hasIntervalChanges) {
-            setAutoUpdateInterval(sub.id, normalizedIntervalHours)
+            subscriptionRepo.setAutoUpdateIntervalSeconds(sub.id, normalizedIntervalSeconds)
+            subscriptionUpdateScheduler.enqueueDueCheckNow()
         }
     }
 

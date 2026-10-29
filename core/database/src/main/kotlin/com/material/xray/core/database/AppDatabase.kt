@@ -14,7 +14,7 @@ import com.material.xray.core.database.entity.SubscriptionEntity
 
 @Database(
     entities = [ServerEntity::class, SubscriptionEntity::class, AppBypassEntity::class, DatabaseMetadataEntity::class],
-    version = 25,
+    version = 26,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

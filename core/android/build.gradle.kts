@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.androidx.annotation)
     implementation(libs.appcompat)
     implementation(libs.core.ktx)
+    implementation(libs.work.runtime.ktx)
     implementation(libs.coroutines.core)
     implementation(libs.sentry.android)
 

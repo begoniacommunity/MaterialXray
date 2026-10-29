@@ -10,6 +10,7 @@ import com.material.xray.core.database.dao.ServerDao
 import com.material.xray.core.database.dao.SubscriptionDao
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
+import com.material.xray.core.database.entity.effectiveAutoUpdateIntervalSeconds
 import com.material.xray.core.database.withWriteTransaction
 import com.material.xray.core.model.ProfileRoutingOverrideEngine
 import com.material.xray.core.model.ServerConfig
@@ -17,6 +18,7 @@ import com.material.xray.core.model.SubscriptionAppRouting
 import com.material.xray.core.model.SubscriptionRequestIdentity
 import com.material.xray.core.model.SubscriptionRouting
 import com.material.xray.core.model.SubscriptionUserAgentMode
+import com.material.xray.core.model.UpdateInterval
 import com.material.xray.core.model.parseSubscriptionHeaders
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -278,6 +280,11 @@ class SubscriptionRepository(
         subscriptionDao.updateAutoUpdateInterval(subId, intervalHours.coerceAtLeast(0))
     }
 
+    suspend fun setAutoUpdateIntervalSeconds(subId: Long, seconds: Int) {
+        require(UpdateInterval.isValid(seconds, allowManual = true))
+        subscriptionDao.updateAutoUpdateIntervalSeconds(subId, (seconds + 3599) / 3600, seconds)
+    }
+
     internal suspend fun recordAutoRefreshFailure(subId: Long, failedAt: Long) {
         subscriptionDao.recordAutoRefreshFailure(subId, failedAt)
     }
@@ -301,6 +308,7 @@ class SubscriptionRepository(
             url = url.trim(),
             preferJson = sub.preferJson,
             autoUpdateIntervalHours = sub.autoUpdateIntervalHours,
+            autoUpdateIntervalSeconds = sub.autoUpdateIntervalSeconds,
             userAgentMode = sub.userAgentMode,
             customUserAgent = sub.customUserAgent,
             customHeaders = sub.customHeaders,
@@ -420,6 +428,15 @@ class SubscriptionRepository(
     }
 }
 
+/** The next automatic check follows the last successful refresh, including a manual one. */
+fun SubscriptionEntity.nextAutoRefreshAt(): Long? {
+    val interval = effectiveAutoUpdateIntervalSeconds
+    if (isLocal || interval <= 0) return null
+    val nextRefresh = if (lastUpdated > 0) lastUpdated + interval * 1000L else 0L
+    val retryAt = if (lastAutoRefreshFailureAt > lastUpdated) lastAutoRefreshFailureAt + AUTO_REFRESH_FAILURE_RETRY_INTERVAL_MILLIS else 0L
+    return maxOf(nextRefresh, retryAt)
+}
+
 internal fun SubscriptionEntity.isDueForRefresh(nowMillis: Long): Boolean {
     if (lastAutoRefreshFailureAt > lastUpdated &&
         nowMillis - lastAutoRefreshFailureAt < AUTO_REFRESH_FAILURE_RETRY_INTERVAL_MILLIS
@@ -428,10 +445,10 @@ internal fun SubscriptionEntity.isDueForRefresh(nowMillis: Long): Boolean {
     }
     if (lastUpdated <= 0L) return true
 
-    val interval = autoUpdateIntervalHours
+    val interval = effectiveAutoUpdateIntervalSeconds
     if (interval <= 0) return false
 
-    val intervalMillis = interval * MILLIS_PER_HOUR
+    val intervalMillis = interval * 1000L
     return nowMillis - lastUpdated >= intervalMillis
 }
 

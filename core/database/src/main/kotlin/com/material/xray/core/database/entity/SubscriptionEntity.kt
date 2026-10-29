@@ -2,6 +2,7 @@ package com.material.xray.core.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.material.xray.core.model.UpdateInterval
 
 @Entity(tableName = "subscriptions")
 data class SubscriptionEntity(
@@ -16,6 +17,7 @@ data class SubscriptionEntity(
     val profileTitle: String? = null,
     val profileUpdateIntervalHours: Int? = null,
     val autoUpdateIntervalHours: Int = 1,
+    val autoUpdateIntervalSeconds: Int? = null,
     val subscriptionUploadBytes: Long? = null,
     val subscriptionDownloadBytes: Long? = null,
     val subscriptionTotalBytes: Long? = null,
@@ -40,3 +42,6 @@ data class SubscriptionEntity(
     /** The one group that collects share links added directly; it has no URL and never refreshes. */
     val isLocal: Boolean = false,
 )
+
+val SubscriptionEntity.effectiveAutoUpdateIntervalSeconds: Int
+    get() = UpdateInterval.normalize(autoUpdateIntervalSeconds, UpdateInterval.fromHours(autoUpdateIntervalHours), allowManual = true)

@@ -5,6 +5,10 @@ description: Connectivity, DNS, IPv6, appearance, backups and more.
 
 Some options only show up after you turn on **Show advanced options**.
 
+Each automatic-update interval picker ends with **Custom date**. Set hours, minutes and seconds; presets use labels such as **Every day** and **Every week**. This is available for app updates, Xray-core updates, subscriptions and geodata. Existing presets and manual updates remain available. The chosen interval is saved in backups. On Android 12 and newer, the red **Grant alarms and reminders permission** banner opens Material Xray’s permission toggle directly and disappears after access is granted. Enabling automatic checks or saving an interval also opens that page if access is missing. Grant access for precise alarms; without it, checks use approximate alarms. Android sleep, background-work limits and unavailable networks can still delay checks.
+
+Alarms and reminders is a special permission: Android opens a Settings page rather than a standard permission popup. If that page is unavailable on the device, the app shows a message instead of silently ignoring the request.
+
 ## Connectivity and routing
 
 | Setting | What it does |

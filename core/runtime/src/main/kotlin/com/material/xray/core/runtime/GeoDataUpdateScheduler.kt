@@ -3,14 +3,12 @@ package com.material.xray.core.runtime
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.await
-import com.material.xray.core.model.GeoDataUpdateInterval
+import com.material.xray.core.android.update.UpdateAlarmScheduler
 import com.material.xray.service.GeoDataUpdateWorker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
@@ -21,6 +19,7 @@ import org.koin.core.annotation.Singleton
 @Singleton
 class GeoDataUpdateScheduler(
     private val context: Context,
+    private val alarms: UpdateAlarmScheduler,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun enqueueInitialRefresh() = withContext(ioDispatcher) {
@@ -39,27 +38,11 @@ class GeoDataUpdateScheduler(
         preferences.edit().putBoolean(INITIAL_REFRESH_SCHEDULED_KEY, true).apply()
     }
 
-    fun schedulePeriodicRefresh(intervalHours: Int) {
-        val normalizedIntervalHours = GeoDataUpdateInterval.normalize(intervalHours).toLong()
-        if (normalizedIntervalHours == 0L) {
-            WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
-            WorkManager.getInstance(context).cancelUniqueWork(INITIAL_WORK_NAME)
-            return
-        }
-        val request = PeriodicWorkRequestBuilder<GeoDataUpdateWorker>(
-            normalizedIntervalHours,
-            TimeUnit.HOURS,
-        )
-            .setInitialDelay(normalizedIntervalHours, TimeUnit.HOURS)
-            .setConstraints(networkConstraints())
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_MINUTES, TimeUnit.MINUTES)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request,
-        )
+    fun schedulePeriodicRefresh(intervalSeconds: Int) {
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
+        if (intervalSeconds == 0) workManager.cancelUniqueWork(INITIAL_WORK_NAME)
+        alarms.schedule(PERIODIC_WORK_NAME, intervalSeconds, GeoDataUpdateWorker::class.java)
     }
 
     private fun networkConstraints(): Constraints = Constraints.Builder()

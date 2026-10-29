@@ -93,6 +93,8 @@ import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
 import com.material.xray.core.ui.components.UpdateIntervalDialog
+import com.material.xray.core.ui.components.rememberUpdateAlarmPermissionRequest
+import com.material.xray.core.ui.components.updateIntervalLabel
 import com.material.xray.core.xray.InstalledXrayCore
 import com.material.xray.core.xray.XrayCoreSource
 import com.material.xray.core.xraycore.MINIMUM_XRAY_VERSION
@@ -137,7 +139,8 @@ fun XrayCoreScreen(
         uri?.let(viewModel::installFromFile)
     }
     // Checks still run without the permission, but neither outcome could be shown.
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val requestUpdateAlarms = rememberUpdateAlarmPermissionRequest()
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { requestUpdateAlarms() }
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
 
@@ -265,6 +268,8 @@ fun XrayCoreScreen(
                         onPeriodicChecksChange = { enabled ->
                             if (enabled && needsNotificationPermission(context)) {
                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else if (enabled) {
+                                requestUpdateAlarms()
                             }
                             viewModel.setPeriodicChecks(enabled)
                         },
@@ -279,12 +284,12 @@ fun XrayCoreScreen(
 
     if (showUpdateIntervalDialog) {
         UpdateIntervalDialog(
-            current = updateSettings.interval,
-            default = XrayCoreUpdateInterval.default,
-            options = XrayCoreUpdateInterval.entries.map { DropdownOption(it, stringResource(it.labelResource)) },
+            current = updateSettings.effectiveIntervalSeconds,
+            default = XrayCoreUpdateInterval.default.hours * 3600,
+            options = XrayCoreUpdateInterval.entries.map { DropdownOption(it.hours * 3600, stringResource(it.labelResource)) },
             onDismiss = { showUpdateIntervalDialog = false },
             onConfirm = {
-                viewModel.setUpdateInterval(it)
+                viewModel.setUpdateIntervalSeconds(it)
                 showUpdateIntervalDialog = false
             },
         )
@@ -356,7 +361,7 @@ private fun UpdateSettings(
         UpdateChecksSetting(
             title = stringResource(R.string.settings_xray_core_periodic_checks),
             checked = settings.periodicChecks,
-            description = stringResource(settings.interval.descriptionResource),
+            description = updateIntervalLabel(settings.effectiveIntervalSeconds),
             onClick = onIntervalClick,
             onCheckedChange = onPeriodicChecksChange,
         )

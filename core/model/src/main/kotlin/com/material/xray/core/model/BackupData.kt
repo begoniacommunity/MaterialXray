@@ -36,6 +36,7 @@ data class BackupData(
         val url: String,
         val preferJson: Boolean? = null,
         val autoUpdateIntervalHours: Int = 1,
+        val autoUpdateIntervalSeconds: Int? = null,
         val descriptionHidden: Boolean = false,
         val userAgentMode: String? = null,
         val customUserAgent: String? = null,

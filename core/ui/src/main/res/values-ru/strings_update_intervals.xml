@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_custom_date">Свой интервал</string>
+    <string name="update_hours">Часы</string>
+    <string name="update_minutes">Минуты</string>
+    <string name="update_seconds">Секунды</string>
+    <string name="update_check_every">Раз в %1$s</string>
+    <string name="update_every_second">Раз в секунду</string>
+    <string name="update_every_minute">Раз в минуту</string>
+    <string name="update_every_hour">Раз в час</string>
+    <string name="update_every_day">Раз в день</string>
+    <string name="update_every_week">Раз в неделю</string>
+    <string name="update_every_month">Раз в месяц</string>
+    <string name="update_every_year">Раз в год</string>
+    <string name="update_grant_alarm_permission">Разрешить будильники и напоминания</string>
+    <string name="update_alarm_permission_unavailable">Настройки будильников и напоминаний недоступны на этом устройстве</string>
+    <plurals name="update_duration_weeks">
+        <item quantity="one">%1$d неделю</item>
+        <item quantity="few">%1$d недели</item>
+        <item quantity="many">%1$d недель</item>
+        <item quantity="other">%1$d недель</item>
+    </plurals>
+    <plurals name="update_duration_days">
+        <item quantity="one">%1$d день</item>
+        <item quantity="few">%1$d дня</item>
+        <item quantity="many">%1$d дней</item>
+        <item quantity="other">%1$d дней</item>
+    </plurals>
+    <plurals name="update_duration_hours">
+        <item quantity="one">%1$d час</item>
+        <item quantity="few">%1$d часа</item>
+        <item quantity="many">%1$d часов</item>
+        <item quantity="other">%1$d часов</item>
+    </plurals>
+    <plurals name="update_duration_minutes">
+        <item quantity="one">%1$d минуту</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минут</item>
+    </plurals>
+    <plurals name="update_duration_seconds">
+        <item quantity="one">%1$d секунду</item>
+        <item quantity="few">%1$d секунды</item>
+        <item quantity="many">%1$d секунд</item>
+        <item quantity="other">%1$d секунд</item>
+    </plurals>
+    <string name="home_auto_update_custom_interval">Автообновление раз в %1$s</string>
+</resources>

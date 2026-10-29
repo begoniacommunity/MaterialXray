@@ -1,49 +1,21 @@
 package com.material.xray.core.runtime
 
 import android.content.Context
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.material.xray.core.android.update.UpdateAlarmScheduler
 import com.material.xray.core.common.connection.AppUpdateScheduling
-import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.service.AppUpdateWorker
-import java.util.concurrent.TimeUnit
 import org.koin.core.annotation.Singleton
 
 @Singleton(binds = [AppUpdateScheduling::class])
 class AppUpdateScheduler(
     private val context: Context,
+    private val alarms: UpdateAlarmScheduler,
 ) : AppUpdateScheduling {
-    override fun setEnabled(enabled: Boolean, interval: AppUpdateInterval) {
+    override fun setEnabled(enabled: Boolean, intervalSeconds: Int) {
         val workManager = WorkManager.getInstance(context)
-        workManager.cancelUniqueWork(LEGACY_IMMEDIATE_WORK_NAME)
-        if (enabled) {
-            schedule(interval)
-        } else {
-            workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
-        }
-    }
-
-    private fun schedule(interval: AppUpdateInterval) {
-        val request = PeriodicWorkRequestBuilder<AppUpdateWorker>(interval.hours.toLong(), TimeUnit.HOURS)
-            .setConstraints(networkConstraints())
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request,
-        )
-    }
-
-    private fun networkConstraints(): Constraints = Constraints.Builder()
-        .setRequiredNetworkType(NetworkType.CONNECTED)
-        .build()
-
-    private companion object {
-        const val PERIODIC_WORK_NAME = "app_update_check"
-        const val LEGACY_IMMEDIATE_WORK_NAME = "app_update_check_now"
+        workManager.cancelUniqueWork("app_update_check_now")
+        workManager.cancelUniqueWork("app_update_check")
+        alarms.schedule("app_update_check", if (enabled) intervalSeconds else 0, AppUpdateWorker::class.java)
     }
 }

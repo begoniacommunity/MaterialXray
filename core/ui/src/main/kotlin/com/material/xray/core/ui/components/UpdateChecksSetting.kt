@@ -8,28 +8,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.material.xray.core.ui.R
 
 @Composable
 fun UpdateChecksSetting(
@@ -71,48 +61,4 @@ fun UpdateChecksSetting(
             Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
     }
-}
-
-@Composable
-fun <T> UpdateIntervalDialog(
-    current: T,
-    default: T,
-    options: List<DropdownOption<T>>,
-    onDismiss: () -> Unit,
-    onConfirm: (T) -> Unit,
-) {
-    var selectedIndex by rememberSaveable { mutableIntStateOf(options.indexOfFirst { it.value == current }.coerceAtLeast(0)) }
-    AppAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings_app_update_interval_title)) },
-        text = {
-            Column {
-                options.forEachIndexed { index, option ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = index == selectedIndex,
-                                role = Role.RadioButton,
-                                onClick = { selectedIndex = index },
-                            )
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = index == selectedIndex, onClick = null)
-                        Text(if (option.value == default) stringResource(R.string.settings_update_interval_default, option.label) else option.label)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(options[selectedIndex].value) }) {
-                Text(stringResource(R.string.settings_ok))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
-        },
-    )
 }

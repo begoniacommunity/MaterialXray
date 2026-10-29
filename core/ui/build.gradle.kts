@@ -14,5 +14,6 @@ dependencies {
     implementation(project(":core:network"))
 
     implementation(libs.core.ktx)
+    implementation(libs.activity.compose)
     implementation(libs.coroutines.core)
 }

@@ -21,7 +21,7 @@ class XrayCoreUpdateBackupSection(
         val settings = settingsStore.settings.value
         return json.encodeToJsonElement(
             Backup.serializer(),
-            Backup(settings.periodicChecks, settings.action, settings.interval.hours, settings.followProviderRequirements),
+            Backup(settings.periodicChecks, settings.action, settings.intervalHours, settings.followProviderRequirements, settings.intervalSeconds),
         )
     }
 
@@ -32,10 +32,11 @@ class XrayCoreUpdateBackupSection(
                 periodicChecks = backup.periodicChecks,
                 action = backup.action,
                 intervalHours = backup.intervalHours,
+                intervalSeconds = backup.intervalSeconds,
                 followProviderRequirements = backup.followProviderRequirements,
             )
         }
-        scheduler.setEnabled(updated.periodicChecks, updated.interval)
+        scheduler.setEnabled(updated.periodicChecks, updated.effectiveIntervalSeconds)
     }
 
     @Serializable
@@ -44,6 +45,7 @@ class XrayCoreUpdateBackupSection(
         val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
         val intervalHours: Int = XrayCoreUpdateInterval.default.hours,
         val followProviderRequirements: Boolean = true,
+        val intervalSeconds: Int? = null,
     )
 
     private companion object {

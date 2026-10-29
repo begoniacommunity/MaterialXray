@@ -29,6 +29,7 @@ import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.RoutingRuleCatalog
 import com.material.xray.core.model.RoutingRuleScope
 import com.material.xray.core.model.SubscriptionRouting
+import com.material.xray.core.model.UpdateInterval
 import com.material.xray.core.model.XrayLogLevel
 import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
@@ -89,6 +90,8 @@ data class SettingsSnapshot(
     val appUpdateInterval: AppUpdateInterval,
     val diagnosticsNoticeShown: Boolean,
     val diagnosticsEnabled: Boolean,
+    val appUpdateIntervalSeconds: Int = UpdateInterval.fromHours(appUpdateInterval.hours),
+    val geoDataUpdateIntervalSeconds: Int = UpdateInterval.fromHours(geoDataUpdateIntervalHours),
 )
 
 @Suppress("TooManyFunctions")
@@ -175,6 +178,8 @@ class SettingsRepository(
         val SUBSCRIPTION_SEND_HWID = booleanPreferencesKey("subscription_send_hwid")
         val SUBSCRIPTION_PREFER_JSON = booleanPreferencesKey("subscription_prefer_json")
         val APP_UPDATE_CHECKS_ENABLED = booleanPreferencesKey("app_update_checks_enabled")
+        val APP_UPDATE_INTERVAL_SECONDS = intPreferencesKey("app_update_interval_seconds")
+        val GEO_DATA_UPDATE_INTERVAL_SECONDS = intPreferencesKey("geo_data_update_interval_seconds")
         val APP_UPDATE_INTERVAL_HOURS = intPreferencesKey("app_update_interval_hours")
         val DIAGNOSTICS_NOTICE_SHOWN = booleanPreferencesKey("diagnostics_notice_shown")
         val DIAGNOSTICS_ENABLED = booleanPreferencesKey("diagnostics_enabled")
@@ -382,6 +387,12 @@ class SettingsRepository(
     val appUpdateInterval: Flow<AppUpdateInterval> = store.data.map { prefs ->
         AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS])
     }
+    val appUpdateIntervalSeconds: Flow<Int> = store.data.map { prefs ->
+        UpdateInterval.normalize(prefs[APP_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]).hours))
+    }
+    val geoDataUpdateIntervalSeconds: Flow<Int> = store.data.map { prefs ->
+        UpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS])), allowManual = true)
+    }
     val diagnosticsEnabled: Flow<Boolean> = store.data.map { prefs ->
         prefs[DIAGNOSTICS_ENABLED] ?: true
     }
@@ -447,6 +458,8 @@ class SettingsRepository(
             showBothLatencyResults = prefs[SHOW_BOTH_LATENCY_RESULTS] ?: false,
             appUpdateChecksEnabled = prefs[APP_UPDATE_CHECKS_ENABLED] ?: true,
             appUpdateInterval = AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]),
+            appUpdateIntervalSeconds = UpdateInterval.normalize(prefs[APP_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]).hours)),
+            geoDataUpdateIntervalSeconds = UpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS])), allowManual = true),
             diagnosticsNoticeShown = prefs[DIAGNOSTICS_NOTICE_SHOWN] ?: false,
             diagnosticsEnabled = prefs[DIAGNOSTICS_ENABLED] ?: true,
         )
@@ -622,7 +635,23 @@ class SettingsRepository(
 
     suspend fun setAppUpdateInterval(interval: AppUpdateInterval) = store.edit { prefs ->
         prefs[APP_UPDATE_INTERVAL_HOURS] = interval.hours
+        prefs.remove(APP_UPDATE_INTERVAL_SECONDS)
         prefs[APP_UPDATE_CHECKS_ENABLED] = true
+    }
+    suspend fun setAppUpdateIntervalSeconds(seconds: Int) {
+        require(UpdateInterval.isValid(seconds))
+        store.edit { prefs ->
+            prefs[APP_UPDATE_INTERVAL_SECONDS] = seconds
+            prefs[APP_UPDATE_INTERVAL_HOURS] = (seconds + 3599) / 3600
+            prefs[APP_UPDATE_CHECKS_ENABLED] = true
+        }
+    }
+    suspend fun setGeoDataUpdateIntervalSeconds(seconds: Int) {
+        require(UpdateInterval.isValid(seconds, allowManual = true))
+        store.edit { prefs ->
+            prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS] = seconds
+            prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = (seconds + 3599) / 3600
+        }
     }
     suspend fun setDiagnosticsEnabled(enabled: Boolean) {
         if (!enabled) diagnosticsConsentMirror.setEnabled(false)
@@ -646,7 +675,10 @@ class SettingsRepository(
     }
     suspend fun setGeoDataUpdateIntervalHours(hours: Int) {
         require(GeoDataUpdateInterval.isValid(hours))
-        store.edit { prefs -> prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = hours }
+        store.edit { prefs ->
+            prefs.remove(GEO_DATA_UPDATE_INTERVAL_SECONDS)
+            prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = hours
+        }
     }
     suspend fun setLatencyCheckUrl(url: String) = store.edit { prefs ->
         val trimmedUrl = url.trim()
@@ -890,14 +922,20 @@ class SettingsRepository(
             map["subscription_prefer_json"]?.toBooleanStrictOrNull()?.let { prefs[SUBSCRIPTION_PREFER_JSON] = it }
             map["app_update_checks_enabled"]?.toBooleanStrictOrNull()?.let { prefs[APP_UPDATE_CHECKS_ENABLED] = it }
             map["app_update_interval_hours"]?.toIntOrNull()?.let {
+                prefs.remove(APP_UPDATE_INTERVAL_SECONDS)
                 prefs[APP_UPDATE_INTERVAL_HOURS] = AppUpdateInterval.fromHours(it).hours
             }
+            map["app_update_interval_seconds"]?.toIntOrNull()?.takeIf { UpdateInterval.isValid(it) }?.let { prefs[APP_UPDATE_INTERVAL_SECONDS] = it }
             map["geoip_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOIP_URL] = it }
             map["geosite_url"]?.takeIf { it.isNotBlank() }?.let { prefs[GEOSITE_URL] = it }
             map["geo_data_update_interval_hours"]
                 ?.toIntOrNull()
                 ?.let(GeoDataUpdateInterval::normalize)
-                ?.let { prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = it }
+                ?.let {
+                    prefs.remove(GEO_DATA_UPDATE_INTERVAL_SECONDS)
+                    prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = it
+                }
+            map["geo_data_update_interval_seconds"]?.toIntOrNull()?.takeIf { UpdateInterval.isValid(it, allowManual = true) }?.let { prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS] = it }
             map["latency_check_url"]?.takeIf { it.isNotBlank() }?.let { prefs[LATENCY_CHECK_URL] = it }
             map["latency_test_concurrency"]
                 ?.toIntOrNull()

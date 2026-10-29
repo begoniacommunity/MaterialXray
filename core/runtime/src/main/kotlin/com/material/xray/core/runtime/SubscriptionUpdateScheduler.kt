@@ -3,12 +3,11 @@ package com.material.xray.core.runtime
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.material.xray.core.android.update.UpdateAlarmScheduler
 import com.material.xray.service.SubscriptionUpdateWorker
 import java.util.concurrent.TimeUnit
 import org.koin.core.annotation.Singleton
@@ -16,21 +15,11 @@ import org.koin.core.annotation.Singleton
 @Singleton
 class SubscriptionUpdateScheduler(
     private val context: Context,
+    private val alarms: UpdateAlarmScheduler,
 ) {
-    fun schedulePeriodicUpdates() {
-        val request = PeriodicWorkRequestBuilder<SubscriptionUpdateWorker>(
-            REPEAT_INTERVAL_MINUTES,
-            TimeUnit.MINUTES,
-        )
-            .setConstraints(networkConstraints())
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_MINUTES, TimeUnit.MINUTES)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request,
-        )
+    fun schedulePeriodicUpdates(intervalSeconds: Int, firstTriggerAtMillis: Long? = null) {
+        WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
+        alarms.schedule(PERIODIC_WORK_NAME, intervalSeconds, SubscriptionUpdateWorker::class.java, firstTriggerAtMillis)
     }
 
     fun enqueueDueCheckNow(initialDelaySeconds: Long = 0) {
@@ -54,7 +43,6 @@ class SubscriptionUpdateScheduler(
     private companion object {
         const val PERIODIC_WORK_NAME = "subscription_auto_update"
         const val IMMEDIATE_WORK_NAME = "subscription_auto_update_now"
-        const val REPEAT_INTERVAL_MINUTES = 15L
         const val BACKOFF_DELAY_MINUTES = 15L
     }
 }

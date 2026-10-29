@@ -17,7 +17,7 @@ class GeoDataUpdateWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result = runCatching {
-        if (settingsRepository.geoDataUpdateIntervalHours.first() != 0) {
+        if (settingsRepository.geoDataUpdateIntervalSeconds.first() != 0) {
             geoDataManager.refreshForScheduledUpdate()
         }
     }.fold(

@@ -1,5 +1,6 @@
 package com.material.xray.core.xraycore
 
+import com.material.xray.core.model.UpdateInterval
 import com.material.xray.core.xray.XrayPaths
 import java.io.File
 import java.io.IOException
@@ -34,6 +35,7 @@ data class XrayCoreUpdateSettings(
     val periodicChecks: Boolean = false,
     val action: XrayCoreUpdateAction = XrayCoreUpdateAction.Notify,
     val intervalHours: Int = XrayCoreUpdateInterval.default.hours,
+    val intervalSeconds: Int? = null,
     /** The last release a notification was shown for, so each one is announced once. */
     val notifiedTag: String? = null,
     /** The core the last automatic update installed, removed once a newer one replaces it. */
@@ -41,6 +43,9 @@ data class XrayCoreUpdateSettings(
     /** Whether a subscription's required core versions pick, and download, the core on their own. */
     val followProviderRequirements: Boolean = true,
 ) {
+    val effectiveIntervalSeconds: Int
+        get() = UpdateInterval.normalize(intervalSeconds, UpdateInterval.fromHours(interval.hours))
+
     val interval: XrayCoreUpdateInterval
         get() = XrayCoreUpdateInterval.fromHours(intervalHours)
 }

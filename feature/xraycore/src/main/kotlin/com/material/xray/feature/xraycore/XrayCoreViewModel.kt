@@ -13,7 +13,6 @@ import com.material.xray.core.xraycore.XrayCoreOperation
 import com.material.xray.core.xraycore.XrayCoreRelease
 import com.material.xray.core.xraycore.XrayCoreState
 import com.material.xray.core.xraycore.XrayCoreUpdateAction
-import com.material.xray.core.xraycore.XrayCoreUpdateInterval
 import com.material.xray.core.xraycore.XrayCoreUpdateSettings
 import com.material.xray.core.xraycore.XrayCoreUpdateSettingsStore
 import com.material.xray.core.xraycore.newestReleaseFirst
@@ -207,12 +206,12 @@ class XrayCoreViewModel(
 
     fun setPeriodicChecks(enabled: Boolean) {
         val updated = updateSettingsStore.update { it.copy(periodicChecks = enabled) }
-        updateScheduler.setEnabled(updated.periodicChecks, updated.interval)
+        updateScheduler.setEnabled(updated.periodicChecks, updated.effectiveIntervalSeconds)
     }
 
-    fun setUpdateInterval(interval: XrayCoreUpdateInterval) {
-        val updated = updateSettingsStore.update { it.copy(intervalHours = interval.hours) }
-        updateScheduler.setEnabled(updated.periodicChecks, updated.interval)
+    fun setUpdateIntervalSeconds(seconds: Int) {
+        val updated = updateSettingsStore.update { it.copy(intervalHours = (seconds + 3599) / 3600, intervalSeconds = seconds) }
+        updateScheduler.setEnabled(updated.periodicChecks, updated.effectiveIntervalSeconds)
     }
 
     fun setFollowProviderRequirements(enabled: Boolean) {

@@ -15,7 +15,9 @@ import com.material.xray.core.data.repository.ProviderGeoDataManager
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.data.repository.SubscriptionRepository
+import com.material.xray.core.data.repository.nextAutoRefreshAt
 import com.material.xray.core.database.DatabaseOpenChecker
+import com.material.xray.core.database.entity.effectiveAutoUpdateIntervalSeconds
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.runtime.AppUpdateScheduler
@@ -102,13 +104,13 @@ class MaterialXrayApp : Application() {
             }
         }
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            settingsRepository.geoDataUpdateIntervalHours.distinctUntilChanged().collectLatest(
+            settingsRepository.geoDataUpdateIntervalSeconds.distinctUntilChanged().collectLatest(
                 geoDataUpdateScheduler::schedulePeriodicRefresh,
             )
         }
         appScope.launch {
             runCatching {
-                if (settingsRepository.geoDataUpdateIntervalHours.first() != 0) {
+                if (settingsRepository.geoDataUpdateIntervalSeconds.first() != 0) {
                     geoDataUpdateScheduler.enqueueInitialRefresh()
                 }
             }
@@ -145,11 +147,17 @@ class MaterialXrayApp : Application() {
             launcherIconManager.apply(settingsRepository.launcherIcon.first(), settingsRepository.launcherName.first())
             appUpdateScheduler.setEnabled(
                 settingsRepository.appUpdateChecksEnabled.first(),
-                settingsRepository.appUpdateInterval.first(),
+                settingsRepository.appUpdateIntervalSeconds.first(),
             )
             val coreUpdates = xrayCoreUpdateSettingsStore.settings.value
-            xrayCoreUpdateScheduler.setEnabled(coreUpdates.periodicChecks, coreUpdates.interval)
-            subscriptionUpdateScheduler.schedulePeriodicUpdates()
+            xrayCoreUpdateScheduler.setEnabled(coreUpdates.periodicChecks, coreUpdates.effectiveIntervalSeconds)
+            appScope.launch {
+                subscriptionRepository.observeAll().collectLatest { subscriptions ->
+                    val interval = subscriptions.filterNot { it.isLocal }.map { it.effectiveAutoUpdateIntervalSeconds }.filter { it > 0 }.minOrNull() ?: 0
+                    val nextRefreshAt = subscriptions.mapNotNull { it.nextAutoRefreshAt() }.minOrNull()
+                    subscriptionUpdateScheduler.schedulePeriodicUpdates(interval, nextRefreshAt)
+                }
+            }
             subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
         }
     }

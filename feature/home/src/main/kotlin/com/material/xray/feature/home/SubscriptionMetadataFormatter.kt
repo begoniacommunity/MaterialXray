@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import com.material.xray.core.database.entity.SubscriptionEntity
+import com.material.xray.core.database.entity.effectiveAutoUpdateIntervalSeconds
 import com.material.xray.core.ui.R
 import java.text.NumberFormat
 import java.time.Clock
@@ -103,7 +104,7 @@ internal fun buildSubscriptionMetadataUiState(
             zoneId = zoneId,
         )
     },
-    updateIntervalText = formatAutoUpdateInterval(subscription.autoUpdateIntervalHours, text),
+    updateIntervalText = formatAutoUpdateIntervalSeconds(subscription.effectiveAutoUpdateIntervalSeconds, text),
 )
 
 internal fun SubscriptionMetadataUiState.headerDetailText(resources: Resources): String? = headerDetailText(
@@ -266,11 +267,23 @@ internal fun normalizeSubscriptionExpireInstant(
 
 internal fun formatAutoUpdateInterval(intervalHours: Int, resources: Resources): String = formatAutoUpdateInterval(intervalHours, AndroidSubscriptionMetadataText(resources))
 
+private fun formatAutoUpdateIntervalSeconds(seconds: Int, text: SubscriptionMetadataText): String {
+    if (seconds % 3600 == 0) return formatAutoUpdateInterval(seconds / 3600, text)
+    val duration = listOf(
+        seconds / 3600 to R.plurals.update_duration_hours,
+        seconds % 3600 / 60 to R.plurals.update_duration_minutes,
+        seconds % 60 to R.plurals.update_duration_seconds,
+    ).filter { it.first > 0 }.joinToString(" ") { (quantity, resource) -> text.getQuantityString(resource, quantity, quantity) }
+    return text.getString(R.string.home_auto_update_custom_interval, duration)
+}
+
 private fun formatAutoUpdateInterval(intervalHours: Int, text: SubscriptionMetadataText): String = when (intervalHours) {
     0 -> text.getString(R.string.home_auto_update_manual)
-    24, 72 -> {
+    in 24..Int.MAX_VALUE -> if (intervalHours % 24 == 0) {
         val days = intervalHours / 24
         text.getQuantityString(R.plurals.home_auto_update_every_days, days, days)
+    } else {
+        text.getQuantityString(R.plurals.home_auto_update_every_hours, intervalHours, intervalHours)
     }
     else -> text.getQuantityString(
         R.plurals.home_auto_update_every_hours,

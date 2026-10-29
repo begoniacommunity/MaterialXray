@@ -180,6 +180,7 @@ import com.material.xray.core.common.connection.ConnectionEvent
 import com.material.xray.core.data.repository.ProviderRoutingAvailability
 import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
+import com.material.xray.core.database.entity.effectiveAutoUpdateIntervalSeconds
 import com.material.xray.core.model.AppUpdate
 import com.material.xray.core.model.ConnectionProgress
 import com.material.xray.core.model.ConnectionState
@@ -210,7 +211,10 @@ import com.material.xray.core.ui.components.SelectableOptionRow
 import com.material.xray.core.ui.components.SettingsFieldSpacing
 import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
+import com.material.xray.core.ui.components.UpdateIntervalDropdown
 import com.material.xray.core.ui.components.rememberSystemState
+import com.material.xray.core.ui.components.rememberUpdateAlarmPermissionRequest
+import com.material.xray.core.ui.components.updateIntervalLabel
 import com.material.xray.core.ui.text.descriptionResource
 import com.material.xray.core.ui.text.labelResource
 import java.util.Locale
@@ -623,14 +627,14 @@ fun HomeScreen(
     EditSubscriptionDialogHost(
         subscription = editingSubscription,
         onDismiss = { editingSubscriptionId = null },
-        onConfirm = { subscription, name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
+        onConfirm = { subscription, name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalSeconds, userAgentMode, customUserAgent, customHeaders ->
             viewModel.updateSubscription(
                 subscription,
                 name,
                 url,
                 preferJson,
                 allowInsecureUpdates,
-                autoUpdateIntervalHours,
+                autoUpdateIntervalSeconds,
                 userAgentMode,
                 customUserAgent,
                 customHeaders,
@@ -1096,14 +1100,14 @@ private fun EditSubscriptionDialogHost(
     EditSubscriptionDialog(
         subscription = subscription,
         onDismiss = onDismiss,
-        onConfirm = { name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalHours, userAgentMode, customUserAgent, customHeaders ->
+        onConfirm = { name, url, preferJson, allowInsecureUpdates, autoUpdateIntervalSeconds, userAgentMode, customUserAgent, customHeaders ->
             onConfirm(
                 subscription,
                 name,
                 url,
                 preferJson,
                 allowInsecureUpdates,
-                autoUpdateIntervalHours,
+                autoUpdateIntervalSeconds,
                 userAgentMode,
                 customUserAgent,
                 customHeaders,
@@ -2016,6 +2020,7 @@ private fun SubscriptionCard(
         subscription.subscriptionTotalBytes,
         subscription.subscriptionExpireAt,
         subscription.autoUpdateIntervalHours,
+        subscription.autoUpdateIntervalSeconds,
         locale,
     ) {
         buildSubscriptionMetadataUiState(subscription, resources)
@@ -3104,21 +3109,12 @@ private val autoUpdateIntervalOptions = listOf(
 )
 
 @Composable
-private fun autoUpdateIntervalLabel(intervalHours: Int): String = when (intervalHours) {
-    0 -> stringResource(R.string.home_duration_manual)
-    24, 72 -> {
-        val days = intervalHours / 24
-        pluralStringResource(R.plurals.home_duration_days, days, days)
-    }
-    else -> pluralStringResource(R.plurals.home_duration_hours, intervalHours, intervalHours)
-}
-
-@Composable
 private fun EditSubscriptionDialog(
     subscription: SubscriptionEntity,
     onDismiss: () -> Unit,
     onConfirm: (String, String, Boolean, Boolean, Int, SubscriptionUserAgentMode, String, String) -> Unit,
 ) {
+    val requestUpdateAlarms = rememberUpdateAlarmPermissionRequest()
     var advancedExpanded by rememberSaveable(subscription.id) { mutableStateOf(false) }
     val name = rememberSaveable(subscription.id, saver = TextFieldState.Saver) { TextFieldState(subscription.name) }
     val url = rememberSaveable(subscription.id, saver = TextFieldState.Saver) { TextFieldState(subscription.url) }
@@ -3126,8 +3122,8 @@ private fun EditSubscriptionDialog(
     var allowInsecureUpdates by rememberSaveable(subscription.id) {
         mutableStateOf(subscription.allowInsecureUpdates)
     }
-    var autoUpdateIntervalHours by rememberSaveable(subscription.id) {
-        mutableStateOf(subscription.autoUpdateIntervalHours)
+    var autoUpdateIntervalSeconds by rememberSaveable(subscription.id) {
+        mutableStateOf(subscription.effectiveAutoUpdateIntervalSeconds)
     }
     var userAgentMode by rememberSaveable(subscription.id) {
         mutableStateOf(SubscriptionUserAgentMode.fromValue(subscription.userAgentMode))
@@ -3142,7 +3138,7 @@ private fun EditSubscriptionDialog(
         url.text.toString().trim() != subscription.url ||
         preferJson != (subscription.preferJson ?: true) ||
         allowInsecureUpdates != subscription.allowInsecureUpdates ||
-        autoUpdateIntervalHours != subscription.autoUpdateIntervalHours ||
+        autoUpdateIntervalSeconds != subscription.effectiveAutoUpdateIntervalSeconds ||
         userAgentMode != SubscriptionUserAgentMode.fromValue(subscription.userAgentMode) ||
         customUserAgent.text.toString().trim().ifBlank { null } != subscription.customUserAgent ||
         customHeaders.text.toString().trim().ifBlank { null } != subscription.customHeaders
@@ -3172,16 +3168,16 @@ private fun EditSubscriptionDialog(
                 )
                 Spacer(modifier = Modifier.height(SettingsFieldSpacing))
                 key(subscription.id) {
-                    ReadOnlyDropdownField(
+                    UpdateIntervalDropdown(
                         label = stringResource(R.string.home_auto_update_label),
-                        selectedText = autoUpdateIntervalLabel(autoUpdateIntervalHours),
+                        current = autoUpdateIntervalSeconds,
                         options = autoUpdateIntervalOptions.map { option ->
                             DropdownOption(
-                                value = option.intervalHours,
-                                label = autoUpdateIntervalLabel(option.intervalHours),
+                                value = option.intervalHours * 3600,
+                                label = updateIntervalLabel(option.intervalHours * 3600),
                             )
                         },
-                        onSelected = { autoUpdateIntervalHours = it },
+                        onSelected = { autoUpdateIntervalSeconds = it },
                     )
                 }
                 Spacer(modifier = Modifier.height(SettingsFieldSpacing))
@@ -3207,11 +3203,12 @@ private fun EditSubscriptionDialog(
                         url.text.toString().trim(),
                         preferJson,
                         allowInsecureUpdates,
-                        autoUpdateIntervalHours,
+                        autoUpdateIntervalSeconds,
                         userAgentMode,
                         customUserAgent.text.toString(),
                         customHeaders.text.toString(),
                     )
+                    if (autoUpdateIntervalSeconds > 0) requestUpdateAlarms()
                 },
                 enabled = url.text.isNotBlank() && hasChanges,
             ) {

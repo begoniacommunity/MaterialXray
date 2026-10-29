@@ -81,6 +81,29 @@ class SettingsBackupRoundTripTest {
         )
     }
 
+    @Test
+    fun `custom update intervals preserve seconds through settings and backup restore`() = runBlocking {
+        repository.setAppUpdateIntervalSeconds(3637)
+        repository.setGeoDataUpdateIntervalSeconds(1805)
+        val backup = repository.getAllAsMap()
+        repository.setAppUpdateIntervalSeconds(7200)
+        repository.setGeoDataUpdateIntervalSeconds(0)
+        repository.restoreFromMap(backup, sourceBackupVersion = BackupData.CURRENT_VERSION)
+        assertEquals(3637, repository.appUpdateIntervalSeconds.first())
+        assertEquals(1805, repository.geoDataUpdateIntervalSeconds.first())
+        assertEquals(3637, repository.settingsSnapshot.first().appUpdateIntervalSeconds)
+        assertEquals(1805, repository.settingsSnapshot.first().geoDataUpdateIntervalSeconds)
+    }
+
+    @Test
+    fun `legacy hour settings replace custom intervals when an older backup is restored`() = runBlocking {
+        repository.setAppUpdateIntervalSeconds(61)
+        repository.setGeoDataUpdateIntervalSeconds(31)
+        repository.restoreFromMap(mapOf("app_update_interval_hours" to "24", "geo_data_update_interval_hours" to "48"), sourceBackupVersion = BackupData.CURRENT_VERSION)
+        assertEquals(86400, repository.appUpdateIntervalSeconds.first())
+        assertEquals(172800, repository.geoDataUpdateIntervalSeconds.first())
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun MutablePreferences.putSample(key: Preferences.Key<*>) {
         val sample = requireNotNull(SAMPLES[key.name]) {
@@ -164,6 +187,8 @@ class SettingsBackupRoundTripTest {
             "subscription_prefer_json" to true,
             "app_update_checks_enabled" to false,
             "app_update_interval_hours" to 24,
+            "app_update_interval_seconds" to 3637,
+            "geo_data_update_interval_seconds" to 1805,
             "diagnostics_notice_shown" to true,
             "diagnostics_enabled" to false,
         )

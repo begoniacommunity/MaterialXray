@@ -139,7 +139,6 @@ import com.material.xray.core.data.repository.SettingsSnapshot
 import com.material.xray.core.model.AppUpdateCheckStatus
 import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
-import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LatencyTestConcurrency
 import com.material.xray.core.model.LauncherIcon
@@ -176,8 +175,11 @@ import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
 import com.material.xray.core.ui.components.UpdateIntervalDialog
+import com.material.xray.core.ui.components.UpdateIntervalDropdown
 import com.material.xray.core.ui.components.rememberOptionValue
 import com.material.xray.core.ui.components.rememberSystemState
+import com.material.xray.core.ui.components.rememberUpdateAlarmPermissionRequest
+import com.material.xray.core.ui.components.updateIntervalLabel
 import com.material.xray.core.ui.text.descriptionResource
 import com.material.xray.core.ui.text.labelResource
 import com.material.xray.core.xray.TproxyCompatibility
@@ -269,7 +271,7 @@ private fun SettingsScreenContent(
     val routingPolicyControl = settings.routingPolicyControl
     val geoipUrl = settings.geoipUrl
     val geositeUrl = settings.geositeUrl
-    val geoDataUpdateIntervalHours = settings.geoDataUpdateIntervalHours
+    val requestUpdateAlarms = rememberUpdateAlarmPermissionRequest()
     val latencyCheckUrl = settings.latencyCheckUrl
     val latencyTestConcurrency = settings.latencyTestConcurrency
     val sortOutboundsByLatency = settings.sortOutboundsByLatency
@@ -325,9 +327,6 @@ private fun SettingsScreenContent(
     }
     val editingGeoipUrl = rememberSaveable(geoipUrl, saver = TextFieldState.Saver) { TextFieldState(geoipUrl) }
     val editingGeositeUrl = rememberSaveable(geositeUrl, saver = TextFieldState.Saver) { TextFieldState(geositeUrl) }
-    val editingGeoDataUpdateIntervalHours = rememberSaveable(geoDataUpdateIntervalHours, saver = TextFieldState.Saver) {
-        TextFieldState(geoDataUpdateIntervalHours.toString())
-    }
     val editingLatencyCheckUrl = rememberSaveable(latencyCheckUrl, saver = TextFieldState.Saver) { TextFieldState(latencyCheckUrl) }
     val editingLatencyTestConcurrency = rememberSaveable(latencyTestConcurrency, saver = TextFieldState.Saver) {
         TextFieldState(latencyTestConcurrency.toString())
@@ -350,9 +349,6 @@ private fun SettingsScreenContent(
     val parsedXrayMemoryRestartThresholdMiB by remember(editingXrayMemoryRestartThresholdMiB) {
         derivedStateOf { editingXrayMemoryRestartThresholdMiB.text.toString().toIntOrNull() }
     }
-    val parsedGeoDataUpdateIntervalHours by remember(editingGeoDataUpdateIntervalHours) {
-        derivedStateOf { editingGeoDataUpdateIntervalHours.text.toString().toIntOrNull() }
-    }
     val isXrayBufferSizeKiBValid by remember(parsedXrayBufferSizeKiB) {
         derivedStateOf { parsedXrayBufferSizeKiB?.let(XrayRuntimeSettings::isValidXrayBufferSizeKiB) == true }
     }
@@ -364,9 +360,6 @@ private fun SettingsScreenContent(
             parsedXrayMemoryRestartThresholdMiB
                 ?.let(XrayRuntimeSettings::isValidXrayMemoryRestartThresholdMiB) == true
         }
-    }
-    val isGeoDataUpdateIntervalHoursValid by remember(parsedGeoDataUpdateIntervalHours) {
-        derivedStateOf { parsedGeoDataUpdateIntervalHours?.let(GeoDataUpdateInterval::isValid) == true }
     }
     val hasXrayBufferSizeKiBChanges by remember(editingXrayBufferSizeKiB, xrayBufferSizeKiB) {
         derivedStateOf { editingXrayBufferSizeKiB.text.toString() != xrayBufferSizeKiB.toString() }
@@ -385,12 +378,6 @@ private fun SettingsScreenContent(
     }
     val hasGeositeUrlChanges by remember(editingGeositeUrl, geositeUrl) {
         derivedStateOf { editingGeositeUrl.text.toString().trim() != geositeUrl }
-    }
-    val hasGeoDataUpdateIntervalHoursChanges by remember(
-        editingGeoDataUpdateIntervalHours,
-        geoDataUpdateIntervalHours,
-    ) {
-        derivedStateOf { editingGeoDataUpdateIntervalHours.text.toString() != geoDataUpdateIntervalHours.toString() }
     }
     val hasLatencyCheckUrlChanges by remember(editingLatencyCheckUrl, latencyCheckUrl) {
         derivedStateOf { editingLatencyCheckUrl.text.toString().trim() != latencyCheckUrl }
@@ -826,28 +813,16 @@ private fun SettingsScreenContent(
             }
 
             settingsItem(key = "geo_data_update_interval", spaceAfter = SettingsFieldSpacing) {
-                Column(
+                UpdateIntervalDropdown(
+                    label = stringResource(R.string.settings_geo_data_update_interval_label),
+                    current = settings.geoDataUpdateIntervalSeconds,
+                    options = listOf(1, 6, 24, 72, 168, 0).map { hours -> DropdownOption(hours * 3600, updateIntervalLabel(hours * 3600)) },
+                    onSelected = {
+                        viewModel.setGeoDataUpdateIntervalSeconds(it)
+                        if (it > 0) requestUpdateAlarms()
+                    },
                     modifier = Modifier.padding(horizontal = 16.dp),
-
-                ) {
-                    AdvancedIntegerSetting(
-                        state = editingGeoDataUpdateIntervalHours,
-                        label = stringResource(R.string.settings_geo_data_update_interval_label),
-                        supportingText = stringResource(
-                            R.string.settings_geo_data_update_interval_supporting_text,
-                            GeoDataUpdateInterval.MIN_HOURS,
-                            GeoDataUpdateInterval.MAX_HOURS,
-                            GeoDataUpdateInterval.DEFAULT_HOURS,
-                        ),
-                        suffix = stringResource(R.string.settings_hours_abbreviation),
-                        isValid = isGeoDataUpdateIntervalHoursValid,
-                        hasChanges = hasGeoDataUpdateIntervalHoursChanges,
-                        onSave = {
-                            parsedGeoDataUpdateIntervalHours
-                                ?.let(viewModel::setGeoDataUpdateIntervalHours)
-                        },
-                    )
-                }
+                )
             }
 
             settingsItem(key = "geoip", spaceAfter = SettingsFieldSpacing) {
@@ -1110,9 +1085,12 @@ private fun SettingsScreenContent(
                 UpdateChecksSetting(
                     title = stringResource(R.string.settings_app_update_checks_title),
                     checked = appUpdateChecksEnabled,
-                    description = stringResource(settings.appUpdateInterval.descriptionResource),
+                    description = updateIntervalLabel(settings.appUpdateIntervalSeconds),
                     onClick = { showAppUpdateIntervalDialog = true },
-                    onCheckedChange = viewModel::setAppUpdateChecksEnabled,
+                    onCheckedChange = {
+                        viewModel.setAppUpdateChecksEnabled(it)
+                        if (it) requestUpdateAlarms()
+                    },
                 )
             }
             settingsItem(key = "check_for_updates") {
@@ -1188,12 +1166,12 @@ private fun SettingsScreenContent(
     }
     if (showAppUpdateIntervalDialog) {
         UpdateIntervalDialog(
-            current = settings.appUpdateInterval,
-            default = AppUpdateInterval.default,
-            options = AppUpdateInterval.entries.map { DropdownOption(it, stringResource(it.labelResource)) },
+            current = settings.appUpdateIntervalSeconds,
+            default = AppUpdateInterval.default.hours * 3600,
+            options = AppUpdateInterval.entries.map { DropdownOption(it.hours * 3600, stringResource(it.labelResource)) },
             onDismiss = { showAppUpdateIntervalDialog = false },
             onConfirm = {
-                viewModel.setAppUpdateInterval(it)
+                viewModel.setAppUpdateIntervalSeconds(it)
                 showAppUpdateIntervalDialog = false
             },
         )
