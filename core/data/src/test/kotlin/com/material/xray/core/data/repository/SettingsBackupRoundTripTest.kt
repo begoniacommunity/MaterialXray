@@ -104,6 +104,55 @@ class SettingsBackupRoundTripTest {
         assertEquals(172800, repository.geoDataUpdateIntervalSeconds.first())
     }
 
+    @Test
+    fun `geo assets inherit the shared interval and then retain independent choices through backup`() = runBlocking {
+        repository.setGeoDataUpdateIntervalSeconds(1805)
+        assertEquals(1805, repository.geoipUpdateIntervalSeconds.first())
+        assertEquals(1805, repository.geositeUpdateIntervalSeconds.first())
+        repository.setGeoipUpdateIntervalSeconds(61)
+        repository.setGeositeUpdateIntervalSeconds(3605)
+        repository.setGeoipUpdateChecksEnabled(false)
+        val backup = repository.getAllAsMap()
+        repository.setGeoipUpdateIntervalSeconds(7200)
+        repository.setGeositeUpdateChecksEnabled(false)
+        repository.restoreFromMap(backup, sourceBackupVersion = BackupData.CURRENT_VERSION)
+        assertEquals(61, repository.geoipUpdateIntervalSeconds.first())
+        assertEquals(3605, repository.geositeUpdateIntervalSeconds.first())
+        assertEquals(false, repository.geoipUpdateChecksEnabled.first())
+        assertEquals(true, repository.geositeUpdateChecksEnabled.first())
+        val snapshot = repository.settingsSnapshot.first()
+        assertEquals(61, snapshot.geoipUpdateIntervalSeconds)
+        assertEquals(3605, snapshot.geositeUpdateIntervalSeconds)
+        assertEquals(false, snapshot.geoipUpdateChecksEnabled)
+        assertEquals(true, snapshot.geositeUpdateChecksEnabled)
+        repository.setGeoipUpdateChecksEnabled(true)
+        assertEquals(61, repository.geoipUpdateIntervalSeconds.first())
+        assertEquals(3605, repository.geositeUpdateIntervalSeconds.first())
+    }
+
+    @Test
+    fun `disabled legacy geodata checks migrate to disabled assets with the previous default period`() = runBlocking {
+        repository.setGeoDataUpdateIntervalSeconds(0)
+        assertEquals(false, repository.geoipUpdateChecksEnabled.first())
+        assertEquals(false, repository.geositeUpdateChecksEnabled.first())
+        assertEquals(86400, repository.geoipUpdateIntervalSeconds.first())
+        assertEquals(86400, repository.geositeUpdateIntervalSeconds.first())
+        repository.setGeoipUpdateChecksEnabled(true)
+        assertEquals(true, repository.geoipUpdateChecksEnabled.first())
+        assertEquals(false, repository.geositeUpdateChecksEnabled.first())
+    }
+
+    @Test
+    fun `older backups restore shared asset intervals instead of retaining new per-file overrides`() = runBlocking {
+        repository.setGeoipUpdateIntervalSeconds(61)
+        repository.setGeositeUpdateIntervalSeconds(3605)
+        repository.restoreFromMap(mapOf("geo_data_update_interval_hours" to "48"), sourceBackupVersion = BackupData.CURRENT_VERSION)
+        assertEquals(172800, repository.geoipUpdateIntervalSeconds.first())
+        assertEquals(172800, repository.geositeUpdateIntervalSeconds.first())
+        assertEquals(true, repository.geoipUpdateChecksEnabled.first())
+        assertEquals(true, repository.geositeUpdateChecksEnabled.first())
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun MutablePreferences.putSample(key: Preferences.Key<*>) {
         val sample = requireNotNull(SAMPLES[key.name]) {
@@ -189,6 +238,10 @@ class SettingsBackupRoundTripTest {
             "app_update_interval_hours" to 24,
             "app_update_interval_seconds" to 3637,
             "geo_data_update_interval_seconds" to 1805,
+            "geoip_update_interval_seconds" to 61,
+            "geosite_update_interval_seconds" to 3605,
+            "geoip_update_checks_enabled" to false,
+            "geosite_update_checks_enabled" to true,
             "diagnostics_notice_shown" to true,
             "diagnostics_enabled" to false,
         )

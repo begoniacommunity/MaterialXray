@@ -10,6 +10,8 @@ import androidx.work.WorkManager
 import androidx.work.await
 import com.material.xray.core.android.update.UpdateAlarmScheduler
 import com.material.xray.service.GeoDataUpdateWorker
+import com.material.xray.service.GeoIpUpdateWorker
+import com.material.xray.service.GeoSiteUpdateWorker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -38,11 +40,14 @@ class GeoDataUpdateScheduler(
         preferences.edit().putBoolean(INITIAL_REFRESH_SCHEDULED_KEY, true).apply()
     }
 
-    fun schedulePeriodicRefresh(intervalSeconds: Int) {
+    fun schedulePeriodicRefresh(asset: GeoDataAsset, intervalSeconds: Int) {
         val workManager = WorkManager.getInstance(context)
         workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
-        if (intervalSeconds == 0) workManager.cancelUniqueWork(INITIAL_WORK_NAME)
-        alarms.schedule(PERIODIC_WORK_NAME, intervalSeconds, GeoDataUpdateWorker::class.java)
+        alarms.schedule(PERIODIC_WORK_NAME, 0, GeoDataUpdateWorker::class.java)
+        when (asset) {
+            GeoDataAsset.GEOIP -> alarms.schedule("geoip_auto_update", intervalSeconds, GeoIpUpdateWorker::class.java)
+            GeoDataAsset.GEOSITE -> alarms.schedule("geosite_auto_update", intervalSeconds, GeoSiteUpdateWorker::class.java)
+        }
     }
 
     private fun networkConstraints(): Constraints = Constraints.Builder()

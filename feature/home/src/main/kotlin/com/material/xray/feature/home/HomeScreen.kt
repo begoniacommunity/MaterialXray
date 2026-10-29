@@ -3178,6 +3178,7 @@ private fun EditSubscriptionDialog(
                             )
                         },
                         onSelected = { autoUpdateIntervalSeconds = it },
+                        onDismissAll = onDismiss,
                     )
                 }
                 Spacer(modifier = Modifier.height(SettingsFieldSpacing))

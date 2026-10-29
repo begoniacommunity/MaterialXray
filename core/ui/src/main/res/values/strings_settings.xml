@@ -232,4 +232,6 @@
     <string name="settings_local_proxy_edit">Edit %1$s</string>
     <string name="settings_local_proxy_copy">Copy %1$s</string>
     <string name="settings_local_proxy_copied">%1$s copied</string>
+    <string name="settings_geo_asset_update_checks_title">Automatically check for asset updates</string>
+    <string name="settings_geo_asset_not_downloaded">Not downloaded</string>
 </resources>

@@ -175,7 +175,6 @@ import com.material.xray.core.ui.components.SettingsSwitchRow
 import com.material.xray.core.ui.components.TooltipIconButton
 import com.material.xray.core.ui.components.UpdateChecksSetting
 import com.material.xray.core.ui.components.UpdateIntervalDialog
-import com.material.xray.core.ui.components.UpdateIntervalDropdown
 import com.material.xray.core.ui.components.rememberOptionValue
 import com.material.xray.core.ui.components.rememberSystemState
 import com.material.xray.core.ui.components.rememberUpdateAlarmPermissionRequest
@@ -312,6 +311,7 @@ private fun SettingsScreenContent(
     var showUpdateFrequencyDialog by rememberSaveable { mutableStateOf(false) }
     var showOpenSourceLicensesDialog by rememberSaveable { mutableStateOf(false) }
     var showAppUpdateIntervalDialog by rememberSaveable { mutableStateOf(false) }
+    var geoDataAsset by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
     var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
     var showClearGeoDataDialog by rememberSaveable { mutableStateOf(false) }
     val rootServiceAvailable = rootAvailable != false
@@ -812,19 +812,6 @@ private fun SettingsScreenContent(
                 )
             }
 
-            settingsItem(key = "geo_data_update_interval", spaceAfter = SettingsFieldSpacing) {
-                UpdateIntervalDropdown(
-                    label = stringResource(R.string.settings_geo_data_update_interval_label),
-                    current = settings.geoDataUpdateIntervalSeconds,
-                    options = listOf(1, 6, 24, 72, 168, 0).map { hours -> DropdownOption(hours * 3600, updateIntervalLabel(hours * 3600)) },
-                    onSelected = {
-                        viewModel.setGeoDataUpdateIntervalSeconds(it)
-                        if (it > 0) requestUpdateAlarms()
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-
             settingsItem(key = "geoip", spaceAfter = SettingsFieldSpacing) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -841,9 +828,9 @@ private fun SettingsScreenContent(
                             } else {
                                 GeoDataSupportingText(
                                     description = stringResource(R.string.settings_geoip_url_supporting_text),
-                                    lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOIP].takeIf { showAdvancedOptions },
-                                    enabled = !geoipUpdating && geoDataClearingAllowed,
-                                    onClick = { geoDataToDelete = GeoDataAsset.GEOIP },
+                                    lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOIP],
+                                    enabled = true,
+                                    onClick = { geoDataAsset = GeoDataAsset.GEOIP },
                                 )
                             }
                         },
@@ -898,9 +885,9 @@ private fun SettingsScreenContent(
                             } else {
                                 GeoDataSupportingText(
                                     description = stringResource(R.string.settings_geosite_url_supporting_text),
-                                    lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOSITE].takeIf { showAdvancedOptions },
-                                    enabled = !geositeUpdating && geoDataClearingAllowed,
-                                    onClick = { geoDataToDelete = GeoDataAsset.GEOSITE },
+                                    lastUpdated = geoDataLastUpdated[GeoDataAsset.GEOSITE],
+                                    enabled = true,
+                                    onClick = { geoDataAsset = GeoDataAsset.GEOSITE },
                                 )
                             }
                         },
@@ -1174,6 +1161,20 @@ private fun SettingsScreenContent(
                 viewModel.setAppUpdateIntervalSeconds(it)
                 showAppUpdateIntervalDialog = false
             },
+        )
+    }
+    geoDataAsset?.takeIf { geoDataToDelete == null }?.let { asset ->
+        val geoip = asset == GeoDataAsset.GEOIP
+        GeoDataAssetDialog(
+            asset = asset,
+            bytes = geoDataCachedSizes[asset] ?: 0L,
+            checksEnabled = if (geoip) settings.geoipUpdateChecksEnabled else settings.geositeUpdateChecksEnabled,
+            intervalSeconds = if (geoip) settings.geoipUpdateIntervalSeconds else settings.geositeUpdateIntervalSeconds,
+            canDelete = geoDataClearingAllowed && !(if (geoip) geoipUpdating else geositeUpdating),
+            onDismiss = { geoDataAsset = null },
+            onDelete = { geoDataToDelete = asset },
+            onChecksEnabledChange = { viewModel.setGeoDataUpdateChecksEnabled(asset, it) },
+            onIntervalChange = { viewModel.setGeoDataUpdateIntervalSeconds(asset, it) },
         )
     }
     geoDataToDelete?.let { asset ->
@@ -1993,21 +1994,18 @@ private fun GeoDataSupportingText(description: String, lastUpdated: Long?, enabl
             DateFormat.getLongDateFormat(context).format(date),
             DateFormat.format("HH:mm:ss", date),
         )
-    }
-    val shownUpdatedText = rememberOptionValue(updatedText != null, updatedText.orEmpty())
+    } ?: stringResource(R.string.settings_geo_asset_not_downloaded)
     val linkStyle = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline)
     Column {
         Text(description)
-        AnimatedOptionContent(visible = updatedText != null) {
-            Spacer(Modifier.height(SettingsItemSpacing))
-            Text(
-                buildAnnotatedString {
-                    withLink(LinkAnnotation.Clickable("delete_asset", TextLinkStyles(style = linkStyle)) { if (enabled) onClick() }) {
-                        append(shownUpdatedText)
-                    }
-                },
-            )
-        }
+        Spacer(Modifier.height(SettingsItemSpacing))
+        Text(
+            buildAnnotatedString {
+                withLink(LinkAnnotation.Clickable("geo_asset", TextLinkStyles(style = linkStyle)) { if (enabled) onClick() }) {
+                    append(updatedText)
+                }
+            },
+        )
     }
 }
 

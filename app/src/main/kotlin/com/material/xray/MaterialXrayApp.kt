@@ -22,6 +22,7 @@ import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.network.Ipv6Detector
 import com.material.xray.core.runtime.AppUpdateScheduler
 import com.material.xray.core.runtime.ConnectionRuntimeManager
+import com.material.xray.core.runtime.GeoDataAsset
 import com.material.xray.core.runtime.GeoDataUpdateScheduler
 import com.material.xray.core.runtime.NetworkServerManager
 import com.material.xray.core.runtime.OemAutostartManager
@@ -34,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -104,17 +106,19 @@ class MaterialXrayApp : Application() {
             }
         }
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            settingsRepository.geoDataUpdateIntervalSeconds.distinctUntilChanged().collectLatest(
-                geoDataUpdateScheduler::schedulePeriodicRefresh,
-            )
+            combine(settingsRepository.geoipUpdateChecksEnabled, settingsRepository.geoipUpdateIntervalSeconds) { enabled, seconds -> if (enabled) seconds else 0 }
+                .distinctUntilChanged().collectLatest { geoDataUpdateScheduler.schedulePeriodicRefresh(GeoDataAsset.GEOIP, it) }
+        }
+        appScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            combine(settingsRepository.geositeUpdateChecksEnabled, settingsRepository.geositeUpdateIntervalSeconds) { enabled, seconds -> if (enabled) seconds else 0 }
+                .distinctUntilChanged().collectLatest { geoDataUpdateScheduler.schedulePeriodicRefresh(GeoDataAsset.GEOSITE, it) }
         }
         appScope.launch {
             runCatching {
-                if (settingsRepository.geoDataUpdateIntervalSeconds.first() != 0) {
+                if (settingsRepository.geoipUpdateChecksEnabled.first() || settingsRepository.geositeUpdateChecksEnabled.first()) {
                     geoDataUpdateScheduler.enqueueInitialRefresh()
                 }
-            }
-                .onFailure { error -> Log.e(LOG_TAG, "Unable to schedule initial geodata refresh", error) }
+            }.onFailure { error -> Log.e(LOG_TAG, "Unable to schedule initial geodata refresh", error) }
         }
         appScope.launch {
             databaseOpenChecker.awaitReadable()

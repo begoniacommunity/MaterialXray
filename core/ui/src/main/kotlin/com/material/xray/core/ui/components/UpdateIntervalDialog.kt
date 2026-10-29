@@ -45,6 +45,7 @@ fun UpdateIntervalDialog(
     options: List<DropdownOption<Int>>,
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
+    onDismissAll: () -> Unit = onDismiss,
 ) {
     var selected by rememberSaveable { mutableIntStateOf(current) }
     var customSelected by rememberSaveable { mutableStateOf(options.none { it.value == current }) }
@@ -54,6 +55,7 @@ fun UpdateIntervalDialog(
         CustomUpdateIntervalDialog(
             current = selected.takeIf { it > 0 } ?: default,
             onDismiss = { showCustom = false },
+            onDismissRequest = onDismissAll,
             onConfirm = {
                 selected = it
                 customSelected = true
@@ -107,6 +109,7 @@ fun UpdateIntervalDropdown(
     options: List<DropdownOption<Int>>,
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onDismissAll: () -> Unit = {},
 ) {
     var showCustom by rememberSaveable { mutableStateOf(false) }
     ReadOnlyDropdownField(
@@ -120,6 +123,10 @@ fun UpdateIntervalDropdown(
         CustomUpdateIntervalDialog(
             current = current.takeIf { it > 0 } ?: 3600,
             onDismiss = { showCustom = false },
+            onDismissRequest = {
+                showCustom = false
+                onDismissAll()
+            },
             onConfirm = {
                 showCustom = false
                 onSelected(it)
@@ -129,7 +136,7 @@ fun UpdateIntervalDropdown(
 }
 
 @Composable
-private fun CustomUpdateIntervalDialog(current: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
+private fun CustomUpdateIntervalDialog(current: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit, onDismissRequest: () -> Unit) {
     val pickers = remember { mutableMapOf<String, NumberPicker>() }
     var hours by rememberSaveable { mutableIntStateOf(current / 3600) }
     var minutes by rememberSaveable { mutableIntStateOf(current % 3600 / 60) }
@@ -140,7 +147,7 @@ private fun CustomUpdateIntervalDialog(current: Int, onDismiss: () -> Unit, onCo
     }
     val requestAlarms = rememberUpdateAlarmPermissionRequest()
     AppAlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = onDismissRequest,
         title = { Text(stringResource(R.string.update_custom_date)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {

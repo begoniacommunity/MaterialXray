@@ -236,4 +236,6 @@
     <string name="settings_local_proxy_edit">Изменить: %1$s</string>
     <string name="settings_local_proxy_copy">Копировать: %1$s</string>
     <string name="settings_local_proxy_copied">Скопировано: %1$s</string>
+    <string name="settings_geo_asset_update_checks_title">Автоматически проверять обновления файла</string>
+    <string name="settings_geo_asset_not_downloaded">Не загружен</string>
 </resources>

@@ -9,6 +9,8 @@ Each automatic-update interval picker ends with **Custom date**. Set hours, minu
 
 Alarms and reminders is a special permission: Android opens a Settings page rather than a standard permission popup. If that page is unavailable on the device, the app shows a message instead of silently ignoring the request.
 
+Tap **Last updated on…** below **GeoIP URL** or **GeoSite URL** to open that asset’s dialog. When the file is missing, **Not downloaded** opens the same dialog. Its file card shows the filename and size; the trash button opens the existing deletion confirmation. **Automatically check for asset updates** has a switch and interval picker, including **Custom date**. GeoIP and GeoSite use separate schedules; both default to once a day and inherit the previous shared interval on upgrade. Turning checks off preserves the selected interval. Close the asset dialog with **OK**. Tapping outside **Custom date** closes the entire dialog chain.
+
 ## Connectivity and routing
 
 | Setting | What it does |

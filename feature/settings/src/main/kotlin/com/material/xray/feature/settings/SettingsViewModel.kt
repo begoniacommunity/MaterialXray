@@ -466,8 +466,18 @@ class SettingsViewModel(
 
     fun setGeoipUrl(url: String) = viewModelScope.launch { settingsRepo.setGeoipUrl(url) }
     fun setGeositeUrl(url: String) = viewModelScope.launch { settingsRepo.setGeositeUrl(url) }
-    fun setGeoDataUpdateIntervalSeconds(seconds: Int) = viewModelScope.launch {
-        settingsRepo.setGeoDataUpdateIntervalSeconds(seconds)
+    fun setGeoDataUpdateIntervalSeconds(asset: GeoDataAsset, seconds: Int) = viewModelScope.launch {
+        when (asset) {
+            GeoDataAsset.GEOIP -> settingsRepo.setGeoipUpdateIntervalSeconds(seconds)
+            GeoDataAsset.GEOSITE -> settingsRepo.setGeositeUpdateIntervalSeconds(seconds)
+        }
+    }
+
+    fun setGeoDataUpdateChecksEnabled(asset: GeoDataAsset, enabled: Boolean) = viewModelScope.launch {
+        when (asset) {
+            GeoDataAsset.GEOIP -> settingsRepo.setGeoipUpdateChecksEnabled(enabled)
+            GeoDataAsset.GEOSITE -> settingsRepo.setGeositeUpdateChecksEnabled(enabled)
+        }
     }
 
     fun setLatencyCheckUrl(url: String) = viewModelScope.launch { settingsRepo.setLatencyCheckUrl(url) }

@@ -92,6 +92,10 @@ data class SettingsSnapshot(
     val diagnosticsEnabled: Boolean,
     val appUpdateIntervalSeconds: Int = UpdateInterval.fromHours(appUpdateInterval.hours),
     val geoDataUpdateIntervalSeconds: Int = UpdateInterval.fromHours(geoDataUpdateIntervalHours),
+    val geoipUpdateIntervalSeconds: Int = geoDataUpdateIntervalSeconds.takeIf { it > 0 } ?: GeoDataUpdateInterval.DEFAULT_HOURS * 3600,
+    val geositeUpdateIntervalSeconds: Int = geoDataUpdateIntervalSeconds.takeIf { it > 0 } ?: GeoDataUpdateInterval.DEFAULT_HOURS * 3600,
+    val geoipUpdateChecksEnabled: Boolean = geoDataUpdateIntervalSeconds > 0,
+    val geositeUpdateChecksEnabled: Boolean = geoDataUpdateIntervalSeconds > 0,
 )
 
 @Suppress("TooManyFunctions")
@@ -179,6 +183,10 @@ class SettingsRepository(
         val SUBSCRIPTION_PREFER_JSON = booleanPreferencesKey("subscription_prefer_json")
         val APP_UPDATE_CHECKS_ENABLED = booleanPreferencesKey("app_update_checks_enabled")
         val APP_UPDATE_INTERVAL_SECONDS = intPreferencesKey("app_update_interval_seconds")
+        val GEOIP_UPDATE_INTERVAL_SECONDS = intPreferencesKey("geoip_update_interval_seconds")
+        val GEOSITE_UPDATE_INTERVAL_SECONDS = intPreferencesKey("geosite_update_interval_seconds")
+        val GEOIP_UPDATE_CHECKS_ENABLED = booleanPreferencesKey("geoip_update_checks_enabled")
+        val GEOSITE_UPDATE_CHECKS_ENABLED = booleanPreferencesKey("geosite_update_checks_enabled")
         val GEO_DATA_UPDATE_INTERVAL_SECONDS = intPreferencesKey("geo_data_update_interval_seconds")
         val APP_UPDATE_INTERVAL_HOURS = intPreferencesKey("app_update_interval_hours")
         val DIAGNOSTICS_NOTICE_SHOWN = booleanPreferencesKey("diagnostics_notice_shown")
@@ -390,9 +398,25 @@ class SettingsRepository(
     val appUpdateIntervalSeconds: Flow<Int> = store.data.map { prefs ->
         UpdateInterval.normalize(prefs[APP_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]).hours))
     }
-    val geoDataUpdateIntervalSeconds: Flow<Int> = store.data.map { prefs ->
-        UpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS])), allowManual = true)
-    }
+    val geoDataUpdateIntervalSeconds: Flow<Int> = store.data.map { it.legacyGeoDataIntervalSeconds() }
+    val geoipUpdateIntervalSeconds: Flow<Int> = store.data.map { it.geoAssetIntervalSeconds(GEOIP_UPDATE_INTERVAL_SECONDS) }
+    val geositeUpdateIntervalSeconds: Flow<Int> = store.data.map { it.geoAssetIntervalSeconds(GEOSITE_UPDATE_INTERVAL_SECONDS) }
+    val geoipUpdateChecksEnabled: Flow<Boolean> = store.data.map { it.geoAssetChecksEnabled(GEOIP_UPDATE_CHECKS_ENABLED) }
+    val geositeUpdateChecksEnabled: Flow<Boolean> = store.data.map { it.geoAssetChecksEnabled(GEOSITE_UPDATE_CHECKS_ENABLED) }
+
+    private fun Preferences.legacyGeoDataIntervalSeconds(): Int = UpdateInterval.normalize(
+        this[GEO_DATA_UPDATE_INTERVAL_SECONDS],
+        UpdateInterval.fromHours(GeoDataUpdateInterval.normalize(this[GEO_DATA_UPDATE_INTERVAL_HOURS])),
+        allowManual = true,
+    )
+
+    private fun Preferences.geoAssetIntervalSeconds(key: Preferences.Key<Int>): Int = UpdateInterval.normalize(
+        this[key],
+        legacyGeoDataIntervalSeconds().takeIf { it > 0 } ?: GeoDataUpdateInterval.DEFAULT_HOURS * 3600,
+    )
+
+    private fun Preferences.geoAssetChecksEnabled(key: Preferences.Key<Boolean>): Boolean = this[key] ?: (legacyGeoDataIntervalSeconds() > 0)
+
     val diagnosticsEnabled: Flow<Boolean> = store.data.map { prefs ->
         prefs[DIAGNOSTICS_ENABLED] ?: true
     }
@@ -459,7 +483,11 @@ class SettingsRepository(
             appUpdateChecksEnabled = prefs[APP_UPDATE_CHECKS_ENABLED] ?: true,
             appUpdateInterval = AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]),
             appUpdateIntervalSeconds = UpdateInterval.normalize(prefs[APP_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(AppUpdateInterval.fromHours(prefs[APP_UPDATE_INTERVAL_HOURS]).hours)),
-            geoDataUpdateIntervalSeconds = UpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS], UpdateInterval.fromHours(GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS])), allowManual = true),
+            geoDataUpdateIntervalSeconds = prefs.legacyGeoDataIntervalSeconds(),
+            geoipUpdateIntervalSeconds = prefs.geoAssetIntervalSeconds(GEOIP_UPDATE_INTERVAL_SECONDS),
+            geositeUpdateIntervalSeconds = prefs.geoAssetIntervalSeconds(GEOSITE_UPDATE_INTERVAL_SECONDS),
+            geoipUpdateChecksEnabled = prefs.geoAssetChecksEnabled(GEOIP_UPDATE_CHECKS_ENABLED),
+            geositeUpdateChecksEnabled = prefs.geoAssetChecksEnabled(GEOSITE_UPDATE_CHECKS_ENABLED),
             diagnosticsNoticeShown = prefs[DIAGNOSTICS_NOTICE_SHOWN] ?: false,
             diagnosticsEnabled = prefs[DIAGNOSTICS_ENABLED] ?: true,
         )
@@ -653,6 +681,20 @@ class SettingsRepository(
             prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = (seconds + 3599) / 3600
         }
     }
+    suspend fun setGeoipUpdateIntervalSeconds(seconds: Int) = setGeoAssetIntervalSeconds(GEOIP_UPDATE_INTERVAL_SECONDS, GEOIP_UPDATE_CHECKS_ENABLED, seconds)
+    suspend fun setGeositeUpdateIntervalSeconds(seconds: Int) = setGeoAssetIntervalSeconds(GEOSITE_UPDATE_INTERVAL_SECONDS, GEOSITE_UPDATE_CHECKS_ENABLED, seconds)
+
+    private suspend fun setGeoAssetIntervalSeconds(intervalKey: Preferences.Key<Int>, enabledKey: Preferences.Key<Boolean>, seconds: Int) {
+        require(UpdateInterval.isValid(seconds))
+        store.edit { prefs ->
+            prefs[intervalKey] = seconds
+            prefs[enabledKey] = true
+        }
+    }
+
+    suspend fun setGeoipUpdateChecksEnabled(enabled: Boolean) = store.edit { it[GEOIP_UPDATE_CHECKS_ENABLED] = enabled }
+    suspend fun setGeositeUpdateChecksEnabled(enabled: Boolean) = store.edit { it[GEOSITE_UPDATE_CHECKS_ENABLED] = enabled }
+
     suspend fun setDiagnosticsEnabled(enabled: Boolean) {
         if (!enabled) diagnosticsConsentMirror.setEnabled(false)
         store.edit { prefs ->
@@ -936,6 +978,10 @@ class SettingsRepository(
                     prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = it
                 }
             map["geo_data_update_interval_seconds"]?.toIntOrNull()?.takeIf { UpdateInterval.isValid(it, allowManual = true) }?.let { prefs[GEO_DATA_UPDATE_INTERVAL_SECONDS] = it }
+            map["geoip_update_interval_seconds"]?.toIntOrNull()?.takeIf { UpdateInterval.isValid(it) }?.let { prefs[GEOIP_UPDATE_INTERVAL_SECONDS] = it }
+            map["geosite_update_interval_seconds"]?.toIntOrNull()?.takeIf { UpdateInterval.isValid(it) }?.let { prefs[GEOSITE_UPDATE_INTERVAL_SECONDS] = it }
+            map["geoip_update_checks_enabled"]?.toBooleanStrictOrNull()?.let { prefs[GEOIP_UPDATE_CHECKS_ENABLED] = it }
+            map["geosite_update_checks_enabled"]?.toBooleanStrictOrNull()?.let { prefs[GEOSITE_UPDATE_CHECKS_ENABLED] = it }
             map["latency_check_url"]?.takeIf { it.isNotBlank() }?.let { prefs[LATENCY_CHECK_URL] = it }
             map["latency_test_concurrency"]
                 ?.toIntOrNull()
