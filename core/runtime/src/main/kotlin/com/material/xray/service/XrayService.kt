@@ -365,11 +365,11 @@ class XrayService(
         networkRetargetWorker = NetworkRetargetWorker(
             scope = scope,
             settleDelayMs = NETWORK_RETARGET_SETTLE_DELAY_MS,
-            shouldHandle = { connectionManager.isUsingRootRuntime && activeConfig != null },
+            shouldHandle = { activeConfig != null },
             beforeBatch = ::acquireNetworkRetargetWakeLock,
             afterBatch = ::releaseNetworkRetargetWakeLock,
             onFailure = { error ->
-                logBuffer.append(LogSource.APP, "Root network verification failed: ${error.message ?: error.javaClass.simpleName}")
+                logBuffer.append(LogSource.APP, "Network verification failed: ${error.message ?: error.javaClass.simpleName}")
             },
             handle = ::retargetNetworkUntilStable,
         )
@@ -726,11 +726,19 @@ class XrayService(
         ) {
             return false
         }
-        // A no-op in root mode, where the tunnel belongs to the system rather than to this
-        // process. Rootless reconnects establish a fresh descriptor either way.
-        closeVpnInterface()
-        if (reconnectDelayMs > 0) delay(reconnectDelayMs)
-        return connectWithCurrentSettings(config, transitionState, preparation)
+        // Rootless restarts keep the old tunnel until the new one is established: Android moves the
+        // VPN's apps onto the new interface in one step, so meanwhile their traffic waits in a tunnel
+        // nothing reads instead of leaving over the bare network. A switch into root mode closes it
+        // first, so root setup does not take this app's own VPN for another one.
+        val previousInterface = vpnInterface
+        vpnInterface = null
+        if (settingsRepo.useRootService.first()) runCatching { previousInterface?.close() }
+        try {
+            if (reconnectDelayMs > 0) delay(reconnectDelayMs)
+            return connectWithCurrentSettings(config, transitionState, preparation)
+        } finally {
+            runCatching { previousInterface?.close() }
+        }
     }
 
     private suspend fun connectOnceWithCurrentSettings(
@@ -832,7 +840,7 @@ class XrayService(
             transitionState = transitionState,
             preparation = preparation,
         )
-        if (connectionStateCoordinator.state.value is ConnectionState.Connected && effectiveRuntimeSettings.useRootService) {
+        if (connectionStateCoordinator.state.value is ConnectionState.Connected) {
             activePhysicalNetwork = currentPhysicalNetworkSnapshot()
         } else if (!effectiveRuntimeSettings.useRootService) {
             activePhysicalNetwork = null
@@ -1833,7 +1841,6 @@ class XrayService(
     }
 
     private fun scheduleNetworkRetarget(reason: String, settle: Boolean) {
-        if (!connectionManager.isUsingRootRuntime) return
         activeConfig ?: return
         networkRetargetWorker.signal(
             reason = reason,
@@ -1856,12 +1863,13 @@ class XrayService(
     private suspend fun retargetNetworkUntilStableOnce(reason: String): NetworkRetargetRetryOutcome {
         val requiresPassiveMonitoring = reason == PERIODIC_ROOT_ROUTE_VERIFICATION_REASON
         if (requiresPassiveMonitoring && !passiveHealthMonitoringEnabled) return NetworkRetargetRetryOutcome.Stopped
+        // Waits outside the command lock, so a per-network server switch, which restarts the core
+        // anyway, goes first and leaves the new network recorded instead of restarting twice.
+        if (!connectionManager.isUsingRootRuntime) delay(ROOTLESS_NETWORK_FOLLOW_DELAY_MS)
         val outcome = retryNetworkRetarget(
             retryDelaysMs = NETWORK_RETARGET_RETRY_DELAYS_MS,
             shouldContinue = {
-                connectionManager.isUsingRootRuntime &&
-                    activeConfig != null &&
-                    (!requiresPassiveMonitoring || passiveHealthMonitoringEnabled)
+                activeConfig != null && (!requiresPassiveMonitoring || passiveHealthMonitoringEnabled)
             },
         ) { attempt ->
             retargetNetwork(reason, attempt)
@@ -1881,10 +1889,10 @@ class XrayService(
         if (reason == PERIODIC_ROOT_ROUTE_VERIFICATION_REASON && !passiveHealthMonitoringEnabled) {
             return@runConnectionCommand NetworkRetargetResult.Done
         }
-        if (!connectionManager.isUsingRootRuntime) return@runConnectionCommand NetworkRetargetResult.Done
         val latestConfig = activeConfig ?: return@runConnectionCommand NetworkRetargetResult.Done
         val latestState = connectionStateCoordinator.state.value as? ConnectionState.Connected
             ?: return@runConnectionCommand NetworkRetargetResult.Done
+        if (!connectionManager.isUsingRootRuntime) return@runConnectionCommand followRootlessNetwork(reason, latestConfig)
         val dnsSource = when {
             connectionManager.otherVpnDnsChanged() -> "the other VPN's DNS"
             connectionManager.systemDnsChanged() -> "the network's DNS"
@@ -1934,6 +1942,30 @@ class XrayService(
             currentNetwork = currentNetwork,
             previousNetwork = previousNetwork,
         )
+    }
+
+    /**
+     * Android moves a rootless core's new sockets to the new network on its own, but the connections
+     * it already holds to the servers stay on the old one and hang until TCP gives up, which on a
+     * lost Wi-Fi took minutes. A restart drops them, as root mode's reconnect does.
+     */
+    private suspend fun followRootlessNetwork(reason: String, config: ServerConfig): NetworkRetargetResult {
+        // A lost network is not the next one; the network that replaces it signals again.
+        val currentNetwork = currentPhysicalNetworkSnapshot() ?: return NetworkRetargetResult.Done
+        val previousNetwork = activePhysicalNetwork
+        if (previousNetwork == null || previousNetwork.sameNetwork(currentNetwork)) {
+            activePhysicalNetwork = currentNetwork
+            return NetworkRetargetResult.Done
+        }
+        logBuffer.append(
+            LogSource.APP,
+            "Network changed ($reason): ${previousNetwork.describe()} -> ${currentNetwork.describe()}, " +
+                "restarting the core to drop connections on the old network",
+        )
+        stopProcessWatchdog()
+        connectionStateCoordinator.startConnection(ConnectionState.Connecting)
+        restartRuntime(config)
+        return NetworkRetargetResult.Done
     }
 
     private suspend fun refreshPhysicalRoutingForNetworkChange(
@@ -2493,6 +2525,8 @@ class XrayService(
     ) {
         fun sameNetwork(other: PhysicalNetworkSnapshot): Boolean = handle == other.handle &&
             interfaceName == other.interfaceName
+
+        fun describe(): String = interfaceName?.let { "$label ($it)" } ?: label
     }
 
     private data class NotificationMetrics(
@@ -2578,6 +2612,7 @@ class XrayService(
         private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 5_000L
         private const val NETWORK_SAFETY_CHECK_INTERVAL_MS = 60_000L
         private const val ROOT_ACCESS_CHECK_INTERVAL_MS = 30_000L
+        private const val ROOTLESS_NETWORK_FOLLOW_DELAY_MS = 1_000L
         private const val PERIODIC_ROOT_ROUTE_VERIFICATION_REASON = "periodic root route verification"
         private val NETWORK_RETARGET_RETRY_DELAYS_MS = listOf(250L, 500L, 1_000L, 2_000L, 4_000L, 8_000L)
         private const val LOCAL_API_HEALTH_PROBE_INTERVAL_MS = 60_000L

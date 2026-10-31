@@ -19,6 +19,7 @@ Material Xray runs the same Xray-core build either way. The two modes differ in 
 | **Hotspot and tethering** | ⚠️ Tethered clients are not tunneled. | ✅ Can tunnel tethered clients. |
 | **Always-on VPN** | ✅ Supported. | ⚠️ Turning on Android's always-on VPN switches the app to rootless mode. |
 | **Auto-connect after reboot** | ✅ Supported. | ✅ Supported. |
+| **Switching networks** | ✅ Restarts Xray on the new network. The VPN stays up meanwhile, so apps wait instead of going out directly. | ✅ Retargets routing to the new network, restarting Xray when its DNS changes. |
 | **If Android kills the app** | ⚠️ The proxy stops too. Always-on VPN can restart it. | ✅ The proxy process keeps running on its own. |
 | **Stability** | ✅ Android does the routing: standard and battle-tested. | ⚠️ Rigorously tested, but may have rough edges. |
 
