@@ -177,10 +177,9 @@ class RootShell(
             }
 
             val namespaces = executeInternal(
-                "printf 'shell=%s\\napp=%s\\ninit=%s\\n' " +
-                    "\"\$(readlink /proc/\$\$/ns/net 2>/dev/null)\" " +
-                    "\"\$(readlink /proc/$appProcessId/ns/net 2>/dev/null)\" " +
-                    "\"\$(readlink /proc/1/ns/net 2>/dev/null)\"",
+                "echo \"shell=\$(readlink /proc/\$\$/ns/net 2>/dev/null)\"; " +
+                    "echo \"app=\$(readlink /proc/$appProcessId/ns/net 2>/dev/null)\"; " +
+                    "echo \"init=\$(readlink /proc/1/ns/net 2>/dev/null)\"",
                 NetworkNamespace.CURRENT,
             ).output.let(::parseTaggedRootValues)
             directNamespaces = detectDirectRootShellNamespaces(
@@ -212,10 +211,12 @@ class RootShell(
         val exitMarker = "XRAY_EXIT_${System.nanoTime()}"
         val errorMarker = "XRAY_STDERR_DONE_${System.nanoTime()}"
 
+        // Android's mksh has no printf builtin, so the markers use echo: an exec per marker
+        // used to cost more than most commands themselves.
         writer.write("${wrapRootCommand(command, namespace, directNamespaces, appProcessId)}\n")
-        writer.write("__xray_status=${'$'}?; printf '\n%s%s\n' '$exitMarker' \"${'$'}__xray_status\"\n")
-        writer.write("printf '%s\n' '$marker'\n")
-        writer.write("printf '%s\n' '$errorMarker' >&2\n")
+        writer.write("__xray_status=${'$'}?; echo; echo '$exitMarker'\"${'$'}__xray_status\"\n")
+        writer.write("echo '$marker'\n")
+        writer.write("echo '$errorMarker' >&2\n")
         writer.flush()
 
         val outputLines = mutableListOf<String>()
@@ -368,7 +369,8 @@ internal fun wrapRootCommand(
     directNamespaces: Set<RootShell.NetworkNamespace>,
     appProcessId: Int,
 ): String {
-    if (requestedNamespace in directNamespaces) return "sh -c ${shellQuote(command)}"
+    // A forked subshell isolates exit, cd and variables as well as `sh -c` does, without an exec.
+    if (requestedNamespace in directNamespaces) return "( eval ${shellQuote(command)} )"
     val targetPid = if (requestedNamespace == RootShell.NetworkNamespace.INIT) 1 else appProcessId
     return "nsenter -t $targetPid -n -- sh -c ${shellQuote(command)}"
 }

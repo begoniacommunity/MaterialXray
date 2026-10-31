@@ -101,9 +101,42 @@ class RootShellTest {
     }
 
     @Test
+    fun `commands cannot change or end the persistent shell`() = runBlocking {
+        File(folder.root, "id").apply {
+            writeText("#!/bin/sh\nprintf '0\\n'\n")
+            setExecutable(true)
+        }
+        File(folder.root, "readlink").apply {
+            writeText("#!/bin/sh\nprintf 'net:[41]\\n'\n")
+            setExecutable(true)
+        }
+        val shell = RootShell(
+            appProcessId = 123,
+            startProcess = {
+                ProcessBuilder("sh").apply {
+                    environment()["PATH"] = "${folder.root}:${System.getenv("PATH")}"
+                }.start()
+            },
+        )
+        try {
+            assertTrue(shell.open(RootShell.NetworkNamespace.INIT))
+            val exited = shell.execute("echo partial; echo oops >&2; exit 3")
+            assertEquals(3, exited.exitCode)
+            assertEquals("partial", exited.output.trim())
+            assertEquals("oops", exited.error)
+            assertFalse(shell.execute("if then").isSuccess)
+            assertTrue(shell.execute("cd /; marker=set").isSuccess)
+            assertEquals("${System.getProperty("user.dir")}|", shell.execute("echo \"\$PWD|\$marker\"").output.trim())
+            assertEquals("no newline", shell.execute("printf 'no newline'").output.trim())
+        } finally {
+            shell.close()
+        }
+    }
+
+    @Test
     fun `same-namespace commands retain an isolated child shell`() {
         assertEquals(
-            "sh -c 'ip rule show'",
+            "( eval 'ip rule show' )",
             wrapRootCommand(
                 command = "ip rule show",
                 requestedNamespace = RootShell.NetworkNamespace.INIT,
