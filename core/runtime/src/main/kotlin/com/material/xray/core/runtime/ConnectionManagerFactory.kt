@@ -178,6 +178,7 @@ class ConnectionManagerFactory(
     private val appInventory: AppInventory,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
+    private val coreSocketAccess: CoreSocketAccessState,
     private val telemetryReporter: TelemetryReporter,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -211,6 +212,7 @@ class ConnectionManagerFactory(
             commandRunner = RootShellCommandRunner(shell),
             xrayBinary = xrayBinary,
             log = log,
+            coreSocketAccess = coreSocketAccess,
         )
         val userProcess = UserXrayProcessSupervisor(
             environment = runtimeEnvironment,

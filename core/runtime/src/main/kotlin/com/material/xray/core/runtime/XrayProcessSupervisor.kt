@@ -24,6 +24,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Singleton
 
 internal interface RootCommandRunner {
     suspend fun execute(command: String): RootShell.Result
@@ -82,11 +83,22 @@ internal class AndroidXrayRuntimeEnvironment(
     }
 }
 
+/**
+ * Outlives the per-connection [XrayProcessSupervisor]: the policy only changes at boot, or when the
+ * check itself patches it, so one confirmation holds for the app process.
+ */
+@Singleton
+class CoreSocketAccessState {
+    @Volatile
+    var confirmed = false
+}
+
 internal class XrayProcessSupervisor(
     private val environment: XrayRuntimeEnvironment,
     private val commandRunner: RootCommandRunner,
     private val xrayBinary: XrayProcessBinary,
     private val log: LogBuffer,
+    private val coreSocketAccess: CoreSocketAccessState = CoreSocketAccessState(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : RootXrayProcessController {
     val logFile: String
@@ -181,12 +193,8 @@ internal class XrayProcessSupervisor(
         return crashLog.lines().lastOrNull { it.isNotBlank() } ?: "xray process exited"
     }
 
-    // The policy only changes at boot, or when this check itself patches it.
-    @Volatile
-    private var coreSocketAccessConfirmed = false
-
     override suspend fun ensureCoreSocketAccess(): Boolean {
-        if (coreSocketAccessConfirmed) return true
+        if (coreSocketAccess.confirmed) return true
         val appContext = environment.selinuxContext
         if (appContext == null || !SELINUX_CONTEXT.matches(appContext)) {
             log.append(LogSource.APP, "SELinux core socket check skipped: unknown app context")
@@ -195,10 +203,10 @@ internal class XrayProcessSupervisor(
         val result = commandRunner.execute(coreSocketAccessCommand(appContext))
         val verdict = result.output.trim()
         when {
-            verdict == "allowed" -> coreSocketAccessConfirmed = true
+            verdict == "allowed" -> coreSocketAccess.confirmed = true
             verdict.startsWith("patched ") -> {
                 log.append(LogSource.APP, "Allowed the app to reach the core's sockets with ${verdict.removePrefix("patched ")}")
-                coreSocketAccessConfirmed = true
+                coreSocketAccess.confirmed = true
             }
             verdict.startsWith("denied ") -> {
                 log.append(

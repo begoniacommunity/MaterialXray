@@ -250,15 +250,15 @@ class XrayProcessSupervisorTest {
     }
 
     @Test
-    fun `core socket access is checked once and patching is logged`() = runTest {
+    fun `core socket access is checked once per app process and patching is logged`() = runTest {
         val commands = FakeRootCommandRunner(
             resultForCommand = { RootShell.Result(exitCode = 0, output = "patched ksud\n", error = "") },
         )
         val log = LogBuffer()
-        val supervisor = supervisor(commandRunner = commands, log = log)
+        val state = CoreSocketAccessState()
 
-        assertTrue(supervisor.ensureCoreSocketAccess())
-        assertTrue(supervisor.ensureCoreSocketAccess())
+        assertTrue(supervisor(commandRunner = commands, log = log, coreSocketAccess = state).ensureCoreSocketAccess())
+        assertTrue(supervisor(commandRunner = commands, log = log, coreSocketAccess = state).ensureCoreSocketAccess())
 
         assertEquals(1, commands.commands.size)
         assertTrue(log.entries.value.any { it.message.contains("with ksud") })
@@ -377,11 +377,13 @@ class XrayProcessSupervisorTest {
         commandRunner: FakeRootCommandRunner = FakeRootCommandRunner(),
         log: LogBuffer = LogBuffer(),
         xrayBinary: XrayProcessBinary = FakeXrayProcessBinary(),
+        coreSocketAccess: CoreSocketAccessState = CoreSocketAccessState(),
     ) = XrayProcessSupervisor(
         environment = environment,
         commandRunner = commandRunner,
         xrayBinary = xrayBinary,
         log = log,
+        coreSocketAccess = coreSocketAccess,
     )
 
     private fun userSupervisor(
