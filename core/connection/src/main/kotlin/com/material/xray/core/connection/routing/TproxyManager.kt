@@ -37,6 +37,7 @@ class TproxyManager internal constructor(
     private var bulkRestoreSupported = false
     private var useIndividualCommands = false
     private var guardCoversTethering = false
+    private var installedGuard: String? = null
     private var activationAppliedAtomically = false
     private val localAddressTracker = LocalAddressChangeTracker()
     private var dynamicLocalAddresses = false
@@ -62,7 +63,23 @@ class TproxyManager internal constructor(
             "[ \$result -eq 0 ] && [ \$flushed -eq 0 ] && [ \$removed -eq 0 ]; }"
     }
 
+    /**
+     * Installs or refreshes the startup guard. A reconnect asks again for the guard it installed a
+     * moment earlier; while its hooks are still there, nothing is rebuilt. Cleanup removes hooks
+     * with their chains, so a guard torn down meanwhile fails the hook check and is installed again.
+     */
     suspend fun installGuard(plan: TproxyTrafficPlan): TunManager.RoutingResult {
+        val guard = guardRestoreCommand(plan, appUid, checkSupport = false)
+        if (guard == installedGuard && executeCommand(guardHooksPresentCommand(plan)).isSuccess) {
+            return TunManager.RoutingResult(success = true)
+        }
+        installedGuard = null
+        val result = installGuardChecked(plan)
+        if (result.success) installedGuard = guard
+        return result
+    }
+
+    private suspend fun installGuardChecked(plan: TproxyTrafficPlan): TunManager.RoutingResult {
         if (useIndividualCommands) return installGuardIndividually(plan, hasCompleteGuard(plan))
         val restored = executeCommand(guardRestoreCommand(plan, appUid, checkSupport = !bulkRestoreSupported))
         if (restored.isSuccess) {
@@ -112,6 +129,19 @@ class TproxyManager internal constructor(
         if (!cleanup.isSuccess) return cleanup.toRoutingResult("TPROXY routing rollback")
         useIndividualCommands = true
         return activate(plan).withRestoreError(restored)
+    }
+
+    private fun guardHooksPresentCommand(plan: TproxyTrafficPlan): String {
+        val guard = chainNames(appUid).guard
+        return FirewallCommands.tools.flatMap { tool ->
+            buildList {
+                add("$tool -t mangle -C OUTPUT -j $guard 2>/dev/null")
+                if (plan.runtimeState.tetherUpstreamInterface != null) {
+                    add("$tool -t filter -C INPUT -j ${guard}I 2>/dev/null")
+                    add("$tool -t filter -C FORWARD -j $guard 2>/dev/null")
+                }
+            }
+        }.shellAnd()
     }
 
     private suspend fun hasCompleteGuard(plan: TproxyTrafficPlan): Boolean = executeCommand(guardHookVerifyCommand(plan, appUid)).isSuccess
@@ -339,6 +369,7 @@ class TproxyManager internal constructor(
     }
 
     suspend fun removeGuard(): Boolean {
+        installedGuard = null
         val removed = (bulkRestoreSupported && executeCommand(guardRemovalRestoreCommand(guardCoversTethering)).isSuccess) ||
             executeCommand(guardCleanupCommand(appUid, guardCoversTethering)).isSuccess
         if (removed) guardCoversTethering = false

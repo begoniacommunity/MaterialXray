@@ -352,6 +352,29 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `a reconnect keeps an identical guard only while its hooks remain`() = runTest {
+        var hooksPresent = true
+        val commands = mutableListOf<String>()
+        val manager = TproxyManager(APP_UID) { command ->
+            commands += command
+            RootShell.Result(if (command.contains(" -C OUTPUT") && !command.contains("restore")) (if (hooksPresent) 0 else 1) else 0, "", "")
+        }
+
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.installGuard(plan()).success)
+        assertEquals(2, commands.size)
+        assertFalse(commands.last().contains("restore"))
+
+        hooksPresent = false
+        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(commands.last().contains("iptables-restore"))
+
+        hooksPresent = true
+        assertTrue(manager.installGuard(plan(tetherUpstreamInterface = "wlan0")).success)
+        assertTrue(commands.last().contains("iptables-restore"))
+    }
+
+    @Test
     fun `cleanup deletes through one restore per table and falls back to single commands`() {
         fun run(restoreWorks: Boolean, filterOrphan: Boolean = false): Pair<Int, String> {
             val log = File.createTempFile("cleanup", ".log").apply { deleteOnExit() }
@@ -920,7 +943,7 @@ class TproxyManagerTest {
         }
 
         assertTrue(manager.installGuard(plan()).success)
-        assertTrue(manager.installGuard(plan()).success)
+        assertTrue(manager.installGuard(plan(tetherUpstreamInterface = "wlan0")).success)
 
         assertTrue(commands[0].contains("command -v iptables-restore"))
         assertFalse(commands[1].contains("command -v iptables-restore"))

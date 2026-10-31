@@ -198,6 +198,7 @@ class XrayService(
     @Volatile
     private var lastNetworkSafetyCheckAtMs = 0L
     private var lastRootAccessCheckAtMs = 0L
+    private var lastRootAccessConfirmedAtMs = 0L
     private var processRecoveryJob: Job? = null
     private var alwaysOnRetryJob: Job? = null
     private var fullReconfigurationPending = false
@@ -741,6 +742,19 @@ class XrayService(
         }
     }
 
+    /**
+     * A fast reconnect follows root commands that just worked, and the watchdog asks a fresh su
+     * session on the same interval, so it trusts a confirmation that recent instead of asking
+     * again. A grant revoked within that window is caught by the watchdog's next check.
+     */
+    private suspend fun checkRootRuntimeAccess(preparation: ConnectionPreparation): Boolean {
+        val recentlyConfirmed = preparation.reusesStaticRuntime &&
+            SystemClock.elapsedRealtime() - lastRootAccessConfirmedAtMs < ROOT_ACCESS_CHECK_INTERVAL_MS
+        val confirmed = recentlyConfirmed || settingsRuntimeManager.checkRootAvailability(reloadConnection = false)
+        if (confirmed && !recentlyConfirmed) lastRootAccessConfirmedAtMs = SystemClock.elapsedRealtime()
+        return confirmed && withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
+    }
+
     private suspend fun connectOnceWithCurrentSettings(
         config: ServerConfig,
         transitionState: ConnectionState = ConnectionState.Connecting,
@@ -774,10 +788,7 @@ class XrayService(
                     ConnectionProgress.PreparingRuntime,
                     telemetryStep = ConnectionTelemetryStep.RootAccess,
                     isSuccessful = { it },
-                    action = {
-                        settingsRuntimeManager.checkRootAvailability(reloadConnection = false) &&
-                            withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
-                    },
+                    action = { checkRootRuntimeAccess(preparation) },
                 ),
             )
         } else {
@@ -1368,6 +1379,7 @@ class XrayService(
                 rootServiceRequested = false
                 return "Root access lost; switching to Android VpnService..."
             }
+            lastRootAccessConfirmedAtMs = now
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         val alwaysOnVpn = isAlwaysOn
