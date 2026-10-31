@@ -7,6 +7,8 @@ import android.graphics.drawable.Drawable
 import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
+import com.material.xray.core.common.log.LogBuffer
+import com.material.xray.core.common.log.LogSource
 import com.material.xray.core.data.app.AppInventorySource
 import com.material.xray.core.data.app.RoutableApp
 import com.material.xray.core.data.app.RoutableAppSnapshot
@@ -39,6 +41,7 @@ data class AppInventorySnapshot(
 @Singleton(binds = [AppInventorySource::class])
 class AppInventory(
     private val context: Context,
+    private val log: LogBuffer,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppInventorySource {
     suspend fun loadInstalledApps(): List<InstalledApp> = loadSnapshot().apps
@@ -66,8 +69,8 @@ class AppInventory(
         val appsByKey = linkedMapOf<String, InstalledApp>()
         val snapshotContext = currentCoroutineContext()
 
-        val personalApps = pm.getInstalledApplications(0).filterNot { it.packageName == context.packageName }
         val launcherApps = context.getSystemService(LauncherApps::class.java)
+        val personalApps = personalApplications(launcherApps).filterNot { it.packageName == context.packageName }
         val profileActivities = if (launcherApps == null) {
             emptyList()
         } else {
@@ -120,6 +123,20 @@ class AppInventory(
             ),
             profileIds = profileIds,
         )
+    }
+
+    // Some vendor ROMs (Unisoc CTA builds) throw from getInstalledApplications. Connecting needs a
+    // snapshot, so fall back to launcher apps, then to none: assignments keep their stored uids.
+    private fun personalApplications(launcherApps: LauncherApps?): List<ApplicationInfo> = runCatching {
+        context.packageManager.getInstalledApplications(0)
+    }.recoverCatching { error ->
+        log.append(LogSource.APP, "Installed app list unavailable, using launcher apps: $error")
+        launcherApps?.getActivityList(null, Process.myUserHandle()).orEmpty()
+            .map { it.applicationInfo }
+            .distinctBy { it.packageName }
+    }.getOrElse { error ->
+        log.append(LogSource.APP, "Launcher app list unavailable: $error")
+        emptyList()
     }
 
     private fun ApplicationInfo.toInstalledApp(
