@@ -158,9 +158,9 @@ class OtherVpnRoutingTest {
     fun `cleanup removes mirrored rules and treats them as owned state`() {
         val command = TproxyManager.cleanupCommand(null, APP_UID)
 
-        assertTrue(command.contains("while ip rule del fwmark 0x10000000/0x10020000 pref 9980 2>/dev/null; do :; done"))
-        assertTrue(command.contains("while ip -6 rule del fwmark 0x10000000/0x10020000 pref 9980 2>/dev/null; do :; done"))
-        assertTrue(command.contains("grep -Fq 'fwmark 0x10000000/0x10020000'"))
+        assertTrue(command.contains("rule del fwmark 0x10000000/0x10020000 pref 9980\$newline"))
+        assertTrue(command.contains("ip -6 -force -batch -"))
+        assertTrue(command.contains("case \"\$rules\" in *'fwmark 0x10000000/0x10020000'*) false;; esac"))
     }
 
     @Test

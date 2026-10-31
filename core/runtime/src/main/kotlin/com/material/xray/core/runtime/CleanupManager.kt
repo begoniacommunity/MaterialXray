@@ -133,10 +133,13 @@ internal fun ownedProcessStopCommand(configPath: String, appGid: Int, persistedP
     append("if is_owned \"\$pid\"; then owned=\"\$owned \$pid\"; fi; done; ")
     append("for pid in \$owned; do if is_owned \"\$pid\"; then kill \"\$pid\" 2>/dev/null || ")
     append("{ if is_owned \"\$pid\"; then exit 1; fi; }; fi; done; ")
-    append("attempt=0; while [ \$attempt -lt 20 ]; do alive=''; for pid in \$owned; do ")
-    append("if is_owned \"\$pid\"; then alive=\"\$alive \$pid\"; fi; ")
+    // A core usually exits within a few tens of milliseconds of SIGTERM, so a fine poll saves most
+    // of a coarse interval on every disconnect. The poll only asks whether the pid is still there,
+    // which starts no process; every kill below checks ownership again before signalling.
+    append("attempt=0; while [ \$attempt -lt 100 ]; do alive=''; for pid in \$owned; do ")
+    append("if [ -d \"/proc/\$pid\" ]; then alive=\"\$alive \$pid\"; fi; ")
     append("done; [ -z \"\$alive\" ] && break; ")
-    append("sleep 0.05; attempt=\$((attempt + 1)); done; ")
+    append("sleep 0.01; attempt=\$((attempt + 1)); done; ")
     append("for pid in \$alive; do if is_owned \"\$pid\"; then kill -9 \"\$pid\" 2>/dev/null || ")
     append("{ if is_owned \"\$pid\"; then exit 1; fi; }; fi; done; ")
     append("[ -z \"\$alive\" ] || sleep 0.05; for pid in \$alive; do if is_owned \"\$pid\"; then exit 1; ")

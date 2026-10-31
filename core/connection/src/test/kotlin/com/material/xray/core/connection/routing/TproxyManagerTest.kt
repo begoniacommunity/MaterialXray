@@ -3,6 +3,7 @@ package com.material.xray.core.connection.routing
 import com.material.xray.core.root.RootShell
 import com.material.xray.core.xray.FirewallCommands
 import com.material.xray.core.xray.LocalAddresses
+import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -281,7 +282,7 @@ class TproxyManagerTest {
             commands += command
             when {
                 command.startsWith("ip rule show") -> RootShell.Result(0, "\n__MXRAY_TPROXY_ROUTES__\n", "")
-                command.contains("-restore") -> RootShell.Result(127, "", "")
+                command.contains("command -v iptables-restore") -> RootShell.Result(127, "", "")
                 else -> RootShell.Result(0, "", "")
             }
         }
@@ -348,6 +349,58 @@ class TproxyManagerTest {
 
         assertFalse(manager.activate(plan()).success)
         assertEquals(4, calls)
+    }
+
+    @Test
+    fun `cleanup deletes through one restore per table and falls back to single commands`() {
+        fun run(restoreWorks: Boolean, filterOrphan: Boolean = false): Pair<Int, String> {
+            val log = File.createTempFile("cleanup", ".log").apply { deleteOnExit() }
+            val stubs = """
+                log() { echo "${'$'}*" >> ${log.absolutePath}; }
+                iptables-restore() { log "restore ${'$'}(cat | tr '\n' ' ')"; return ${if (restoreWorks) 0 else 1}; }
+                ip6tables-restore() { iptables-restore "${'$'}@"; }
+                iptables() {
+                    case "${'$'}*" in
+                        *'-t mangle -S') printf '%s\n' '-N MXO278b' '-A OUTPUT -j MXO278b';;
+                        *'-t filter -S') ${if (filterOrphan) "printf '%s\\n' '-N MXO278b'" else ":"};;
+                        *' -S') ;;
+                        *) log "single ${'$'}*";;
+                    esac
+                }
+                ip6tables() { case "${'$'}*" in *' -S') ;; *) log "single ${'$'}*";; esac; }
+                ip() {
+                    case "${'$'}*" in
+                        'rule show') [ -e ${log.absolutePath}.ip ] || printf '9990:\tfrom all fwmark 0x10000000/0x10000000 lookup 300 \n';;
+                        *'-batch -') log "ip ${'$'}1 batch ${'$'}(cat | tr '\n' ' ')"; : > ${log.absolutePath}.ip;;
+                        *'rule del'*) return 1;;
+                    esac
+                }
+            """.trimIndent()
+            val exitCode = ProcessBuilder("bash", "-c", "$stubs\n${TproxyManager.cleanupCommand(null, APP_UID)}").start().waitFor()
+            File(log.absolutePath + ".ip").delete()
+            return exitCode to log.readText()
+        }
+
+        val (batchedExit, batched) = run(restoreWorks = true)
+        assertEquals(batched, 0, batchedExit)
+        assertTrue(batched, batched.contains("restore *mangle -D OUTPUT -j MXO278b -F MXO278b -X MXO278b COMMIT"))
+        assertFalse(batched, batched.contains("single"))
+        assertTrue(
+            batched,
+            batched.contains("ip -force batch route del local 0.0.0.0/0 dev lo table 300 rule del fwmark 0x10000000/0x10000000 pref 9990"),
+        )
+        assertFalse(batched, batched.contains("ip -6"))
+
+        // The stubbed chain never goes away, so the fallback's read-back reports it.
+        val (fallbackExit, fallback) = run(restoreWorks = false)
+        assertTrue(fallback.contains("single -w 2 -t mangle -D OUTPUT -j MXO278b"))
+        assertEquals(1, fallbackExit)
+
+        // No deletion is queued for an owned chain in a table the batch does not target, so the
+        // single commands and the read-back run instead of reporting it clean.
+        val (orphanExit, orphan) = run(restoreWorks = true, filterOrphan = true)
+        assertFalse(orphan, orphan.contains("restore"))
+        assertEquals(1, orphanExit)
     }
 
     @Test

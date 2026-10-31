@@ -805,16 +805,8 @@ class TproxyManager internal constructor(
                 commands += "$IPV6 -t filter -F $chain 2>/dev/null || true"
                 commands += "$IPV6 -t filter -X $chain 2>/dev/null || true"
             }
-            commands += discoveredRouteTableCleanupCommand("ip", prefix, mask, priority)
-            commands += discoveredRouteTableCleanupCommand("ip -6", prefix, mask, priority)
-            commands += "while ip rule del fwmark $prefix/$mask pref $priority 2>/dev/null; do :; done"
-            commands += "while ip -6 rule del fwmark $prefix/$mask pref $priority 2>/dev/null; do :; done"
-            commands += "while ip rule del fwmark $mirrorSelector pref $OTHER_VPN_RULE_PRIORITY 2>/dev/null; do :; done"
-            commands += "while ip -6 rule del fwmark $mirrorSelector pref $OTHER_VPN_RULE_PRIORITY 2>/dev/null; do :; done"
-            table?.let {
-                commands += "ip route del local 0.0.0.0/0 dev lo table $it 2>/dev/null || true"
-                commands += "ip -6 route del local ::/0 dev lo table $it 2>/dev/null || true"
-                commands += "ip -6 route del unreachable default table $it 2>/dev/null || true"
+            for (ipCommand in listOf("ip", "ip -6")) {
+                commands += ipRoutingCleanupCommand(ipCommand, prefix, mask, priority, mirrorSelector, table)
             }
             val tetherSlots = listOf(SLOT_A, SLOT_B).flatMap { slot ->
                 listOf(names.tetherSlot(slot), names.tetherForwardSlot(slot), names.tetherInputSlot(slot))
@@ -822,19 +814,20 @@ class TproxyManager internal constructor(
             val ownedChains = listOf(names.output, names.slotA, names.slotB, names.prerouting, names.prerouting + "I", names.prerouting + "L", names.guard + "P") +
                 tetherSlots +
                 listOf(names.guard, names.guard + "I").takeUnless { preserveGuard }.orEmpty()
-            commands += FirewallCommands.absentChains(ownedChains)
+            val absentChains = FirewallCommands.absentChains(ownedChains)
+            // Matched with case rather than piped through grep: printf and grep are separate
+            // executables on Android, and this check runs on every disconnect.
             val routingAbsent = buildList {
                 for (ipCommand in listOf("ip", "ip -6")) {
                     add("rules=\$($ipCommand rule show) || false")
-                    add("! printf '%s\\n' \"\$rules\" | grep -Fq 'fwmark $prefix/$mask'")
-                    add("! printf '%s\\n' \"\$rules\" | grep -Fq 'fwmark $mirrorSelector'")
+                    add("case \"\$rules\" in *'fwmark $prefix/$mask'*) false;; esac")
+                    add("case \"\$rules\" in *'fwmark $mirrorSelector'*) false;; esac")
                     table?.let { routeTable ->
                         add("routes=\$($ipCommand route show table $routeTable) || false")
                         add("[ -z \"\$routes\" ]")
                     }
                 }
             }.shellAnd()
-            commands += routingAbsent
             val snapshots = "v4_mangle_rules=\$($IPV4 -t mangle -S) && " +
                 "v4_filter_rules=\$($IPV4 -t filter -S) && " +
                 "v6_mangle_rules=\$($IPV6 -t mangle -S) && " +
@@ -845,9 +838,16 @@ class TproxyManager internal constructor(
                 "for rules in \"\$v4_mangle_rules\" \"\$v4_filter_rules\" \"\$v6_mangle_rules\" \"\$v6_filter_rules\"; do " +
                 "if has_line \"\$rules\" \"-N \$chain\"; then owned=1; break 2; fi; done; done"
             val noOwnedState = "[ -z \"\$owned\" ] && $routingAbsent"
-            val selectiveCleanup = commands.joinToString("; ") { conditionalFirewallCleanup(it) }
+            val (firewallCommands, routingCommands) = commands.partition { FIREWALL_CLEANUP_COMMAND.matches(it) }
+            val individualCleanup = firewallCommands.joinToString("; ") { conditionalFirewallCleanup(it) }
+            // One iptables-restore per table replaces a process per deleted hook and chain. Restore
+            // commits each table atomically, so its success proves the chains gone; any failure
+            // falls back to the individual commands and the read-back they always had.
+            val firewallCleanup = "${batchedFirewallCleanup(firewallCommands, ownedChains)}; " +
+                "if [ -z \"\$batched\" ]; then $individualCleanup; $absentChains; fi"
+            val cleanup = (listOf(firewallCleanup) + routingCommands + routingAbsent).joinToString("; ")
             return "$hasLine; $snapshots || exit 1; $ownedChainCheck; " +
-                "if $noOwnedState; then true; else $selectiveCleanup; fi"
+                "if $noOwnedState; then true; else $cleanup; fi"
         }
 
         fun guardCleanupCommand(appUid: Int, includeFilterTables: Boolean = true): String {
@@ -1523,15 +1523,80 @@ private fun conditionalFirewallCleanup(command: String): String {
     return "if has_line \"\$$snapshot\" ${shellQuote(rule)}; then $command; fi"
 }
 
-private fun discoveredRouteTableCleanupCommand(
+/**
+ * Collects the deletions [conditionalFirewallCleanup] would run one by one into a restore payload
+ * per table, from the same snapshots, and applies them. Leaves `batched` set only when every owned
+ * chain the snapshots show has a deletion queued and every non-empty table committed; otherwise the
+ * caller runs the single commands and reads the tables back. Payload lines hold only chain names,
+ * so the echo builtin carries them safely.
+ */
+private fun batchedFirewallCleanup(commands: List<String>, ownedChains: List<String>): String {
+    val deletions = commands.mapNotNull { FIREWALL_CLEANUP_COMMAND.matchEntire(it)?.groupValues }.map { groups ->
+        val tool = groups[1]
+        val table = groups[2]
+        val action = groups[3]
+        val chain = groups[4]
+        val existing = if (action == "D") "-A $chain -j ${groups[5]}" else "-N $chain"
+        val line = if (action == "D") "-D $chain -j ${groups[5]}" else "-$action $chain"
+        BatchedDeletion(tool, table, "${if (tool == "iptables") "v4" else "v6"}_$table", existing, line)
+    }
+    val batches = deletions.distinctBy { it.snapshot }
+    val snapshots = listOf("v4_mangle", "v4_filter", "v6_mangle", "v6_filter")
+    val reset = snapshots.joinToString("; ") { "${it}_batch=" }
+    val coverage = snapshots.joinToString("; ") { snapshot ->
+        "for chain in ${ownedChains.joinToString(" ")}; do if has_line \"\$${snapshot}_rules\" \"-N \$chain\" && " +
+            "! has_line \"\$${snapshot}_batch\" \"-X \$chain\"; then batched=; fi; done"
+    }
+    val collect = deletions.joinToString("; ") { deletion ->
+        "if has_line \"\$${deletion.snapshot}_rules\" ${shellQuote(deletion.existing)}; then " +
+            "${deletion.snapshot}_batch=\"\$${deletion.snapshot}_batch${deletion.line}\$newline\"; fi"
+    }
+    val apply = batches.joinToString("; ") { batch ->
+        val restore = FirewallCommands.restore(if (batch.tool == "iptables") IPV4 else IPV6)
+        "if [ -n \"\$${batch.snapshot}_batch\" ]; then echo \"*${batch.table}\$newline\$${batch.snapshot}_batch\"COMMIT | " +
+            "$restore 2>/dev/null || batched=; fi"
+    }
+    return "batched=1; $reset; $collect; $coverage; if [ -n \"\$batched\" ]; then $apply; fi"
+}
+
+private data class BatchedDeletion(
+    val tool: String,
+    val table: String,
+    val snapshot: String,
+    val existing: String,
+    val line: String,
+)
+
+/**
+ * Removes one IP family's TPROXY rules and routes through a single `ip -batch`, planned from one
+ * rule listing with shell builtins: every `ip` process costs more than the change it makes. A
+ * listing that cannot be read leaves the batch empty, and the caller's read-back fails the stage.
+ */
+private fun ipRoutingCleanupCommand(
     ipCommand: String,
     prefix: String,
     mask: String,
     priority: Int,
-): String = "tables=\$($ipCommand rule show 2>/dev/null | while IFS= read -r line; do " +
-    "case \"\$line\" in \"$priority:\"*\"fwmark $prefix/$mask\"*) " +
-    "previous=''; for field in \$line; do " +
-    "[ \"\$previous\" = lookup ] && printf '%s\\n' \"\$field\"; previous=\$field; done;; esac; done); " +
-    "for table in \$tables; do case \"\$table\" in ''|*[!0-9]*) continue;; esac; " +
-    "$ipCommand route del local ${if (ipCommand == "ip -6") "::/0" else "0.0.0.0/0"} " +
-    "dev lo table \"\$table\" 2>/dev/null || true; done"
+    mirrorSelector: String,
+    table: Int?,
+): String {
+    val anyAddress = if (ipCommand == "ip -6") "::/0" else "0.0.0.0/0"
+    val mirrorPriority = TproxyManager.OTHER_VPN_RULE_PRIORITY
+    val knownRoutes = buildList {
+        table?.let {
+            add("route del local $anyAddress dev lo table $it")
+            if (ipCommand == "ip -6") add("route del unreachable default table $it")
+        }
+    }
+    val plan = "ip_rules=\$($ipCommand rule show 2>/dev/null); ip_batch=; set -f; ip_ifs=\$IFS; IFS=\$newline; " +
+        "for line in \$ip_rules; do case \"\$line\" in " +
+        "\"$priority:\"*\"fwmark $prefix/$mask\"*) ip_table=\${line##*lookup }; ip_table=\${ip_table%% *}; " +
+        "case \"\$ip_table\" in ''|*[!0-9]*) ;; " +
+        "*) ip_batch=\"\${ip_batch}route del local $anyAddress dev lo table \$ip_table\$newline\";; esac; " +
+        "ip_batch=\"\${ip_batch}rule del fwmark $prefix/$mask pref $priority\$newline\";; " +
+        "\"$mirrorPriority:\"*\"fwmark $mirrorSelector\"*) " +
+        "ip_batch=\"\${ip_batch}rule del fwmark $mirrorSelector pref $mirrorPriority\$newline\";; " +
+        "esac; done; IFS=\$ip_ifs; set +f" +
+        knownRoutes.joinToString("") { "; ip_batch=\"\${ip_batch}$it\$newline\"" }
+    return "$plan; [ -z \"\$ip_batch\" ] || echo \"\$ip_batch\" | $ipCommand -force -batch - >/dev/null 2>&1; true"
+}
