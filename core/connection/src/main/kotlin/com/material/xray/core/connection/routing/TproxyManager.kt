@@ -414,6 +414,7 @@ class TproxyManager internal constructor(
         const val OTHER_VPN_RULE_PRIORITY = 9_980
         private const val ACTIVATION_INSPECTION_SEPARATOR = "__MXRAY_TPROXY_ROUTES__"
         private const val COMMAND_NOT_FOUND_EXIT_CODE = 127
+        private const val GUARD_REUSED_FLAG = "guard_reused"
 
         fun createRuntimeState(
             routeTable: Int,
@@ -511,7 +512,7 @@ class TproxyManager internal constructor(
                     val setup = FirewallRestoreBatch(tool, "mangle", guardSetupCommands(tool, guard, plan, appUid))
                     val refresh = FirewallRestoreBatch(tool, "mangle", guardRefreshCommands(tool, guard, plan, appUid))
                     add(
-                        "if $tool -t mangle -S $guard >/dev/null 2>&1; then " +
+                        "if $tool -t mangle -S $guard >/dev/null 2>&1; then $GUARD_REUSED_FLAG=1; " +
                             "if $tool -t mangle -C OUTPUT -j $guard 2>/dev/null; then ${refresh.command()}; else " +
                             "${guardMangleCleanupCommands(tool, guard).joinToString("; ")}; ${setup.command()}; fi; " +
                             "else ${setup.command()}; fi",
@@ -521,7 +522,8 @@ class TproxyManager internal constructor(
                         val filterRefresh = FirewallRestoreBatch(tool, "filter", tetherGuardRefreshCommands(tool, guard, plan))
                         add(
                             "if $tool -t filter -C INPUT -j ${guard}I 2>/dev/null && " +
-                                "$tool -t filter -C FORWARD -j $guard 2>/dev/null; then ${filterRefresh.command()}; else " +
+                                "$tool -t filter -C FORWARD -j $guard 2>/dev/null; then " +
+                                "$GUARD_REUSED_FLAG=1; ${filterRefresh.command()}; else " +
                                 "${conditionalTetherGuardCleanup(tool, guard)}; " +
                                 "${filterSetup.command()}; fi",
                         )
@@ -530,8 +532,11 @@ class TproxyManager internal constructor(
                     }
                 }
             }
-            val guardedRestore = "if ${restores.shellAnd()}; " +
-                "then ${guardPlanVerifyCommand(plan, appUid)}; else status=\$?; " +
+            // A guard restored from nothing is complete once iptables-restore commits; only one built
+            // on chains or hooks that already existed needs reading back.
+            val guardedRestore = "$GUARD_REUSED_FLAG=; if ${restores.shellAnd()}; " +
+                "then if [ -n \"\$$GUARD_REUSED_FLAG\" ]; then ${guardPlanVerifyCommand(plan, appUid)}; fi; " +
+                "else status=\$?; " +
                 "if ${guardHookVerifyCommand(plan, appUid)}; then true; else ${guardCleanupCommand(appUid)}; fi; " +
                 "exit \$status; fi"
             return if (checkSupport) {
@@ -934,7 +939,7 @@ class TproxyManager internal constructor(
         )
 
         private fun conditionalTetherGuardCleanup(tool: String, chain: String): String = "if $tool -t filter -S $chain >/dev/null 2>&1 || " +
-            "$tool -t filter -S ${chain}I >/dev/null 2>&1; then " +
+            "$tool -t filter -S ${chain}I >/dev/null 2>&1; then $GUARD_REUSED_FLAG=1; " +
             "${tetherGuardCleanupCommands(tool, chain).joinToString("; ")}; fi"
 
         private fun tetherGuardSetupCommands(tool: String, chain: String, plan: TproxyTrafficPlan): List<String> = buildList {

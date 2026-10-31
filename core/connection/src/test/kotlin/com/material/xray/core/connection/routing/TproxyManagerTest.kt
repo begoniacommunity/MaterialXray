@@ -378,6 +378,38 @@ class TproxyManagerTest {
     }
 
     @Test
+    fun `guard restore reads back only a guard built on existing chains`() {
+        fun run(chainExists: Boolean, tether: String?): Pair<Int, Boolean> {
+            val existing = if (chainExists) "0" else "1"
+            val stubs = """
+                iptables-restore() {
+                    case "${'$'}*" in *--help*) printf '%s\n' '--noflush --wait';; *) cat >/dev/null;; esac
+                }
+                ip6tables-restore() { iptables-restore "${'$'}@"; }
+                iptables() {
+                    case "${'$'}*" in
+                        *'-S OUTPUT'*|*'-S INPUT'*|*'-S FORWARD'*) echo verified >&2; return 1;;
+                        *' -S MXG278b'|*' -S MXG278bI'|*' -C '*) return $existing;;
+                        *) return 0;;
+                    esac
+                }
+                ip6tables() { iptables "${'$'}@"; }
+            """.trimIndent()
+            val command = TproxyManager.guardRestoreCommand(plan(tetherUpstreamInterface = tether), APP_UID)
+            val process = ProcessBuilder("bash", "-c", "$stubs\n$command").start()
+            val exitCode = process.waitFor()
+            return exitCode to process.errorStream.bufferedReader().readText().contains("verified")
+        }
+
+        for (tether in listOf(null, "wlan0")) {
+            assertEquals(tether.toString(), 0 to false, run(chainExists = false, tether = tether))
+            val (exitCode, verified) = run(chainExists = true, tether = tether)
+            assertTrue(tether.toString(), verified)
+            assertTrue(tether.toString(), exitCode != 0)
+        }
+    }
+
+    @Test
     fun `non tether cleanup cannot hide a failed standalone guard setup`() {
         val stubs = "iptables() { return 1; }; ip6tables() { return 1; }; "
         val command = TproxyManager.guardInstallCommand(plan(), APP_UID)
@@ -788,7 +820,7 @@ class TproxyManagerTest {
         for (tool in FirewallCommands.tools) {
             assertTrue(
                 command.contains(
-                    "if $tool -t mangle -S MXG278b >/dev/null 2>&1; then " +
+                    "if $tool -t mangle -S MXG278b >/dev/null 2>&1; then guard_reused=1; " +
                         "if $tool -t mangle -C OUTPUT -j MXG278b 2>/dev/null; then",
                 ),
             )
@@ -796,7 +828,7 @@ class TproxyManagerTest {
             assertTrue(
                 command.contains(
                     "if $tool -t filter -S MXG278b >/dev/null 2>&1 || " +
-                        "$tool -t filter -S MXG278bI >/dev/null 2>&1; then " +
+                        "$tool -t filter -S MXG278bI >/dev/null 2>&1; then guard_reused=1; " +
                         "$tool -t filter -D INPUT -j MXG278b",
                 ),
             )
