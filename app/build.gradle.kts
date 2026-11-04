@@ -481,6 +481,14 @@ sentry {
     // uploads need the token.
     autoUploadProguardMapping.set(sentryAuthToken.map { true }.orElse(false))
     includeSourceContext.set(true)
+    // Sentry only collects this module's sources by default, and nearly all the code lives elsewhere.
+    additionalSourceDirsForSourceContext.set(
+        rootProject.subprojects
+            .filter { it != project }
+            .map { it.projectDir.resolve("src/main/kotlin") }
+            .filter(File::isDirectory)
+            .map(File::getPath),
+    )
     autoUploadSourceContext.set(sentryAuthToken.map { true }.orElse(false))
     uploadNativeSymbols.set(sentryAuthToken.map { true }.orElse(false))
     includeNativeSources.set(sentryAuthToken.map { true }.orElse(false))
