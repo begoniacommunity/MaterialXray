@@ -1,5 +1,6 @@
 import io.sentry.android.gradle.sourcecontext.GenerateBundleIdTask
 import io.sentry.android.gradle.sourcecontext.UploadSourceBundleTask
+import io.sentry.android.gradle.tasks.SentryGenerateProguardUuidTask
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
@@ -512,6 +513,19 @@ tasks.withType<GenerateBundleIdTask>().configureEach {
         }
         val bundleId = UUID.nameUUIDFromBytes(digest.digest())
         properties.get().asFile.writeText("io.sentry.bundle-ids=$bundleId\n")
+    }
+}
+// R8 writes a few mapping lines in a different order from run to run, and Sentry hashes the whole
+// file into the mapping's UUID. R8's own map id stays the same, so the UUID is derived from it.
+tasks.withType<SentryGenerateProguardUuidTask>().configureEach {
+    val mapping = mappingFile
+    val properties = outputFile
+    doLast {
+        val mapId = mapping.get().asFile.useLines { lines ->
+            lines.take(20).firstOrNull { it.startsWith("# pg_map_id: ") }?.substringAfter("# pg_map_id: ")
+        }
+        checkNotNull(mapId) { "The R8 mapping file has no pg_map_id" }
+        properties.get().asFile.writeText("io.sentry.ProguardUuids=${UUID.nameUUIDFromBytes(mapId.toByteArray())}\n")
     }
 }
 // Without uploading, sentry-cli still asks for the token, so a tokenless build skips the task.
