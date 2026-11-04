@@ -35,7 +35,7 @@ The protocol definitions under `app/src/main/proto/` are reduced, Java-targeted 
 - Upstream data: https://hg.mozilla.org/projects/nss/file/tip/lib/ckfw/builtins/certdata.txt
 - License: Mozilla Public License 2.0; see `legal/licenses/MPL-2.0.txt`
 
-Material Xray uses this bundle only as an additive trust fallback on Android 7 after the platform trust store rejects a certificate chain.
+Material Xray uses this bundle only on Android 7, as roots trusted in addition to the platform trust store.
 
 ## Apache-2.0 Components
 

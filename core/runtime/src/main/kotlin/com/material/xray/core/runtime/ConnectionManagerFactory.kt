@@ -189,8 +189,14 @@ class ConnectionManagerFactory(
         AndroidRootCertificateBundle(
             refreshScope = CoroutineScope(SupervisorJob() + ioDispatcher),
             loadBundledCertificates = {
-                context.resources.openRawResource(R.raw.mozilla_ca_bundle).use { input ->
-                    loadX509Certificates(input).map { certificate -> certificate.encoded }
+                // Android 7 lacks root CAs that current certificate chains depend on; later versions
+                // keep their own store current, so the core trusts exactly what the system trusts.
+                if (Build.VERSION.SDK_INT in Build.VERSION_CODES.N..Build.VERSION_CODES.N_MR1) {
+                    context.resources.openRawResource(R.raw.mozilla_ca_bundle).use { input ->
+                        loadX509Certificates(input).map { certificate -> certificate.encoded }
+                    }
+                } else {
+                    emptyList()
                 }
             },
         )
