@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.material.xray.core.data.parser.ProfileRouting
 import com.material.xray.core.data.parser.ProfileRoutingRule
 import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.RoutingRuleScope
@@ -89,19 +90,18 @@ internal fun RoutingRulesTab(
     scopeOrder: List<RoutingRuleScope>,
     customRules: List<RoutingRule>,
     subscriptionRules: List<RoutingRule>,
-    profileRules: List<ProfileRoutingRule>,
-    profileServerId: Long?,
+    profileRouting: ProfileRouting?,
     canResetSubscriptionRules: Boolean,
     providerManaged: Boolean,
     providerName: String?,
     providerGeoDataNotice: ProviderGeoDataNotice?,
-    onProviderGeoDataNoticeClick: () -> Unit,
     selectionMode: Boolean,
     selectedRuleIds: Set<String>,
-    onSelectionChange: (Set<String>) -> Unit,
     actions: RoutingRuleActions,
     contentBottomPadding: Dp = 16.dp,
 ) {
+    val profileRules = profileRouting?.rules.orEmpty()
+    val profileServerId = profileRouting?.serverId
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val edgeSize = with(LocalDensity.current) { 64.dp.toPx() }
@@ -130,7 +130,7 @@ internal fun RoutingRulesTab(
         listState = listState,
         keys = visibleScopes.flatMap { scope -> rows.getValue(scope).map { it.key } },
         selectedKeys = selectedRuleIds,
-        onSelectionChange = onSelectionChange,
+        onSelectionChange = actions.onSelectionChange,
         // List inset + card padding + the complete trailing control slot.
         protectedEnd = 16.dp + 16.dp + 52.dp,
         startOnItemOnly = true,
@@ -177,7 +177,7 @@ internal fun RoutingRulesTab(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 if (providerManaged) item(key = "providerRoutingBanner") { ProviderManagedBanner(customRules.isNotEmpty(), providerName) }
-                if (providerGeoDataNotice != null) item(key = "providerGeoDataBanner") { ProviderGeoDataBanner(providerGeoDataNotice, onProviderGeoDataNoticeClick) }
+                if (providerGeoDataNotice != null) item(key = "providerGeoDataBanner") { ProviderGeoDataBanner(providerGeoDataNotice, actions.onProviderGeoDataNoticeClick) }
                 visibleScopes.forEach { scope ->
                     val headerKey = scope.headerKey()
                     item(key = headerKey, contentType = "routingScopeHeader") {

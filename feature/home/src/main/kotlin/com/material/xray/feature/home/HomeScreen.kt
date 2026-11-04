@@ -442,13 +442,11 @@ fun HomeScreen(
                         refreshFeedback = uiState.subscriptionRefreshFeedback[subscription.id],
                         servers = servers,
                         selectedServerId = uiState.selectedServerId,
-                        defaultPingMethod = uiState.defaultPingMethod,
-                        showBothLatencyResults = uiState.showBothLatencyResults,
+                        latencyTest = LatencyTestSettings(uiState.defaultPingMethod, uiState.showBothLatencyResults),
                         canApplyRouting = canApplyRouting,
                         canCollapse = subscriptions.size > 1,
                         expanded = subscription.id !in collapsedSubscriptionIds,
-                        canReorder = subscriptions.size > 1,
-                        reorderState = subscriptionReorder,
+                        reorderState = subscriptionReorder.takeIf { subscriptions.size > 1 },
                         focusRequester = subscriptionFocus.forSubscription(subscription.id),
                         actions = SubscriptionCardActions(
                             onExpandedChange = { expanded ->
@@ -1940,6 +1938,9 @@ private fun AddSubscriptionActionButton(
     }
 }
 
+/** How a subscription card's latency test button probes its servers. */
+private data class LatencyTestSettings(val pingMethod: PingMethod, val testBoth: Boolean)
+
 /** Everything a subscription card and its header menu can trigger. */
 private data class SubscriptionCardActions(
     val onExpandedChange: (Boolean) -> Unit,
@@ -1964,13 +1965,11 @@ private fun SubscriptionCard(
     refreshFeedback: ActionFeedback?,
     servers: List<ServerListItem>,
     selectedServerId: Long,
-    defaultPingMethod: PingMethod,
-    showBothLatencyResults: Boolean,
+    latencyTest: LatencyTestSettings,
     canApplyRouting: Boolean,
     canCollapse: Boolean,
     expanded: Boolean,
-    canReorder: Boolean,
-    reorderState: SubscriptionReorderState,
+    reorderState: SubscriptionReorderState?,
     focusRequester: FocusRequester,
     actions: SubscriptionCardActions,
 ) {
@@ -1992,7 +1991,7 @@ private fun SubscriptionCard(
         buildSubscriptionMetadataUiState(subscription, resources)
     }
 
-    val reorderModifier = if (canReorder) {
+    val reorderModifier = if (reorderState != null) {
         Modifier.semantics {
             customActions = listOf(
                 CustomAccessibilityAction(moveUp) { reorderState.moveAccessible(subscription.id, -1) },
@@ -2038,12 +2037,11 @@ private fun SubscriptionCard(
                 isRefreshing = isRefreshing,
                 refreshFeedback = refreshFeedback,
                 metadata = metadata,
-                defaultPingMethod = defaultPingMethod,
-                showBothLatencyResults = showBothLatencyResults,
+                latencyTest = latencyTest,
                 canCollapse = canCollapse,
                 expanded = expanded,
                 reorderModifier = reorderModifier,
-                reordering = reorderState.draggingId != null,
+                reordering = reorderState?.draggingId != null,
                 canApplyRouting = canApplyRouting,
                 actions = actions,
             )
@@ -2268,8 +2266,7 @@ private fun SubscriptionHeader(
     isRefreshing: Boolean,
     refreshFeedback: ActionFeedback?,
     metadata: SubscriptionMetadataUiState,
-    defaultPingMethod: PingMethod,
-    showBothLatencyResults: Boolean,
+    latencyTest: LatencyTestSettings,
     canCollapse: Boolean,
     expanded: Boolean,
     reorderModifier: Modifier,
@@ -2421,7 +2418,7 @@ private fun SubscriptionHeader(
                     contentDescription = stringResource(
                         R.string.home_subscription_test_content_description,
                         subscription.name,
-                        defaultPingMethod.value,
+                        latencyTest.pingMethod.value,
                     ),
                 )
             }
@@ -2529,8 +2526,8 @@ private fun SubscriptionHeader(
 
     if (showPingMethodDialog) {
         PingMethodDialog(
-            selectedMethod = defaultPingMethod,
-            testBoth = showBothLatencyResults,
+            selectedMethod = latencyTest.pingMethod,
+            testBoth = latencyTest.testBoth,
             onTestBothChange = actions.onShowBothLatencyResultsChange,
             onDismiss = { showPingMethodDialog = false },
             onSelected = { method ->

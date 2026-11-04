@@ -252,17 +252,16 @@ fun RoutingScreen(
             scopeOrder = scopeOrder,
             customRules = rules,
             subscriptionRules = subscriptionRules,
-            profileRules = profileRouting?.rules.orEmpty(),
-            profileServerId = profileRouting?.serverId,
+            profileRouting = profileRouting,
             canResetSubscriptionRules = canResetSubscriptionRules(subscriptionSources, subscriptionSourceId),
             providerManaged = routingPolicyControl == RoutingPolicyControl.SubscriptionProvider,
             providerName = automaticRoutingProviderName,
             providerGeoDataNotice = providerGeoDataNotice,
-            onProviderGeoDataNoticeClick = viewModel::onProviderGeoDataNoticeClick,
             selectionMode = selectionMode,
             selectedRuleIds = selectedRuleIds,
-            onSelectionChange = { selectedRuleIds = it },
             actions = RoutingRuleActions(
+                onSelectionChange = { selectedRuleIds = it },
+                onProviderGeoDataNoticeClick = viewModel::onProviderGeoDataNoticeClick,
                 onRuleToggled = { rule, enabled -> applyRuleAction(RoutingRuleAction.Toggle(rule, enabled)) },
                 onRuleClick = { rule ->
                     if (selectionMode) {
@@ -842,6 +841,8 @@ internal fun ProviderGeoDataBanner(
 
 /** What tapping, long-pressing and toggling the listed rules does. */
 internal data class RoutingRuleActions(
+    val onSelectionChange: (Set<String>) -> Unit,
+    val onProviderGeoDataNoticeClick: () -> Unit,
     val onRuleToggled: (RoutingRule, Boolean) -> Unit,
     val onRuleClick: (RoutingRule) -> Unit,
     val onRuleLongClick: (RoutingRule) -> Unit,
