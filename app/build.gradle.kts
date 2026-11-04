@@ -1,7 +1,10 @@
+import io.sentry.android.gradle.sourcecontext.GenerateBundleIdTask
+import io.sentry.android.gradle.sourcecontext.UploadSourceBundleTask
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Properties
+import java.util.UUID
 import java.util.zip.ZipFile
 import javax.inject.Inject
 import org.gradle.api.DefaultTask
@@ -474,10 +477,39 @@ sentry {
     tracingInstrumentation {
         enabled.set(false)
     }
+    // The APK must not depend on the token, so its source bundle id is always generated; only the
+    // uploads need the token.
     autoUploadProguardMapping.set(sentryAuthToken.map { true }.orElse(false))
-    includeSourceContext.set(sentryAuthToken.map { true }.orElse(false))
+    includeSourceContext.set(true)
+    autoUploadSourceContext.set(sentryAuthToken.map { true }.orElse(false))
     uploadNativeSymbols.set(sentryAuthToken.map { true }.orElse(false))
     includeNativeSources.set(sentryAuthToken.map { true }.orElse(false))
+}
+
+// Sentry names the source bundle with a random UUID, which would make every release APK unique.
+// Deriving it from the bundled sources keeps the APK reproducible and still changes with the code.
+tasks.withType<GenerateBundleIdTask>().configureEach {
+    val sources = sourceDirs
+    val properties = outputFile
+    doLast {
+        val files = buildList {
+            sources.asFileTree.visit { if (!isDirectory) add(relativePath.pathString to file) }
+        }.sortedBy { it.first }
+        val digest = MessageDigest.getInstance("SHA-256")
+        files.forEach { (path, file) ->
+            digest.update(path.toByteArray())
+            digest.update(0)
+            digest.update(file.readBytes())
+            digest.update(0)
+        }
+        val bundleId = UUID.nameUUIDFromBytes(digest.digest())
+        properties.get().asFile.writeText("io.sentry.bundle-ids=$bundleId\n")
+    }
+}
+// Without uploading, sentry-cli still asks for the token, so a tokenless build skips the task.
+tasks.withType<UploadSourceBundleTask>().configureEach {
+    val hasToken = sentryAuthToken.map { true }.orElse(false)
+    onlyIf { hasToken.get() }
 }
 
 androidComponents {
