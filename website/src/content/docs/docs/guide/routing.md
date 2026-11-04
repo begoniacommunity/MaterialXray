@@ -61,7 +61,7 @@ A rule with no conditions matches **all** traffic, so no rule below it is ever r
 
 ## Geodata
 
-The APK bundles current `geoip.dat` and `geosite.dat` from [v2fly](https://github.com/v2fly), so a new install can connect without downloading anything. Settings lets you update them or point to custom download URLs.
+The APK bundles `geoip.dat` and `geosite.dat` from a pinned [v2fly](https://github.com/v2fly) release, so a new install can connect without downloading anything. Settings lets you update them or point to custom download URLs.
 
 ## Provider-managed routing
 

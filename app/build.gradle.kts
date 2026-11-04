@@ -93,48 +93,64 @@ abstract class ValidateReleaseTelemetry : DefaultTask() {
     }
 }
 
+/**
+ * Downloads the v2fly geodata releases recorded in `third_party/geodata`. Each file must match
+ * `CHECKSUMS.sha256`, so a build can only bundle the geodata `update-geodata.sh` verified.
+ */
+@CacheableTask
 abstract class DownloadGeoData : DefaultTask() {
     @get:Input
-    abstract val geoipUrl: Property<String>
+    abstract val geoipVersion: Property<String>
 
     @get:Input
-    abstract val geositeUrl: Property<String>
+    abstract val geositeVersion: Property<String>
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val checksums: RegularFileProperty
 
     @get:OutputDirectory
     abstract val outputDirectory: DirectoryProperty
 
     @TaskAction
     fun download() {
-        val output = outputDirectory.get().asFile.apply { mkdirs() }
-        fetch(geoipUrl.get(), File(output, "geoip.dat"))
-        fetch(geositeUrl.get(), File(output, "geosite.dat"))
+        val expectedSha256 = checksums.get().asFile.readLines()
+            .map { it.trim().split(Regex("\\s+"), limit = 2) }
+            .filter { it.size == 2 }
+            .associate { (sha256, name) -> name to sha256 }
+        fun expected(name: String) = requireNotNull(expectedSha256[name]) {
+            "third_party/geodata/CHECKSUMS.sha256 has no entry for $name; run scripts/update-geodata.sh"
+        }
+
+        val output = outputDirectory.get().asFile.apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        fetch("v2fly/geoip", geoipVersion.get(), "geoip.dat", File(output, "geoip.dat"), expected("geoip.dat"))
+        fetch("v2fly/domain-list-community", geositeVersion.get(), "dlc.dat", File(output, "geosite.dat"), expected("geosite.dat"))
     }
 
-    private fun fetch(url: String, target: File) {
-        val temporary = File(target.parentFile, "${target.name}.download")
-        try {
-            URI(url).toURL().openConnection().apply {
-                connectTimeout = 30_000
-                readTimeout = 60_000
-            }.getInputStream().use { input ->
-                temporary.outputStream().use { outputStream -> input.copyTo(outputStream) }
-            }
-            val digest = MessageDigest.getInstance("SHA-256")
-            temporary.inputStream().use { input ->
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    digest.update(buffer, 0, count)
-                }
-            }
-            check(temporary.length() > 1024L) { "Downloaded ${target.name} is unexpectedly small" }
-            val actualSha256 = digest.digest().joinToString("") { "%02x".format(it) }
-            logger.lifecycle("Bundled ${target.name}: SHA-256 $actualSha256")
-            check(temporary.renameTo(target)) { "Unable to install ${target.name}" }
-        } finally {
-            temporary.delete()
+    private fun fetch(repository: String, tag: String, asset: String, target: File, expectedSha256: String) {
+        URI("https://github.com/$repository/releases/download/$tag/$asset").toURL().openConnection().apply {
+            connectTimeout = 30_000
+            readTimeout = 60_000
+        }.getInputStream().use { input ->
+            target.outputStream().use { outputStream -> input.copyTo(outputStream) }
         }
+        check(sha256(target) == expectedSha256) { "SHA-256 mismatch for $repository $tag $asset" }
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }
 
@@ -355,11 +371,12 @@ val generateLegalAssets = tasks.register<GenerateLegalAssets>("generateLegalAsse
     xrayMetadata.set(xrayMetadataDirectory)
     outputDirectory.set(layout.buildDirectory.dir("generated/legalAssets"))
 }
+val geodataMetadataDirectory = rootProject.layout.projectDirectory.dir("third_party/geodata")
 val downloadGeoData = tasks.register<DownloadGeoData>("downloadGeoData") {
-    geoipUrl.set("https://github.com/v2fly/geoip/releases/latest/download/geoip.dat")
-    geositeUrl.set("https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat")
+    geoipVersion.set(providers.fileContents(geodataMetadataDirectory.file("GEOIP_VERSION")).asText.map(String::trim))
+    geositeVersion.set(providers.fileContents(geodataMetadataDirectory.file("GEOSITE_VERSION")).asText.map(String::trim))
+    checksums.set(geodataMetadataDirectory.file("CHECKSUMS.sha256"))
     outputDirectory.set(layout.buildDirectory.dir("generated/geodataAssets"))
-    outputs.upToDateWhen { false }
 }
 val downloadXray = tasks.register<DownloadXray>("downloadXray") {
     version.set(providers.fileContents(xrayMetadataDirectory.file("VERSION")).asText.map(String::trim))
