@@ -5,6 +5,7 @@
   scripts/check-pins.py core kotlin    only these: groups (libraries, build, core, actions) or pin names
   scripts/check-pins.py --check        report only
   scripts/check-pins.py --yes          bump without asking
+  scripts/check-pins.py --regenerate   only regenerate gradle/verification-metadata.xml
 
 After bumping a Gradle dependency it regenerates gradle/verification-metadata.xml and adds the
 per-OS artifacts a Linux build doesn't download. Review the diff and run the QA from AGENTS.md.
@@ -38,9 +39,10 @@ VERIFY_PAGE = ROOT / "website/src/content/docs/docs/reference/verifying-releases
 
 # Moves only together with another pin, so it is reported but never bumped here.
 HELD = {"sqlite": "follows Room's androidx.sqlite line"}
-# The Gradle tasks whose dependencies gradle/verification-metadata.xml has to cover.
+# The Gradle tasks whose dependencies gradle/verification-metadata.xml has to cover. --continue keeps
+# a failing test or lint check from cutting the recording short.
 REGENERATE = [
-    "./gradlew", "--write-verification-metadata", "sha256", "test", ":app:assembleDebug",
+    "./gradlew", "--continue", "--write-verification-metadata", "sha256", "test", ":app:assembleDebug",
     ":app:assembleRelease", "-x", "validateReleaseTelemetry", "detektMain", "detektTest",
     "-x", "detektRelease", ":app:lintDebug", "ktlintCheck", "detekt",
     ":core:android:assembleDebugAndroidTest",
@@ -212,9 +214,14 @@ def build_pins():
 
     def bump_gradle(version):
         sha256 = get(f"https://services.gradle.org/distributions/gradle-{version}-bin.zip.sha256")[1].decode().strip()
-        # The second run lets the new Gradle write its own wrapper jar and scripts.
+        # The second run lets the new Gradle write its own wrapper jar and scripts. Running any task
+        # loads every build script, whose bumped plugins only get recorded by the regeneration that
+        # follows, so verification is off here; the distribution itself is still checked against sha256.
         for _ in range(2):
-            run("./gradlew", "-q", "wrapper", "--gradle-version", version, "--gradle-distribution-sha256-sum", sha256)
+            run(
+                "./gradlew", "-q", "--dependency-verification", "off", "wrapper",
+                "--gradle-version", version, "--gradle-distribution-sha256-sum", sha256,
+            )
     pins.append(Pin(
         "gradle", current_gradle,
         lambda: json.loads(get("https://services.gradle.org/versions/current")[1])["version"],
@@ -346,6 +353,14 @@ def add_foreign_checksums():
     METADATA.write_text(text)
 
 
+def regenerate():
+    print("Regenerating gradle/verification-metadata.xml...")
+    failed = subprocess.run(REGENERATE, cwd=ROOT).returncode != 0
+    add_foreign_checksums()
+    if failed:
+        print("\nThe build had failures (see above). The metadata still covers every task that ran; fix them and run the QA.")
+
+
 def describe(pin):
     if pin.error:
         return f"could not check: {pin.error}"
@@ -360,7 +375,11 @@ def main():
     parser.add_argument("pins", nargs="*", help="groups (libraries, build, core, actions) or pin names (default: all)")
     parser.add_argument("--check", action="store_true", help="report only")
     parser.add_argument("--yes", action="store_true", help="bump without asking")
+    parser.add_argument("--regenerate", action="store_true", help="only regenerate gradle/verification-metadata.xml")
     args = parser.parse_args()
+    if args.regenerate:
+        regenerate()
+        return
 
     wanted = set(args.pins)
     selected = []
@@ -399,9 +418,7 @@ def main():
         print(f"Bumping {pin.name} {pin.current} -> {pin.latest}")
         pin.bump(pin.latest)
     if any(p.regenerate for p in outdated):
-        print("Regenerating gradle/verification-metadata.xml...")
-        run(*REGENERATE)
-        add_foreign_checksums()
+        regenerate()
     print("\nDone. Review `git diff` (especially gradle/verification-metadata.xml) and run the QA from AGENTS.md.")
 
 
