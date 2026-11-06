@@ -26,7 +26,7 @@ Releases after `v0.10.0` are reproducible: building the tagged source produces t
 - The Android SDK with these packages:
 
   ```sh
-  sdkmanager "platforms;android-37.2" "build-tools;37.0.0" "ndk;30.0.16248370" "cmake;3.31.6"
+  sdkmanager "platforms;android-37.2" "build-tools;37.0.0" "ndk;30.0.16248370" "cmake;4.1.2"
   ```
 
 - Network access. The build downloads Gradle, its dependencies, Xray-core and the geodata, and checks every file against a checksum recorded in the repository. Gradle also downloads the JDK 21 it builds with if it can't find one.
