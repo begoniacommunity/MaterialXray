@@ -30,4 +30,4 @@ Releases from `v0.5.0` onwards carry build-provenance attestations. With the Git
 gh attestation verify MaterialXray-0.9.4.apk --repo AetherMagee/MaterialXray
 ```
 
-Each release also ships an archive of the corresponding Xray-core source.
+Each release also ships an archive of the corresponding Xray-core source. To check a release without trusting GitHub, [rebuild it yourself](/docs/reference/verifying-releases/).

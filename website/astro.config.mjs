@@ -92,7 +92,7 @@ export default defineConfig({
 				},
 				{
 					...label('reference'),
-					items: ['docs/reference/share-links', 'docs/reference/faq'],
+					items: ['docs/reference/share-links', 'docs/reference/verifying-releases', 'docs/reference/faq'],
 				},
 			],
 		}),

@@ -30,4 +30,4 @@ Material Xray работает на телефонах, планшетах, ск
 gh attestation verify MaterialXray-0.9.4.apk --repo AetherMagee/MaterialXray
 ```
 
-К каждому релизу также приложен архив исходного кода соответствующей версии Xray-core.
+К каждому релизу также приложен архив исходного кода соответствующей версии Xray-core. Чтобы проверить релиз, не доверяя GitHub, [соберите его сами](/ru/docs/reference/verifying-releases/).
