@@ -69,12 +69,10 @@ jobs:
           echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
           echo "LEGACY_KEYSTORE_PATH=$RUNNER_TEMP/legacy.keystore" >> "$GITHUB_ENV"
 
+      # Gradle builds unsigned APKs and apksigner signs them once below, so a release is a rebuild
+      # of its tag plus the signature, which is what lets anyone reproduce it.
       - name: Build release APK
         env:
-          RELEASE_KEYSTORE_PATH: ${{ env.RELEASE_KEYSTORE_PATH }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: ./gradlew --stacktrace app:assembleRelease
 
@@ -105,7 +103,9 @@ jobs:
 
           apksigner="$ANDROID_SDK_ROOT/build-tools/37.0.0/apksigner"
           sign_with_lineage() {
+            # minSdk 24 always verifies v2 or v3, and apksigner would otherwise still add v1 files.
             "$apksigner" sign \
+              --v1-signing-enabled false \
               --ks "$LEGACY_KEYSTORE_PATH" \
               --ks-key-alias "$LEGACY_KEY_ALIAS" \
               --ks-pass env:LEGACY_STORE_PASSWORD \
@@ -122,11 +122,11 @@ jobs:
           }
 
           sign_with_lineage \
-            "app/build/outputs/apk/release/app-universal-release.apk" \
+            "app/build/outputs/apk/release/app-universal-release-unsigned.apk" \
             "$apk_dir/${apk_base}.apk"
           for abi in arm64-v8a x86_64 armeabi-v7a; do
             sign_with_lineage \
-              "app/build/outputs/apk/release/app-${abi}-release.apk" \
+              "app/build/outputs/apk/release/app-${abi}-release-unsigned.apk" \
               "$apk_dir/${apk_base}.${abi}.apk"
           done
 

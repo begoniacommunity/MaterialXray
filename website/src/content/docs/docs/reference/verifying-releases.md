@@ -49,13 +49,12 @@ The unsigned APKs land in `app/build/outputs/apk/release/`: `app-universal-relea
 
 ### Compare
 
-Unzip the release APK and your build, delete the release's signature files, and compare what's left:
+Unzip the release APK and your build, and compare the two:
 
 ```sh
 mkdir release rebuilt
 unzip -q MaterialXray-v0.10.1-<commit>.apk -d release
 unzip -q app/build/outputs/apk/release/app-universal-release-unsigned.apk -d rebuilt
-rm release/META-INF/MANIFEST.MF release/META-INF/*.SF release/META-INF/*.RSA
 diff -r release rebuilt && echo Reproduced
 ```
 
