@@ -40,9 +40,12 @@ VERIFY_PAGE = ROOT / "website/src/content/docs/docs/reference/verifying-releases
 # Moves only together with another pin, so it is reported but never bumped here.
 HELD = {"sqlite": "follows Room's androidx.sqlite line"}
 # The Gradle tasks whose dependencies gradle/verification-metadata.xml has to cover. --continue keeps
-# a failing test or lint check from cutting the recording short.
+# a failing test or lint check from cutting the recording short. --refresh-dependencies refetches the
+# metadata a cold cache (CI, a fresh clone) reads, such as a BOM's .module that the local cache only
+# holds as its .pom, so the recording does not miss it.
 REGENERATE = [
-    "./gradlew", "--continue", "--write-verification-metadata", "sha256", "test", ":app:assembleDebug",
+    "./gradlew", "--continue", "--refresh-dependencies", "--write-verification-metadata", "sha256",
+    "test", ":app:assembleDebug",
     ":app:assembleRelease", "-x", "validateReleaseTelemetry", "detektMain", "detektTest",
     "-x", "detektRelease", ":app:lintDebug", "ktlintCheck", "detekt",
     ":core:android:assembleDebugAndroidTest",
