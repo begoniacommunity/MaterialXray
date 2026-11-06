@@ -447,6 +447,9 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
+            // The git commit AGP embeds would make the APK reproducible only from a git checkout;
+            // the release attestation already records the commit.
+            vcsInfo.include = false
         }
     }
 
