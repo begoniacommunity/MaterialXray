@@ -9,7 +9,7 @@
 - Single Kotlin backtick-named test: `./gradlew :core:xray:test --tests "com.material.xray.core.xray.ConfigGeneratorTest.generates TUN inbound with correct name and MTU"`.
 - Type-resolving static analysis: `./gradlew detektMain detektTest -x detektRelease`. In Android modules `detektMain` covers every variant, and the release one only adds a second compilation of the same sources, hence the exclusion. These tasks compile the sources first. prek's plain `detekt` is quicker, but it silently skips every rule that needs types.
 - Final lint: `./gradlew :app:lintDebug`. `:app` has `lint.checkDependencies = true`, so that one task lints every module as one project; a library's own lint task is not meaningful on its own.
-- Gradle verifies every dependency and plugin against `gradle/verification-metadata.xml`. After adding or bumping one, regenerate it with the QA tasks plus an unsigned release build, then review the diff: `./gradlew --write-verification-metadata sha256 test :app:assembleDebug :app:assembleRelease -x validateReleaseTelemetry detektMain detektTest -x detektRelease :app:lintDebug ktlintCheck detekt :core:android:assembleDebugAndroidTest`. Regenerating only records the host's artifacts. `aapt2` (per OS), `protoc` and `protoc-gen-grpc-java` (per OS and CPU) also have hand-added macOS, Windows and ARM Linux entries; when bumping AGP, protoc or gRPC, add the new versions' variants too, checked against the repository's SHA-1.
+- Gradle verifies every dependency and plugin against `gradle/verification-metadata.xml`. After adding or bumping one, regenerate it with the QA tasks plus an unsigned release build, then review the diff: `./gradlew --write-verification-metadata sha256 test :app:assembleDebug :app:assembleRelease -x validateReleaseTelemetry detektMain detektTest -x detektRelease :app:lintDebug ktlintCheck detekt :core:android:assembleDebugAndroidTest`. Regenerating only records the host's artifacts, so `aapt2` (per OS), `protoc` and `protoc-gen-grpc-java` (per OS and CPU) also carry macOS, Windows and ARM Linux entries checked against their repository's SHA-1. `scripts/check-pins.py` does both steps after it bumps a dependency.
 - Formatting is not applied by building. `prek` verifies it with `ktlintCheck`; fix it with `./gradlew ktlintFormat`.
 - Iterate with targeted unit tests. Run the full unit-test suite before final QA, then defer assembly and lint until source edits are finished because they rerun expensive dexing and analysis work.
 - Device-only flows need a connected device/emulator: `./gradlew :app:installDebug`. The only instrumentation test is `./gradlew :core:android:connectedDebugAndroidTest`.
@@ -35,6 +35,25 @@
 - The APK bundles the v2fly `geoip.dat` and `geosite.dat` releases pinned in `third_party/geodata/`; `downloadGeoData` fails unless they match its `CHECKSUMS.sha256`. Pin the latest releases with `./scripts/update-geodata.sh` (or pass the geoip and geosite tags).
 - Switch Xray versions with `./scripts/change-xray-ver.sh <tag>`; it verifies the upstream digests and rewrites the version, commit, Go toolchain, license and checksums under `third_party/xray/`.
 - The Android build only adopts a TUN as an open fd (`xray.tun.fd`). The native sources live in `core/runtime/src/main/cpp`. Rootless mode starts Xray through `xray_launcher.c` (`System.loadLibrary("xray_launcher")`) with the VpnService fd; root mode execs it through `xray_root_exec.c`, built as the executable `libxrayroot.so` so the installer extracts it. That launcher creates the TUN for root TUN mode, then drops the core to its own uid (`ROOT_CORE_UID`) with the app's gid and only the network capabilities; the core gets its config on stdin and reaches `files/bin` only through `/proc/self/cwd`, writing only to `files/bin/sockets`. Native changes need an Android build, not only JVM tests.
+
+## Pinned Versions
+- Every input of the build is pinned, so a release can be reproduced from its tag. `./scripts/check-pins.py` checks each pin below against the latest upstream version, group by group, and bumps the outdated ones after asking. Name groups or pins to limit it (`./scripts/check-pins.py core kotlin`), pass `--check` to only report, or `--yes` to skip the question. After a bump, review the diff and run the QA.
+
+| Group | Pins | Where |
+| --- | --- | --- |
+| `libraries` | one per `[versions]` key or inline version | `gradle/libs.versions.toml`; after a bump the script regenerates `gradle/verification-metadata.xml` and its per-OS entries |
+| `build` | `gradle` | `gradle/wrapper/gradle-wrapper.properties` |
+| | `jdk` (CI) | `java-version` in `ci.yml` and `release.yml` |
+| | `ndk`, `cmake`, `build-tools` | `MaterialXrayConventions.kt`, `core/runtime/build.gradle.kts`, the workflows' `sdkmanager` lines, `release.yml`'s `apksigner` path, the verifying-releases page |
+| | `protoc` (3.x only, to match grpc-protobuf-lite's javalite runtime) | `core/xray/build.gradle.kts` |
+| `core` | `xray` | `third_party/xray/`, through `scripts/change-xray-ver.sh` |
+| | `geoip`, `geosite` | `third_party/geodata/`, through `scripts/update-geodata.sh` |
+| | `ca-bundle` (Android 7 only) | `third_party/mozilla-ca-bundle/`, through `scripts/update-ca-bundle.sh` |
+| `actions` | one per action, such as `actions/checkout` | commit SHAs in every workflow |
+
+- The script only moves pins to the newest version. To pin a specific one, call the `core` group's scripts directly, such as `./scripts/change-xray-ver.sh v26.10.21`; they do the downloading and checksum checks for the script too.
+
+- Not handled by the script: `compileSdk`, `targetSdk` and `minSdk` (behaviour changes, bumped by hand), `sqlite` (moves with Room's androidx.sqlite line, reported as held), the Gradle daemon's JDK major in `gradle/gradle-daemon-jvm.properties`, and `go-version` in the workflows, which only bootstraps the toolchain pinned in `third_party/xray/GO_TOOLCHAIN`.
 
 ## Data And Generated Code
 - Room lives in `:core:database`, a JVM module on Room's KMP driver API (`androidx.sqlite`). Migrations receive an `SQLiteConnection`; transactions go through `withWriteTransaction`; tests use the bundled SQLite driver. `:app`'s `di/DatabaseModule` opens the real file with `AndroidSQLiteDriver`.
