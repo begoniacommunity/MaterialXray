@@ -111,7 +111,7 @@ private data class AppListFilters(
 class AppsViewModel(
     private val context: Application,
     private val appBypassDao: AppBypassDao,
-    private val subscriptionDao: SubscriptionDao,
+    subscriptionDao: SubscriptionDao,
     private val serverRepository: ServerRepository,
     private val settingsRepository: SettingsRepository,
     alwaysOnVpnState: AlwaysOnVpnState,

@@ -37,7 +37,7 @@ import org.koin.core.annotation.Singleton
 @Singleton
 class BackupManager(
     private val backupStorage: BackupStorage,
-    private val xrayPaths: XrayPaths,
+    xrayPaths: XrayPaths,
     private val database: AppDatabase,
     private val settingsRepository: SettingsRepository,
     private val launcherIconSwitcher: LauncherIconSwitcher,

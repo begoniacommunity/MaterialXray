@@ -30,7 +30,7 @@ class ConnectionRuntimeManager(
     private val settingsRepository: SettingsRepository,
     private val serverRepository: ServerRepository,
     private val stateCoordinator: ConnectionStateCoordinator,
-    private val log: LogBuffer,
+    log: LogBuffer,
     private val vpnTransportProbe: VpnTransportProbe,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {

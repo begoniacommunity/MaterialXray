@@ -145,7 +145,7 @@ class HomeViewModel(
     private val serverController: HomeServerController,
     private val subscriptionOperations: SubscriptionOperations,
     private val latencyMeasurer: ServerLatencyMeasurer,
-    private val connectionStateCoordinator: ConnectionStateCoordinator,
+    connectionStateCoordinator: ConnectionStateCoordinator,
     private val connectionRuntimeManager: ConnectionRuntimeManager,
     alwaysOnVpnState: AlwaysOnVpnState,
     geoDataManager: GeoDataManager,

@@ -30,11 +30,11 @@ import kotlinx.coroutines.withContext
 
 @Suppress("LargeClass")
 class ConnectionManager(
-    private val configGenerator: ConfigGenerator,
+    configGenerator: ConfigGenerator,
     private val stateCoordinator: ConnectionStateCoordinator,
     private val log: LogBuffer,
     dependencies: ConnectionManagerDependencies,
-    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : XrayHealthProbe {
     private val environment = dependencies.environment
     private val rootRuntime = dependencies.rootRuntime

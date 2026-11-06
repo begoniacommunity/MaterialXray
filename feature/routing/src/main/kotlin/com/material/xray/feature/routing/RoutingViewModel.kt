@@ -49,7 +49,7 @@ class RoutingViewModel(
     private val settingsRepository: SettingsRepository,
     private val routingChangeManager: RoutingChangeManager,
     private val serverRepository: ServerRepository,
-    private val subscriptionDao: SubscriptionDao,
+    subscriptionDao: SubscriptionDao,
     private val subscriptionRoutingRepository: SubscriptionRoutingRepository,
     private val providerGeoDataManager: ProviderGeoDataManager,
     connectionStateCoordinator: ConnectionStateCoordinator,

@@ -21,7 +21,7 @@ import org.koin.core.annotation.Singleton
 class ConnectionShutdownManager(
     private val context: Context,
     private val stateCoordinator: ConnectionStateCoordinator,
-    private val log: LogBuffer,
+    log: LogBuffer,
 ) : ConnectionShutdown {
     private val stepExecutor = ConnectionStepExecutor(
         elapsedRealtime = SystemClock::elapsedRealtime,
