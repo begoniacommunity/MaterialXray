@@ -377,13 +377,23 @@ fun HomeScreen(
         }
     }
 
+    val armConnectionHaptic = rememberConnectionChangeHaptic(uiState.connectionState)
     val onConnectionClick = {
         connectionUiState.handleClick(
             context = context,
             useRootService = uiState.useRootService,
-            disconnect = viewModel::disconnect,
-            connectRoot = viewModel::connect,
-            connectVpn = startRootlessConnection,
+            disconnect = {
+                armConnectionHaptic()
+                viewModel.disconnect()
+            },
+            connectRoot = {
+                armConnectionHaptic()
+                viewModel.connect()
+            },
+            connectVpn = {
+                armConnectionHaptic()
+                startRootlessConnection()
+            },
         )
     }
 
@@ -1212,10 +1222,7 @@ private fun buildConnectionUiState(
     val isConnected = connectionState is ConnectionState.Connected
     val isRestartRequired = connectionState is ConnectionState.RestartRequired
     val isInterfaceBusy = connectionState is ConnectionState.InterfaceBusy
-    val isTransitioning = connectionState is ConnectionState.Connecting ||
-        connectionState is ConnectionState.ApplyingRoutingChanges ||
-        connectionState is ConnectionState.UpdatingRoutingData ||
-        connectionState is ConnectionState.Disconnecting
+    val isTransitioning = connectionState.isTransitioning()
     val selectedServerName = selectedServer?.name ?: stringResource(R.string.home_no_server_selected)
     val stopLike = isConnected && !alwaysOnVpn || isRestartRequired || isInterfaceBusy
 
@@ -1564,6 +1571,47 @@ private fun connectionHeading(connectionState: ConnectionState, geoDataDownloadF
     is ConnectionState.Disconnecting -> stringResource(R.string.home_connection_disconnecting)
     is ConnectionState.Error -> stringResource(R.string.home_connection_error)
     ConnectionState.Disconnected -> stringResource(R.string.home_connection_disconnected)
+}
+
+private fun ConnectionState.isTransitioning(): Boolean = this is ConnectionState.Connecting ||
+    this is ConnectionState.ApplyingRoutingChanges ||
+    this is ConnectionState.UpdatingRoutingData ||
+    this is ConnectionState.Disconnecting
+
+/**
+ * Returns a callback that arms one haptic for the first settled state after a transitional one, so
+ * only the outcome of a connect or disconnect the user started is felt, not the spinner phase or a
+ * change the service makes on its own.
+ */
+@Composable
+private fun rememberConnectionChangeHaptic(connectionState: ConnectionState): () -> Unit {
+    val haptics = LocalHapticFeedback.current
+    val arm = remember { ConnectionHapticArm() }
+    LaunchedEffect(connectionState) {
+        when {
+            !arm.pending -> Unit
+            connectionState.isTransitioning() -> arm.transitioned = true
+            arm.transitioned -> {
+                haptics.performHapticFeedback(
+                    when (connectionState) {
+                        is ConnectionState.Connected -> HapticFeedbackType.ToggleOn
+                        ConnectionState.Disconnected -> HapticFeedbackType.ToggleOff
+                        else -> HapticFeedbackType.Reject
+                    },
+                )
+                arm.pending = false
+            }
+        }
+    }
+    return {
+        arm.pending = true
+        arm.transitioned = false
+    }
+}
+
+private class ConnectionHapticArm {
+    var pending = false
+    var transitioned = false
 }
 
 private fun ConnectionState.showsConnectionStats(): Boolean = this is ConnectionState.Connected ||
