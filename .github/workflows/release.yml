@@ -104,8 +104,11 @@ jobs:
           apksigner="$ANDROID_SDK_ROOT/build-tools/37.0.0/apksigner"
           sign_with_lineage() {
             # minSdk 24 always verifies v2 or v3, and apksigner would otherwise still add v1 files.
+            # Gradle's output is already aligned; preserving that leaves the signature block as the
+            # only difference from the unsigned APK, so it can be copied onto a rebuild.
             "$apksigner" sign \
               --v1-signing-enabled false \
+              --alignment-preserved true \
               --ks "$LEGACY_KEYSTORE_PATH" \
               --ks-key-alias "$LEGACY_KEY_ALIAS" \
               --ks-pass env:LEGACY_STORE_PASSWORD \

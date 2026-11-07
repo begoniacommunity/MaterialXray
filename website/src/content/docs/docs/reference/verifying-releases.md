@@ -62,6 +62,18 @@ For a per-ABI APK, unzip the release file ending in `.<abi>.apk` and `app-<abi>-
 
 `diff` prints nothing and the last command prints `Reproduced` when every file matches. If it lists differences, check that you built the release's tag and that `git status` shows no changes.
 
+### Compare the whole file
+
+Releases from `v0.10.1` onwards add nothing to the built APK except the signature, so the signature can be copied onto your build to recreate the release file exactly. With [apksigcopier](https://github.com/obfusk/apksigcopier):
+
+```sh
+apksigcopier copy MaterialXray-v0.10.1-<commit>.apk \
+  app/build/outputs/apk/release/app-universal-release-unsigned.apk rebuilt.apk
+cmp rebuilt.apk MaterialXray-v0.10.1-<commit>.apk && echo Reproduced
+```
+
+`cmp` prints nothing before `Reproduced` when the two files are identical. This is the check F-Droid uses for reproducible builds.
+
 ### What the build pins
 
 - **Gradle and every dependency and plugin:** checksums in `gradle/verification-metadata.xml` and `gradle/wrapper/gradle-wrapper.properties`.
