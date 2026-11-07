@@ -40,6 +40,7 @@ class ActiveCoreHttpClientTest {
         assertEquals(path, privateHttpSocketPath(config, privateDir))
         assertNull(privateHttpSocketPath(config("/tmp/mxray-http.sock"), privateDir))
         assertNull(privateHttpSocketPath(config(path, tag = "other-inbound"), privateDir))
+        assertEquals(path, privateHttpSocketPath(config(path, tag = "other-inbound"), privateDir, inboundTag = "other-inbound"))
     }
 
     @Test

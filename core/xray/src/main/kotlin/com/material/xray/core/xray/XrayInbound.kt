@@ -34,3 +34,6 @@ fun XrayInbound.toJson(): JsonObject = when (this) {
 }
 
 const val XRAY_APP_HTTP_INBOUND_TAG = "mxray-http-in"
+
+/** Private HTTP inbound that generated configs always route to `proxy`, for the live latency reading. */
+const val XRAY_LATENCY_PROBE_INBOUND_TAG = "mxray-probe-in"

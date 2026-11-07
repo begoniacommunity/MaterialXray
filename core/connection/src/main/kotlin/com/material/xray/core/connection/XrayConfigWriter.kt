@@ -17,6 +17,7 @@ import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
 import com.material.xray.core.xray.ProviderGeoDataResolution
 import com.material.xray.core.xray.TUN_INBOUND_TAG
+import com.material.xray.core.xray.XRAY_LATENCY_PROBE_INBOUND_TAG
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.coreSocket
@@ -100,6 +101,10 @@ internal class XrayConfigWriter(
         } else {
             tproxyInbounds
         }
+        // The live ping times requests through the running core here instead of starting its own core.
+        val probeSocket = coreSocket(environment.binDir, "mxray-probe-${java.util.UUID.randomUUID().toString().take(12)}.sock")
+        val generatedInbounds = (effectiveInbounds ?: listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))) +
+            XrayInbound.PrivateHttp(path = probeSocket.path, tag = XRAY_LATENCY_PROBE_INBOUND_TAG, listenPath = probeSocket.listenPath)
         // Xray's GID-exempt sockets follow Android's current default route in both local and
         // tethered TPROXY. The tether firewall still tracks the upstream separately.
         val unboundTproxy = tproxyPlan != null
@@ -141,7 +146,7 @@ internal class XrayConfigWriter(
             physicalRoute = physicalRoute.takeUnless { unboundTproxy },
             xrayApiEndpoint = xrayApiEndpoint,
             syntheticDnsAddress = syntheticDnsAddress,
-            inbounds = effectiveInbounds,
+            inbounds = generatedInbounds,
         )
 
         val configJson = stepExecutor.execute(

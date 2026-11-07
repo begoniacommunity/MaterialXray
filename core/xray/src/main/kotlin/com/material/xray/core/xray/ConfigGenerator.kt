@@ -46,7 +46,8 @@ class ConfigGenerator {
         systemDnsServers: List<String> = emptyList(),
     ): String {
         val effectiveInbounds = inbounds ?: listOf(XrayInbound.Tun(tunName, TUN_INBOUND_TAG, tunMtu))
-        val dataInboundTags = effectiveInbounds.map { it.tag }
+        val (probeInbounds, trafficInbounds) = effectiveInbounds.partition { it.tag == XRAY_LATENCY_PROBE_INBOUND_TAG }
+        val dataInboundTags = trafficInbounds.map { it.tag }
         val bootstrapDnsHosts = bootstrapDnsHosts(server, appProxyRoutes)
         if (server.rawConfigJson.isNotBlank()) {
             return injectTunIntoRawConfig(
@@ -75,7 +76,8 @@ class ConfigGenerator {
                 xrayApiEndpoint = xrayApiEndpoint,
                 xrayBufferSizeKiB = xrayBufferSizeKiB,
                 tunMtu = tunMtu,
-                inbounds = effectiveInbounds,
+                // A raw config has no single `proxy` outbound for the probe to pin.
+                inbounds = trafficInbounds,
                 otherVpnDns = otherVpnDns,
                 systemDnsServers = systemDnsServers,
             )
@@ -124,7 +126,7 @@ class ConfigGenerator {
                     dataInboundTags = dataInboundTags,
                     otherVpnDns = otherVpnDns,
                     systemDnsServers = systemDnsServers,
-                ),
+                ).withLatencyProbeRoute(probeInbounds.map { it.tag }),
             )
         }
         return json.encodeToString(JsonObject.serializer(), config)

@@ -77,12 +77,16 @@ internal fun privateUnixHttpProxyClient(
     .connectionPool(ConnectionPool())
     .build()
 
-internal fun privateHttpSocketPath(config: String, privateDir: File): String? = runCatching {
+internal fun privateHttpSocketPath(
+    config: String,
+    privateDir: File,
+    inboundTag: String = XRAY_APP_HTTP_INBOUND_TAG,
+): String? = runCatching {
     val inbounds = (Json.parseToJsonElement(config) as? JsonObject)?.get("inbounds") as? JsonArray
     val listen = inbounds
         ?.asSequence()
         ?.mapNotNull { it as? JsonObject }
-        ?.firstOrNull { it["tag"]?.jsonPrimitive?.contentOrNull == XRAY_APP_HTTP_INBOUND_TAG }
+        ?.firstOrNull { it["tag"]?.jsonPrimitive?.contentOrNull == inboundTag }
         ?.get("listen")?.jsonPrimitive?.contentOrNull
         ?: return@runCatching null
     // Cores started before the socket became group-only still listen on a world-writable one.

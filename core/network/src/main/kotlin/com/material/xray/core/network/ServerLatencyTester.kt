@@ -4,9 +4,13 @@ import com.material.xray.core.common.log.xrayTimestampPrefix
 import com.material.xray.core.common.platform.MonotonicClock
 import com.material.xray.core.model.PingMethod
 import com.material.xray.core.model.ServerConfig
+import com.material.xray.core.xray.ACTIVE_CONFIG_FILE
+import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.PlatformDns
 import com.material.xray.core.xray.ServerAddressResolver
+import com.material.xray.core.xray.XRAY_LATENCY_PROBE_INBOUND_TAG
 import com.material.xray.core.xray.XrayInbound
+import com.material.xray.core.xray.XrayPaths
 import com.material.xray.core.xray.buildDns
 import com.material.xray.core.xray.buildProxyOutbound
 import com.material.xray.core.xray.toJson
@@ -138,6 +142,9 @@ internal suspend fun executeTimedHttpProbe(
 @Singleton
 class ServerLatencyTester(
     private val ephemeralCore: EphemeralXrayCore,
+    private val baseClient: OkHttpClient,
+    private val xrayPaths: XrayPaths,
+    private val localSockets: LocalSockets,
     platformDns: PlatformDns,
     private val clock: MonotonicClock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -169,6 +176,30 @@ class ServerLatencyTester(
                 PingMethod.Tcping -> measureTcpConnect(server.address, server.port).toResult(PingMethod.Tcping)
             }
         } ?: LatencyProbeResult(latencyMs = -1, method = method, failure = "Timed out after $TEST_TIMEOUT_MS ms")
+    }
+
+    /**
+     * Times [probeUrl] through the running core's probe inbound, which generated configs pin to the
+     * `proxy` outbound. Unlike [measure] it starts no core of its own, so it is cheap enough to repeat.
+     */
+    suspend fun measureThroughActiveCore(probeUrl: String): LatencyProbeResult = withContext(ioDispatcher) {
+        val socketPath = File(xrayPaths.filesDir, ACTIVE_CONFIG_FILE)
+            .takeIf(File::isFile)
+            ?.readText()
+            ?.let { privateHttpSocketPath(it, xrayPaths.filesDir.resolve("bin"), XRAY_LATENCY_PROBE_INBOUND_TAG) }
+            ?: return@withContext LatencyProbeResult(
+                latencyMs = -1,
+                method = PingMethod.Httping,
+                failure = "The running core has no latency probe socket",
+            )
+        val client = privateUnixHttpProxyClient(baseClient, socketPath, localSockets)
+        try {
+            withTimeoutOrNull(TEST_TIMEOUT_MS) {
+                requestProbeThroughProxy(client, probeUrl.trim().ifBlank { DEFAULT_PROBE_URL }).toResult(PingMethod.Httping)
+            } ?: LatencyProbeResult(latencyMs = -1, method = PingMethod.Httping, failure = "Timed out after $TEST_TIMEOUT_MS ms")
+        } finally {
+            evictProxyConnections(ioDispatcher) { client.connectionPool.evictAll() }
+        }
     }
 
     private suspend fun measureHttpProbeThroughXray(

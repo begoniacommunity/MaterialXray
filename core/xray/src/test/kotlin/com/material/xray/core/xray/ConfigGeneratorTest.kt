@@ -170,6 +170,43 @@ class ConfigGeneratorTest {
     }
 
     @Test
+    fun `latency probe inbound is pinned to proxy ahead of every routing rule`() {
+        val probe = XrayInbound.PrivateHttp("/data/mxray-probe.sock", XRAY_LATENCY_PROBE_INBOUND_TAG)
+        val config = generator.generate(
+            vlessReality,
+            routingRules = RoutingRuleCatalog.defaults(),
+            inbounds = listOf(XrayInbound.Tun("tun0", "tun-in"), probe),
+        )
+        val json = Json.parseToJsonElement(config).jsonObject
+        val rules = json.getValue("routing").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
+        val probeRules = rules.filter { rule ->
+            rule["inboundTag"]?.jsonArray?.any { it.jsonPrimitive.content == XRAY_LATENCY_PROBE_INBOUND_TAG } == true
+        }
+
+        assertTrue(json.getValue("inbounds").jsonArray.any { it.jsonObject.getValue("tag").jsonPrimitive.content == XRAY_LATENCY_PROBE_INBOUND_TAG })
+        assertEquals(listOf(rules.first()), probeRules)
+        assertEquals("proxy", rules.first().getValue("outboundTag").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `raw config drops the latency probe inbound`() {
+        val rawServer = vlessReality.copy(
+            rawConfigJson = """{"outbounds": [{"tag":"proxy","protocol":"vless","settings":{}}]}""",
+        )
+
+        val config = generator.generate(
+            rawServer,
+            inbounds = listOf(
+                XrayInbound.Tun("tun0", "tun-in"),
+                XrayInbound.PrivateHttp("/data/mxray-probe.sock", XRAY_LATENCY_PROBE_INBOUND_TAG),
+            ),
+        )
+        val inbounds = Json.parseToJsonElement(config).jsonObject.getValue("inbounds").jsonArray
+
+        assertEquals(listOf("tun-in"), inbounds.map { it.jsonObject.getValue("tag").jsonPrimitive.content })
+    }
+
+    @Test
     fun `configures xray request buffer size`() {
         val config = generator.generate(vlessReality, xrayBufferSizeKiB = 1024)
         val json = Json.parseToJsonElement(config).jsonObject

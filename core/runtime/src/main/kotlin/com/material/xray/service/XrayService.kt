@@ -1303,8 +1303,8 @@ class XrayService(
      * Keeps a single round-trip measurement for whatever the tunnel is using, shared by the
      * connection banner and the notification so neither probes the endpoint on its own.
      *
-     * It runs far slower than the metrics poll because a reading starts a short-lived Xray process
-     * and performs the same end-to-end HTTP check as the server list.
+     * It runs far slower than the metrics poll because each reading is an end-to-end HTTP request
+     * through the server.
      */
     private fun updatePingTracker() {
         val wanted = notificationSettings.needsPingProbe || connectionStateCoordinator.activePingSubscribers.value > 0
@@ -1355,14 +1355,21 @@ class XrayService(
             hasEditedRuntimeConfig = activeConfigOverrideStore.exists(),
             proxyOutboundCount = config.proxyOutboundCount(),
         ) ?: return null
-        return serverLatencyTester.measure(
-            server = config,
-            method = method,
-            probeUrl = settingsRepo.latencyCheckUrl.first(),
-            dnsServers = settingsRepo.dnsServers.first(),
-            domesticDnsServers = settingsRepo.domesticDnsServers.first(),
-            allowIpv6 = sessionAllowIpv6 ?: false,
-        ).latencyMs.takeIf { it >= 0 }
+        val probeUrl = settingsRepo.latencyCheckUrl.first()
+        // Only generated configs carry the probe inbound; a raw profile has no `proxy` tag to pin it to.
+        val result = if (config.rawConfigJson.isBlank()) {
+            serverLatencyTester.measureThroughActiveCore(probeUrl)
+        } else {
+            serverLatencyTester.measure(
+                server = config,
+                method = method,
+                probeUrl = probeUrl,
+                dnsServers = settingsRepo.dnsServers.first(),
+                domesticDnsServers = settingsRepo.domesticDnsServers.first(),
+                allowIpv6 = sessionAllowIpv6 ?: false,
+            )
+        }
+        return result.latencyMs.takeIf { it >= 0 }
     }
 
     private fun startProcessWatchdog(state: ConnectionState.Connected) {

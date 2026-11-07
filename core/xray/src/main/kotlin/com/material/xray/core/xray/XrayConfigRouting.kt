@@ -6,12 +6,14 @@ import com.material.xray.core.model.isIpv4DnsServerLiteral
 import com.material.xray.core.model.isIpv6DnsServerLiteral
 import com.material.xray.core.model.resolveDnsServersForIpv6
 import com.material.xray.core.model.toXrayRules
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 
 const val TUN_INBOUND_TAG = "tun-in"
@@ -272,6 +274,14 @@ internal fun AppProxyRoute.trafficMatcher(dataInboundTags: List<String>): Map<St
 } else {
     inboundTagMatcher(listOf(TUN_INBOUND_TAG)) +
         ("source" to buildJsonArray { appRouteSourceAddresses(routeIndex).forEach { add(it) } })
+}
+
+/** The latency probe measures the server, so no routing rule may send it elsewhere. */
+internal fun JsonObject.withLatencyProbeRoute(probeInboundTags: List<String>): JsonObject {
+    if (probeInboundTags.isEmpty()) return this
+    val probeRule = appProxyRoutingRule(inboundTagMatcher(probeInboundTags), XrayRouteTarget.Outbound("proxy"))
+    val rules = getValue("rules").jsonArray
+    return JsonObject(this + ("rules" to JsonArray(listOf(probeRule) + rules)))
 }
 
 private fun inboundTagMatcher(tags: List<String>): Map<String, JsonElement> = mapOf("inboundTag" to buildJsonArray { tags.forEach { add(it) } })
