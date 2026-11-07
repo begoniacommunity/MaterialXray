@@ -37,6 +37,8 @@ class ShareLinkParserTest {
             "trojan://secret@example.com:443" to Protocol.TROJAN,
             "ss://$methodPassword@1.2.3.4:8388" to Protocol.SHADOWSOCKS,
             "hysteria2://secret@example.com:443" to Protocol.HYSTERIA2,
+            "socks5://example.com:1080#Name" to Protocol.SOCKS,
+            "wg://key@example.com:51820?publickey=pub&address=10.0.0.2%2F32" to Protocol.WIREGUARD,
         ).forEach { (uri, protocol) ->
             assertEquals(uri, protocol, parser.parse(uri)?.protocol)
         }

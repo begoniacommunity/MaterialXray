@@ -16,7 +16,7 @@ Material Xray also opens [`mxray://add/` deeplinks](/docs/providers/deeplinks/),
 | Input | Result |
 | --- | --- |
 | An `https://` subscription URL | A subscription that refreshes on a schedule. |
-| One or more `vless://`, `vmess://`, `trojan://`, `ss://` or `hysteria2://` links | Servers added to **Manual servers**. |
+| One or more `vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`, `wireguard://` or `socks://` links | Servers added to **Manual servers**. |
 
 ## Manual servers
 
@@ -24,7 +24,7 @@ Share links you add directly all go into one **Manual servers** group, in the or
 
 Share links added before this group existed, each shown as its own subscription, are moved into it automatically. Restoring an older backup does the same.
 
-Subscriptions can carry more: HTTP, SOCKS and WireGuard lines, plus raw Xray JSON configurations. See [subscription format](/docs/providers/subscription-format/) and [share links](/docs/reference/share-links/).
+Subscriptions can carry more: HTTP proxy lines and raw Xray JSON configurations. See [subscription format](/docs/providers/subscription-format/) and [share links](/docs/reference/share-links/).
 
 ## Subscription options
 

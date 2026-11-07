@@ -22,17 +22,17 @@ class ShareLinkParser {
             "ss://" to ShadowsocksParser::parse,
             "hysteria2://" to Hysteria2Parser::parse,
             "hy2://" to Hysteria2Parser::parse,
-        )
-
-        /** Subscriptions also carry proxies that only make sense as part of a provider's list. */
-        private val subscriptionParsers: Map<String, (String) -> ServerConfig?> = directParsers + mapOf(
-            "http://" to HttpProxyParser::parse,
-            "https://" to HttpProxyParser::parse,
             "socks://" to SocksParser::parse,
             "socks5://" to SocksParser::parse,
             "socks5h://" to SocksParser::parse,
             "wireguard://" to WireGuardParser::parse,
             "wg://" to WireGuardParser::parse,
+        )
+
+        /** A pasted `http(s)://` link is a subscription URL, so HTTP proxies only come from a provider's list. */
+        private val subscriptionParsers: Map<String, (String) -> ServerConfig?> = directParsers + mapOf(
+            "http://" to HttpProxyParser::parse,
+            "https://" to HttpProxyParser::parse,
         )
 
         val directSchemes: Set<String> = directParsers.keys

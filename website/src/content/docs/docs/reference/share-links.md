@@ -12,8 +12,8 @@ Material Xray reads the share-link formats that most Xray clients use. The text 
 | `trojan://` | ✅ | ✅ |
 | `ss://` | ✅ | ✅ |
 | `hysteria2://`, `hy2://` | ✅ | ✅ |
-| `wireguard://`, `wg://` | | ✅ |
-| `socks://`, `socks5://`, `socks5h://` | | ✅ |
+| `wireguard://`, `wg://` | ✅ | ✅ |
+| `socks://`, `socks5://`, `socks5h://` | ✅ | ✅ |
 | `http://`, `https://` proxies | | ✅ |
 | Xray JSON | | ✅ |
 
