@@ -509,7 +509,12 @@ private fun xrayAssetEnvironment(assetDir: String): Map<String, String> = mapOf(
 private fun xrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayAssetEnvironment(assetDir) + mapOf(
     // Go does not reliably discover Android's CA store, especially in the rootless process.
     "SSL_CERT_FILE" to certificateBundlePath,
+    // Measured on a Snapdragon 7+ Gen 2: two Ps forward a VLESS/XHTTP/TLS stream at the same speed
+    // as one per core while spending about 30% less CPU, which otherwise goes to idle Ps spinning.
+    "GOMAXPROCS" to XRAY_GOMAXPROCS.toString(),
 )
+
+private const val XRAY_GOMAXPROCS = 2
 
 private val SHELL_VARIABLE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 

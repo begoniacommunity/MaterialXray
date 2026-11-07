@@ -22,6 +22,7 @@ class XrayProcessSupervisorTest {
                 assertTrue(command.contains("cd '/tmp/xray bin'"))
                 assertTrue(command.contains("export XRAY_LOCATION_ASSET='/proc/self/cwd'"))
                 assertTrue(command.contains("SSL_CERT_FILE='/proc/self/cwd/xray-ca-certificates.pem'"))
+                assertTrue(command.contains("GOMAXPROCS='2'"))
                 assertFalse(command.contains("xray.location.asset"))
                 assertFalse(command.contains(" env "))
                 assertTrue(command.contains("> '/tmp/runtime dir/xray.log' 2>&1 & fi"))
@@ -318,6 +319,7 @@ class XrayProcessSupervisorTest {
                 File("/tmp/xray bin", XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath,
                 launcher.startedEnvironment?.get("SSL_CERT_FILE"),
             )
+            assertEquals("2", launcher.startedEnvironment?.get("GOMAXPROCS"))
         } finally {
             directory.deleteRecursively()
         }
