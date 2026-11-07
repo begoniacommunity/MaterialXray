@@ -241,6 +241,7 @@ class XrayService(
     private var terminalFailureNotificationShown = false
 
     @Volatile private var screenInteractive = true
+    private var consecutiveRootAccessFailures = 0
     private var screenStateReceiverRegistered = false
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -754,7 +755,7 @@ class XrayService(
     private suspend fun checkRootRuntimeAccess(preparation: ConnectionPreparation): Boolean {
         val recentlyConfirmed = preparation.reusesStaticRuntime &&
             (!screenInteractive || SystemClock.elapsedRealtime() - lastRootAccessConfirmedAtMs < ROOT_ACCESS_CHECK_INTERVAL_MS)
-        val confirmed = recentlyConfirmed || settingsRuntimeManager.checkRootAvailability(reloadConnection = false)
+        val confirmed = recentlyConfirmed || confirmRootAccess()
         if (confirmed && !recentlyConfirmed) lastRootAccessConfirmedAtMs = SystemClock.elapsedRealtime()
         return confirmed && withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
     }
@@ -1388,6 +1389,19 @@ class XrayService(
      */
     private fun healthIntervalScale(): Long = if (screenInteractive) 1L else IDLE_HEALTH_INTERVAL_SCALE
 
+    /**
+     * Asks fresh su sessions until one answers, because a single one can time out under memory
+     * pressure and the last, failed check switches the stored setting to rootless mode.
+     */
+    private suspend fun confirmRootAccess(): Boolean {
+        repeat(ROOT_ACCESS_FAILURE_THRESHOLD - 1) { attempt ->
+            if (rootShell.checkAccess(RootShell.NetworkNamespace.INIT)) return true
+            logBuffer.append(LogSource.APP, "Root access check failed (${attempt + 1}); retrying")
+            delay(ROOT_ACCESS_RETRY_DELAY_MS)
+        }
+        return settingsRuntimeManager.checkRootAvailability(reloadConnection = false)
+    }
+
     private suspend fun runtimeModeRecoveryReason(): String? {
         val now = SystemClock.elapsedRealtime()
         // Revoking root takes the root manager's UI, so a screen-off probe could only find a slow su.
@@ -1397,11 +1411,20 @@ class XrayService(
             now - lastRootAccessCheckAtMs >= ROOT_ACCESS_CHECK_INTERVAL_MS
         ) {
             lastRootAccessCheckAtMs = now
-            if (!settingsRuntimeManager.checkRootAvailability(reloadConnection = false)) {
+            if (rootShell.checkAccess(RootShell.NetworkNamespace.INIT)) {
+                consecutiveRootAccessFailures = 0
+                lastRootAccessConfirmedAtMs = now
+            } else if (++consecutiveRootAccessFailures < ROOT_ACCESS_FAILURE_THRESHOLD) {
+                // A fresh su can time out under memory pressure, and falling back rewrites the setting.
+                logBuffer.append(LogSource.APP, "Root access check failed ($consecutiveRootAccessFailures); retrying")
+            } else if (!settingsRuntimeManager.checkRootAvailability(reloadConnection = false)) {
+                consecutiveRootAccessFailures = 0
                 rootServiceRequested = false
                 return "Root access lost; switching to Android VpnService..."
+            } else {
+                consecutiveRootAccessFailures = 0
+                lastRootAccessConfirmedAtMs = now
             }
-            lastRootAccessConfirmedAtMs = now
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         val alwaysOnVpn = isAlwaysOn
@@ -2646,6 +2669,8 @@ class XrayService(
         private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 5_000L
         private const val NETWORK_SAFETY_CHECK_INTERVAL_MS = 60_000L
         private const val ROOT_ACCESS_CHECK_INTERVAL_MS = 30_000L
+        private const val ROOT_ACCESS_FAILURE_THRESHOLD = 3
+        private const val ROOT_ACCESS_RETRY_DELAY_MS = 1_000L
         private const val IDLE_HEALTH_INTERVAL_SCALE = 6L
         private const val ROOTLESS_NETWORK_FOLLOW_DELAY_MS = 1_000L
         private const val PERIODIC_ROOT_ROUTE_VERIFICATION_REASON = "periodic root route verification"
