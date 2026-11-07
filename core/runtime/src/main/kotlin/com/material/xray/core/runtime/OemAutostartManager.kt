@@ -202,7 +202,7 @@ internal fun oemAutostartTargets(manufacturer: String): List<OemAutostartTarget>
         OemAutostartTarget(
             "com.asus.mobilemanager",
             "com.asus.mobilemanager.entry.FunctionActivity",
-            "mobilemanager://function/entry/AutoStart",
+            dataUri = "mobilemanager://function/entry/AutoStart",
         ),
     )
     manufacturer.matchesOem("samsung") -> listOf(
