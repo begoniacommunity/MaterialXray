@@ -121,6 +121,13 @@ object RoutingRuleCatalog {
             domains = listOf("geosite:category-ads-all"),
             enabled = false,
         ),
+        RoutingRule(
+            id = "block-quic",
+            name = "Block QUIC",
+            outboundTag = "block",
+            protocols = listOf("quic"),
+            enabled = false,
+        ),
     )
 
     fun defaultIds(): Set<String> = defaults().mapTo(mutableSetOf()) { it.id }

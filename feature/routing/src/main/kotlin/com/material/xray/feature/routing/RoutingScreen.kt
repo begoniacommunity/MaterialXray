@@ -1005,6 +1005,7 @@ internal fun routingRuleDisplayName(rule: RoutingRule): String {
     return when (rule.id) {
         "ru-direct" -> stringResource(R.string.routing_default_rule_ru_name)
         "block-ads" -> stringResource(R.string.routing_default_rule_block_ads_name)
+        "block-quic" -> stringResource(R.string.routing_default_rule_block_quic_name)
         else -> rule.name
     }
 }

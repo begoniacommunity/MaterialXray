@@ -8,7 +8,7 @@ class SettingsRoutingRulesTest {
     fun `deleted defaults stay absent without a serialized custom rule list`() {
         val rules = defaultRoutingRules(
             stateOverrides = emptyMap(),
-            deletedDefaultRuleIds = setOf("ru-direct", "block-ads"),
+            deletedDefaultRuleIds = setOf("ru-direct", "block-ads", "block-quic"),
         )
 
         assertEquals(emptyList<Any>(), rules)

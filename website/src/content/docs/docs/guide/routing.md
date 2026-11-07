@@ -35,6 +35,7 @@ A fresh install includes:
 
 - **Bypass Russian domains and IPs** (on): `.ru`, `.su`, `.рф`, `geosite:category-ru` and `geoip:ru` go to `direct`.
 - **Block ads** (off): `geosite:category-ads-all` goes to `block`.
+- **Block QUIC** (off): connections Xray sniffs as QUIC go to `block`, so apps fall back to TCP. TCP through the proxy usually costs the phone less CPU than QUIC over UDP.
 
 Toggle them, edit them, or use **Reset to default** from the menu.
 

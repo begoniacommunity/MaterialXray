@@ -35,6 +35,7 @@
     <string name="routing_new_rule_name">New Rule</string>
     <string name="routing_default_rule_ru_name">Bypass Russian domains and IPs</string>
     <string name="routing_default_rule_block_ads_name">Block ads</string>
+    <string name="routing_default_rule_block_quic_name">Block QUIC</string>
     <string name="routing_rules_managed_by_provider">Routing rules are managed by %1$s</string>
     <string name="routing_rules_managed_by_selected_subscription">Routing rules are managed by the selected subscription</string>
     <string name="routing_some_rules_managed_by_provider">Some routing rules are managed by %1$s</string>

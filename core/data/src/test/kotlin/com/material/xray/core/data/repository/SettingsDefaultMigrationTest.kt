@@ -293,7 +293,7 @@ class SettingsDefaultMigrationTest {
 
         assertEquals("provider-rules", migrated[SettingsRepository.PROVIDER_ROUTING_RULES])
         assertEquals(
-            setOf("ru-direct", "block-ads"),
+            setOf("ru-direct", "block-ads", "block-quic"),
             migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS],
         )
     }
@@ -325,7 +325,7 @@ class SettingsDefaultMigrationTest {
         val migrated = SettingsDefaultMigration().migrate(preferences)
 
         assertEquals(
-            setOf("ru-direct", "block-ads"),
+            setOf("ru-direct", "block-ads", "block-quic"),
             migrated[SettingsRepository.DELETED_DEFAULT_ROUTING_RULE_IDS],
         )
         assertEquals(CURRENT_SETTINGS_DEFAULTS_REVISION, migrated[SETTINGS_DEFAULTS_REVISION])
