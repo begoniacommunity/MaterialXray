@@ -47,5 +47,14 @@ class SettingsRoutingOrderTest {
         assertEquals(listOf("b", "new", "a"), repository.customRoutingRules.first().map { it.id })
     }
 
+    @Test
+    fun `custom rules keep unique ids when a rule is saved twice or was stored twice`() = runBlocking {
+        repository.setRoutingRules(listOf(rule("a"), rule("a")))
+        assertEquals(1, repository.customRoutingRules.first().count { it.id == "a" })
+        repository.addRoutingRule(rule("new"))
+        repository.addRoutingRule(rule("new"))
+        assertEquals(1, repository.customRoutingRules.first().count { it.id == "new" })
+    }
+
     private fun rule(id: String) = RoutingRule(id, id, "proxy", domains = listOf("$id.example"))
 }

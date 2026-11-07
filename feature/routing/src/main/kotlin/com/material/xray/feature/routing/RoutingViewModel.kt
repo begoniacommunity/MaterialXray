@@ -136,7 +136,7 @@ class RoutingViewModel(
 
     fun addRule(rule: RoutingRule) {
         mutateRouting {
-            settingsRepository.setRoutingRules(settingsRepository.customRoutingRules.first() + rule)
+            settingsRepository.addRoutingRule(rule)
             routingChangeManager.markPendingChanges()
         }
     }

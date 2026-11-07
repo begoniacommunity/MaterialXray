@@ -626,6 +626,17 @@ class SettingsRepository(
         prefs.remove(ROUTING_RULE_STATES)
     }
 
+    /** Appends [rule] unless its id is already saved, so a repeated save cannot store a duplicate. */
+    suspend fun addRoutingRule(rule: RoutingRule) = store.edit { prefs ->
+        val current = decodeRoutingRules(prefs[ROUTING_RULES], prefs[ROUTING_RULES_VERSION], prefs[ROUTING_RULE_STATES], prefs[DELETED_DEFAULT_ROUTING_RULE_IDS].orEmpty())
+        if (current.any { it.id == rule.id }) return@edit
+        val updatedRules = current + rule
+        prefs[ROUTING_RULES] = encodeRoutingRules(updatedRules)
+        prefs[ROUTING_RULES_VERSION] = CURRENT_ROUTING_RULES_VERSION
+        prefs[DELETED_DEFAULT_ROUTING_RULE_IDS] = deletedDefaultRuleIds(updatedRules)
+        prefs.remove(ROUTING_RULE_STATES)
+    }
+
     suspend fun reorderRoutingRules(scope: RoutingRuleScope, ids: List<String>) = store.edit { prefs ->
         when (scope) {
             RoutingRuleScope.Custom -> {
@@ -902,7 +913,8 @@ class SettingsRepository(
         }.getOrNull()
 
         if (savedRules != null) {
-            return RoutingRuleCatalog.mergeWithDefaults(savedRules, deletedDefaultRuleIds)
+            // Older releases could save a new rule twice, and the routing list crashes on repeated ids.
+            return RoutingRuleCatalog.mergeWithDefaults(savedRules.distinctBy { it.id }, deletedDefaultRuleIds)
         }
 
         val stateOverrides = decodeRoutingRuleStates(statesEncoded)
