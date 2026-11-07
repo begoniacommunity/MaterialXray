@@ -13,6 +13,7 @@ class LocalXrayHealthMonitor(
     private val snapshotIntervalMs: Long,
     tunnelFailureThreshold: Int,
     apiFailureThreshold: Int,
+    private val intervalScale: () -> Long = { 1L },
 ) {
     private val tunnelFailures = ConsecutiveFailureDetector(tunnelFailureThreshold)
     private val apiFailures = ConsecutiveFailureDetector(apiFailureThreshold)
@@ -48,7 +49,7 @@ class LocalXrayHealthMonitor(
         if (due) lastSnapshotAtMs = nowMs
     }
 
-    private fun isDue(lastAtMs: Long?, nowMs: Long, intervalMs: Long): Boolean = lastAtMs == null || nowMs - lastAtMs >= intervalMs
+    private fun isDue(lastAtMs: Long?, nowMs: Long, intervalMs: Long): Boolean = lastAtMs == null || nowMs - lastAtMs >= intervalMs * intervalScale()
 }
 
 private class ConsecutiveFailureDetector(

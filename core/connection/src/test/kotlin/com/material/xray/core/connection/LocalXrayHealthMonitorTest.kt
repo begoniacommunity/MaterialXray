@@ -66,6 +66,19 @@ class LocalXrayHealthMonitorTest {
         assertTrue(monitor.shouldCheckTproxy(80_000L))
     }
 
+    @Test
+    fun `interval scale stretches every rate limit`() {
+        var scale = 1L
+        val monitor = monitor(memoryCheckIntervalMs = 10_000L, intervalScale = { scale })
+
+        assertTrue(monitor.shouldCheckMemory(0L))
+        scale = 6L
+        assertFalse(monitor.shouldCheckMemory(10_000L))
+        assertTrue(monitor.shouldCheckMemory(60_000L))
+        scale = 1L
+        assertTrue(monitor.shouldCheckMemory(70_000L))
+    }
+
     private fun monitor(
         memoryCheckIntervalMs: Long = 60_000L,
         tproxyCheckIntervalMs: Long = 60_000L,
@@ -73,6 +86,7 @@ class LocalXrayHealthMonitorTest {
         snapshotIntervalMs: Long = 300_000L,
         tunnelFailureThreshold: Int = 2,
         apiFailureThreshold: Int = 3,
+        intervalScale: () -> Long = { 1L },
     ) = LocalXrayHealthMonitor(
         memoryCheckIntervalMs = memoryCheckIntervalMs,
         tproxyCheckIntervalMs = tproxyCheckIntervalMs,
@@ -80,5 +94,6 @@ class LocalXrayHealthMonitorTest {
         snapshotIntervalMs = snapshotIntervalMs,
         tunnelFailureThreshold = tunnelFailureThreshold,
         apiFailureThreshold = apiFailureThreshold,
+        intervalScale = intervalScale,
     )
 }

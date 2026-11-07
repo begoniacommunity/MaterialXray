@@ -239,7 +239,8 @@ class XrayService(
     private var metricsIntervalMs = 0
     private var lastNotificationContent: NotificationContent? = null
     private var terminalFailureNotificationShown = false
-    private var screenInteractive = true
+
+    @Volatile private var screenInteractive = true
     private var screenStateReceiverRegistered = false
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -250,6 +251,7 @@ class XrayService(
             }
             if (screenInteractive == interactive) return
             screenInteractive = interactive
+            if (interactive && ::healthWatchdog.isInitialized) healthWatchdog.reschedule()
             updateBalancerSelectionTracker()
             updatePingTracker()
             updateMetricsJob()
@@ -362,6 +364,7 @@ class XrayService(
             recover = { cause, reason, watchedPid, pidToKill ->
                 recoverNativeProcess(cause, reason, watchedPid, pidToKill)
             },
+            intervalScale = ::healthIntervalScale,
         )
         networkRetargetWorker = NetworkRetargetWorker(
             scope = scope,
@@ -744,12 +747,13 @@ class XrayService(
 
     /**
      * A fast reconnect follows root commands that just worked, and the watchdog asks a fresh su
-     * session on the same interval, so it trusts a confirmation that recent instead of asking
-     * again. A grant revoked within that window is caught by the watchdog's next check.
+     * session on the same interval while the screen is on, so it trusts a confirmation that recent,
+     * or any while the screen is off, instead of asking again. A grant revoked within that window is
+     * caught by the watchdog's next check.
      */
     private suspend fun checkRootRuntimeAccess(preparation: ConnectionPreparation): Boolean {
         val recentlyConfirmed = preparation.reusesStaticRuntime &&
-            SystemClock.elapsedRealtime() - lastRootAccessConfirmedAtMs < ROOT_ACCESS_CHECK_INTERVAL_MS
+            (!screenInteractive || SystemClock.elapsedRealtime() - lastRootAccessConfirmedAtMs < ROOT_ACCESS_CHECK_INTERVAL_MS)
         val confirmed = recentlyConfirmed || settingsRuntimeManager.checkRootAvailability(reloadConnection = false)
         if (confirmed && !recentlyConfirmed) lastRootAccessConfirmedAtMs = SystemClock.elapsedRealtime()
         return confirmed && withContext(ioDispatcher) { rootShell.open(RootShell.NetworkNamespace.INIT) }
@@ -1378,9 +1382,20 @@ class XrayService(
         }
     }
 
+    /**
+     * The watchdog and the periodic route check have nothing to watch for that a network callback or
+     * a crash would not also report, so they run less often while the screen is off.
+     */
+    private fun healthIntervalScale(): Long = if (screenInteractive) 1L else IDLE_HEALTH_INTERVAL_SCALE
+
     private suspend fun runtimeModeRecoveryReason(): String? {
         val now = SystemClock.elapsedRealtime()
-        if (connectionManager.isUsingRootRuntime && now - lastRootAccessCheckAtMs >= ROOT_ACCESS_CHECK_INTERVAL_MS) {
+        // Revoking root takes the root manager's UI, so a screen-off probe could only find a slow su.
+        if (
+            connectionManager.isUsingRootRuntime &&
+            screenInteractive &&
+            now - lastRootAccessCheckAtMs >= ROOT_ACCESS_CHECK_INTERVAL_MS
+        ) {
             lastRootAccessCheckAtMs = now
             if (!settingsRuntimeManager.checkRootAvailability(reloadConnection = false)) {
                 rootServiceRequested = false
@@ -1409,7 +1424,7 @@ class XrayService(
 
     private suspend fun maybeScheduleNetworkSafetyCheck() {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastNetworkSafetyCheckAtMs < NETWORK_SAFETY_CHECK_INTERVAL_MS) return
+        if (now - lastNetworkSafetyCheckAtMs < NETWORK_SAFETY_CHECK_INTERVAL_MS * healthIntervalScale()) return
         lastNetworkSafetyCheckAtMs = now
 
         withContext(Dispatchers.Main.immediate) {
@@ -2631,6 +2646,7 @@ class XrayService(
         private const val LOCAL_ADDRESS_CHECK_INTERVAL_MS = 5_000L
         private const val NETWORK_SAFETY_CHECK_INTERVAL_MS = 60_000L
         private const val ROOT_ACCESS_CHECK_INTERVAL_MS = 30_000L
+        private const val IDLE_HEALTH_INTERVAL_SCALE = 6L
         private const val ROOTLESS_NETWORK_FOLLOW_DELAY_MS = 1_000L
         private const val PERIODIC_ROOT_ROUTE_VERIFICATION_REASON = "periodic root route verification"
         private val NETWORK_RETARGET_RETRY_DELAYS_MS = listOf(250L, 500L, 1_000L, 2_000L, 4_000L, 8_000L)

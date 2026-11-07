@@ -57,6 +57,42 @@ class XrayHealthWatchdogTest {
     }
 
     @Test
+    fun `rescheduling applies a shorter interval scale without waiting out the long delay`() = runTest {
+        val stateCoordinator = ConnectionStateCoordinator()
+        val probe = FakeHealthProbe(processAlive = true)
+        var scale = 6L
+        val watchdog = XrayHealthWatchdog(
+            scope = backgroundScope,
+            stateCoordinator = stateCoordinator,
+            healthProbe = probe,
+            log = LogBuffer(),
+            config = config(),
+            passiveMonitoringEnabled = { false },
+            memoryRestartThresholdMiB = { 1_000 },
+            elapsedRealtime = { testScheduler.currentTime },
+            tunnelAvailable = { true },
+            runtimeModeRecoveryReason = { null },
+            scheduleNetworkSafetyCheck = {},
+            recover = { _, _, _, _ -> true },
+            dispatcher = StandardTestDispatcher(testScheduler),
+            intervalScale = { scale },
+        )
+        stateCoordinator.markConnected(connectedState())
+
+        watchdog.start(connectedState())
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(0, probe.aliveChecks)
+
+        scale = 1L
+        watchdog.reschedule()
+        advanceTimeBy(101)
+        runCurrent()
+
+        assertEquals(1, probe.aliveChecks)
+    }
+
+    @Test
     fun `unresponsive API never restarts a live forwarding process`() = runTest {
         val stateCoordinator = ConnectionStateCoordinator()
         val probe = FakeHealthProbe(processAlive = true, sysStats = null)

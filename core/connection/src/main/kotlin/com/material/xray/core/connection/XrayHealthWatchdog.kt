@@ -48,6 +48,8 @@ class XrayHealthWatchdog(
     private val scheduleNetworkSafetyCheck: suspend () -> Unit,
     private val recover: (cause: CoreRecoveryCause, reason: String, watchedPid: Int, pidToKill: Int?) -> Boolean,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** Stretches every interval, so the checks run less often while nobody is looking at the phone. */
+    private val intervalScale: () -> Long = { 1L },
 ) {
     private var processJob: Job? = null
     private var apiJob: Job? = null
@@ -61,12 +63,22 @@ class XrayHealthWatchdog(
             (!passiveMonitoringEnabled() || apiJob?.isActive == true)
         if (currentSession?.pid == state.corePid && allJobsActive) return false
 
+        startSession(state.corePid)
+        return true
+    }
+
+    /** Restarts the timers, so a shorter [intervalScale] applies now rather than after the wait in progress. */
+    @Synchronized
+    fun reschedule() {
+        currentSession?.let { startSession(it.pid) }
+    }
+
+    private fun startSession(pid: Int) {
         cancelJobs()
-        val session = HealthWatchdogSession(++generation, state.corePid)
+        val session = HealthWatchdogSession(++generation, pid)
         currentSession = session
         startProcessHealth(session)
         if (passiveMonitoringEnabled()) startApiHealth(session)
-        return true
     }
 
     @Synchronized
@@ -89,7 +101,7 @@ class XrayHealthWatchdog(
             var keepWatching = true
             var consecutiveCheckFailures = 0
             while (isActive && keepWatching) {
-                delay(config.processIntervalMs)
+                delay(config.processIntervalMs * intervalScale())
                 try {
                     keepWatching = checkProcessHealth(session, healthMonitor)
                     if (keepWatching && consecutiveCheckFailures > 0) {
@@ -130,7 +142,7 @@ class XrayHealthWatchdog(
                         "Local Xray API health check failed: ${error.message ?: error.javaClass.simpleName}",
                     )
                 }
-                delay(config.apiProbeIntervalMs)
+                delay(config.apiProbeIntervalMs * intervalScale())
             }
         }
     }
@@ -253,6 +265,7 @@ class XrayHealthWatchdog(
         snapshotIntervalMs = config.snapshotIntervalMs,
         tunnelFailureThreshold = config.tunnelFailureThreshold,
         apiFailureThreshold = config.apiFailureThreshold,
+        intervalScale = intervalScale,
     )
 
     private fun isCurrent(session: HealthWatchdogSession): Boolean {
