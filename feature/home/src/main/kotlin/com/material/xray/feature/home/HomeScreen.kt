@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.net.VpnService
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -302,27 +301,7 @@ fun HomeScreen(
     val unableToFetchLinkText = stringResource(R.string.home_unable_to_fetch_link)
     val lifecycleOwner = LocalLifecycleOwner.current
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-    val vpnPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            viewModel.connect()
-        }
-    }
     val openQrScanner = QrScannerPermissionGate { showQrScanner = true }
-    val startRootlessConnection = {
-        val vpnPermissionIntent = VpnService.prepare(context)
-        if (vpnPermissionIntent != null) {
-            // Some TV firmwares (VIDAA) strip the system VPN consent dialog.
-            try {
-                vpnPermissionLauncher.launch(vpnPermissionIntent)
-            } catch (_: ActivityNotFoundException) {
-                showVpnConsentUnavailable = true
-            }
-        } else {
-            viewModel.connect()
-        }
-    }
     val pasteFromClipboard = {
         val link = context.clipboardText()
         if (link == null) {
@@ -378,6 +357,13 @@ fun HomeScreen(
     }
 
     val armConnectionHaptic = rememberConnectionChangeHaptic(uiState.connectionState)
+    val permissionGate = rememberConnectPermissionGate(
+        onConnect = {
+            armConnectionHaptic()
+            viewModel.connect()
+        },
+        onConsentUnavailable = { showVpnConsentUnavailable = true },
+    )
     val onConnectionClick = {
         connectionUiState.handleClick(
             context = context,
@@ -386,14 +372,8 @@ fun HomeScreen(
                 armConnectionHaptic()
                 viewModel.disconnect()
             },
-            connectRoot = {
-                armConnectionHaptic()
-                viewModel.connect()
-            },
-            connectVpn = {
-                armConnectionHaptic()
-                startRootlessConnection()
-            },
+            connectRoot = { permissionGate.connect(needsVpnConsent = false) },
+            connectVpn = { permissionGate.connect(needsVpnConsent = true) },
         )
     }
 
@@ -628,7 +608,8 @@ fun HomeScreen(
         onDismiss = { showRootFallbackDialog = false },
         onConfirm = {
             showRootFallbackDialog = false
-            startRootlessConnection()
+            // The fallback has already left root mode, so this reads the rootless answer.
+            permissionGate.connect(needsVpnConsent = uiState.needsVpnConsent)
         },
     )
     RemoveSubscriptionDialogHost(

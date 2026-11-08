@@ -12,7 +12,6 @@ import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -20,7 +19,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,13 +33,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Icon
@@ -61,7 +56,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -69,7 +63,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -83,6 +76,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.material.xray.core.runtime.NetworkServerStatus
 import com.material.xray.core.ui.R
 import com.material.xray.core.ui.components.AppAlertDialog
+import com.material.xray.core.ui.components.RequirementList
+import com.material.xray.core.ui.components.RequirementRow
 import com.material.xray.core.ui.components.ScrollFadeEdges
 import com.material.xray.core.ui.components.SelectableOptionRow
 import com.material.xray.core.ui.components.TooltipIconButton
@@ -342,23 +337,30 @@ private fun NetworkLocationDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(R.string.network_ssid_permission_description))
-                Column(modifier = Modifier.clip(RoundedCornerShape(20.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    LocationRequirementRow(R.string.network_location_service, R.string.network_location_service_summary, done = access.service) {
-                        context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                    }
-                    LocationRequirementRow(R.string.network_location_precise, R.string.network_location_precise_summary, done = access.precise) {
-                        onRequest(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
-                    }
+                RequirementList {
+                    RequirementRow(
+                        stringResource(R.string.network_location_service),
+                        stringResource(R.string.network_location_service_summary),
+                        done = access.service,
+                        onClick = { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
+                    )
+                    RequirementRow(
+                        stringResource(R.string.network_location_precise),
+                        stringResource(R.string.network_location_precise_summary),
+                        done = access.precise,
+                        onClick = { onRequest(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)) },
+                    )
                     if (Build.VERSION.SDK_INT >= 29) {
-                        LocationRequirementRow(
-                            R.string.network_location_background,
-                            if (access.precise) R.string.network_location_background_summary else R.string.network_location_background_blocked,
+                        RequirementRow(
+                            stringResource(R.string.network_location_background),
+                            stringResource(if (access.precise) R.string.network_location_background_summary else R.string.network_location_background_blocked),
                             done = access.background,
                             enabled = access.precise,
-                        ) {
-                            // Android 11+ only grants background location from the permission screen.
-                            if (Build.VERSION.SDK_INT == 29) onRequest(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) else onOpenPermissions()
-                        }
+                            onClick = {
+                                // Android 11+ only grants background location from the permission screen.
+                                if (Build.VERSION.SDK_INT == 29) onRequest(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) else onOpenPermissions()
+                            },
+                        )
                     }
                 }
             }
@@ -370,36 +372,4 @@ private fun NetworkLocationDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
     )
-}
-
-@Composable
-private fun LocationRequirementRow(@StringRes title: Int, @StringRes summary: Int, done: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    val actionable = !done && enabled
-    ListItem(
-        headlineContent = { Text(stringResource(title)) },
-        supportingContent = { Text(stringResource(summary)) },
-        leadingContent = { LocationRequirementStatus(done) },
-        trailingContent = if (actionable) {
-            { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
-        } else {
-            null
-        },
-        modifier = Modifier.clickable(enabled = actionable, onClick = onClick).alpha(if (done || enabled) 1f else 0.6f),
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
-    )
-}
-
-@Composable
-private fun LocationRequirementStatus(done: Boolean) {
-    val description = stringResource(if (done) R.string.network_location_done else R.string.network_location_missing)
-    if (done) {
-        Icon(Icons.Filled.CheckCircle, contentDescription = description, tint = MaterialTheme.colorScheme.primary)
-    } else {
-        // An empty ring marks a step that is still open, like an unchecked list item.
-        Box(
-            modifier = Modifier.size(24.dp).padding(2.dp)
-                .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                .semantics { contentDescription = description },
-        )
-    }
 }

@@ -23,8 +23,6 @@
     <string name="network_location_background">Геолокация всегда</string>
     <string name="network_location_background_summary">Позволяет правилам переключать серверы в фоне</string>
     <string name="network_location_background_blocked">Сначала разрешите точную геолокацию</string>
-    <string name="network_location_done">Готово</string>
-    <string name="network_location_missing">Требуется</string>
     <string name="network_location_title">Доступ к местоположению</string>
     <string name="network_location_continue">Всё равно продолжить</string>
     <string name="network_location_ready">Продолжить</string>

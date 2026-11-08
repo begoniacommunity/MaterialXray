@@ -111,4 +111,6 @@
     <string name="tile_state_disconnecting">Disconnecting</string>
     <string name="tile_state_connection_error">Connection error</string>
     <string name="tile_state_disconnected">Disconnected</string>
+    <string name="requirement_done">Done</string>
+    <string name="requirement_missing">Required</string>
 </resources>

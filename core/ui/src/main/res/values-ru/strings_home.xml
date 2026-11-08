@@ -255,4 +255,10 @@
     <string name="home_vpn_consent_unavailable_copy">Скопировать команду</string>
     <string name="home_vpn_consent_unavailable_copied">Команда скопирована</string>
     <string name="home_vpn_consent_unavailable_close">Закрыть</string>
+    <string name="home_connect_permissions_title">Перед подключением</string>
+    <string name="home_connect_permission_vpn">VPN-подключение</string>
+    <string name="home_connect_permission_vpn_summary">Позволяет Material Xray направлять трафик устройства</string>
+    <string name="home_connect_permission_notifications">Уведомления</string>
+    <string name="home_connect_permission_notifications_summary">Необязательно. Показывают статус подключения и сообщают о его разрыве</string>
+    <string name="home_connect_permissions_confirm">Подключиться</string>
 </resources>

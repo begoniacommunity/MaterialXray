@@ -96,4 +96,6 @@
     <string name="tile_state_disconnecting">Отключение</string>
     <string name="tile_state_connection_error">Ошибка подключения</string>
     <string name="tile_state_disconnected">Отключено</string>
+    <string name="requirement_done">Готово</string>
+    <string name="requirement_missing">Требуется</string>
 </resources>

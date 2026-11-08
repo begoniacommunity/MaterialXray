@@ -23,8 +23,6 @@
     <string name="network_location_background">Location all the time</string>
     <string name="network_location_background_summary">Lets overrides switch servers in the background</string>
     <string name="network_location_background_blocked">Allow precise location first</string>
-    <string name="network_location_done">Done</string>
-    <string name="network_location_missing">Required</string>
     <string name="network_location_title">Location access</string>
     <string name="network_location_continue">Continue anyway</string>
     <string name="network_location_ready">Continue</string>

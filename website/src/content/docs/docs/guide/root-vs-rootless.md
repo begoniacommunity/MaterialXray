@@ -8,6 +8,8 @@ Material Xray runs the same Xray-core build either way. The two modes differ in 
 - **Rootless** creates a standard Android VPN and hands its TUN file descriptor to Xray.
 - **Rootful** uses `su` to create its own TUN interface and routing tables, so Android never sees a VPN.
 
+The first time you connect, the app lists what it still needs before Android asks: the VPN permission in rootless mode and, on Android 13 and later, notifications, which are optional. **Connect** walks through the missing prompts in turn.
+
 ## Comparison
 
 | | Rootless | Rootful |

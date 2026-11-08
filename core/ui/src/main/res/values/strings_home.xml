@@ -239,4 +239,10 @@
     <string name="home_vpn_consent_unavailable_copy">Copy command</string>
     <string name="home_vpn_consent_unavailable_copied">Command copied</string>
     <string name="home_vpn_consent_unavailable_close">Close</string>
+    <string name="home_connect_permissions_title">Before you connect</string>
+    <string name="home_connect_permission_vpn">VPN connection</string>
+    <string name="home_connect_permission_vpn_summary">Lets Material Xray route this device\'s traffic</string>
+    <string name="home_connect_permission_notifications">Notifications</string>
+    <string name="home_connect_permission_notifications_summary">Optional. Shows the connection status and tells you when it drops</string>
+    <string name="home_connect_permissions_confirm">Connect</string>
 </resources>
