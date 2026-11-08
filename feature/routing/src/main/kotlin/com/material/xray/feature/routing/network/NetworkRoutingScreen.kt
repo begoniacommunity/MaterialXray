@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -142,7 +143,7 @@ fun NetworkRoutingContent(contentBottomPadding: Dp, viewModel: NetworkRoutingVie
         null -> resources.getString(R.string.network_server_unchanged)
         else -> choices.firstOrNull { it.id == id }?.name ?: resources.getString(R.string.network_server_unavailable)
     }
-    LazyColumn(contentPadding = PaddingValues(bottom = contentBottomPadding)) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = contentBottomPadding)) {
         item {
             NetworkMainSwitch(checked = policy.enabled, onCheckedChange = viewModel::setEnabled)
         }
