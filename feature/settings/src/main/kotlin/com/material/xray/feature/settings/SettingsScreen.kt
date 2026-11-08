@@ -2,11 +2,13 @@ package com.material.xray.feature.settings
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.net.Uri
+import android.net.VpnService
 import android.os.Build
 import android.provider.Settings
 import android.text.format.DateFormat
@@ -272,6 +274,29 @@ private fun SettingsScreenContent(
     val diagnosticsEnabled = settings.diagnosticsEnabled
     val context = LocalContext.current
     val isTelevision = remember(context) { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
+    // Turning the tunnel on reconnects a running proxy-only session, which would fail and take the
+    // proxy down with it if Android's VPN consent was never given, so ask for it first.
+    val vpnConsentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) viewModel.setDeviceTunnel(true)
+    }
+    val vpnConsentRequired = stringResource(R.string.connection_error_vpn_permission_required)
+    val onDeviceTunnelChange: (Boolean) -> Unit = { enabled ->
+        val consentIntent = if (enabled && connectionState is ConnectionState.Connected && !settings.useRootService) {
+            VpnService.prepare(context)
+        } else {
+            null
+        }
+        if (consentIntent == null) {
+            viewModel.setDeviceTunnel(enabled)
+        } else {
+            // Some TV firmwares strip the consent dialog; the switch stays off and the proxy keeps running.
+            try {
+                vpnConsentLauncher.launch(consentIntent)
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(context, vpnConsentRequired, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     val resources = LocalResources.current
     val lifecycleOwner = LocalLifecycleOwner.current
     rememberSystemState { viewModel.refreshOemAutostartGuidance() }
@@ -429,7 +454,7 @@ private fun SettingsScreenContent(
                             }
                         },
                         actions = SettingsServiceActions(
-                            onDeviceTunnelChange = viewModel::setDeviceTunnel,
+                            onDeviceTunnelChange = onDeviceTunnelChange,
                             onOpenLocalProxySettings = onOpenLocalProxySettings,
                             onLocalProxyEnabledChange = viewModel::setLocalProxyEnabled,
                             onUseRootServiceChange = viewModel::setUseRootService,

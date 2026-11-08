@@ -878,7 +878,9 @@ class XrayService(
 
     private suspend fun connectAlwaysOnVpn() {
         val state = connectionStateCoordinator.state.value
-        if (state is ConnectionState.Connected && !connectionManager.isUsingRootRuntime && activeConfig != null) return
+        // A proxy-only session is rootless too, but has no tunnel for Android to keep up.
+        val vpnSessionUp = state is ConnectionState.Connected && !connectionManager.isUsingRootRuntime && sessionDeviceTunnel
+        if (vpnSessionUp && activeConfig != null) return
 
         stopProcessWatchdog()
         closeVpnInterface()
