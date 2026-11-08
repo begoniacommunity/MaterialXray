@@ -3,9 +3,7 @@ title: Per-app proxy
 description: Choose how each app's traffic is routed.
 ---
 
-Open **Routing → Apps** to choose a route for each app. Tap the toolbar search icon to search by name in a compact panel above the keyboard, as on Logs. Tapping an app clears search-field focus and dismisses the keyboard before opening its route picker; a nonempty search query is preserved. You can also show system apps and include work-profile apps when you have one.
-
-App rows keep consistent vertical spacing when package names wrap onto multiple lines; long names remain fully readable. Route indicators use the width of their visible label, with an 8 dp gap to the app details. Long labels wrap within a limited part of the row.
+Open **Routing → Apps** to choose a route for each app. Search by name from the toolbar. The menu can also show system apps and work-profile apps.
 
 ## Routes
 
@@ -16,8 +14,6 @@ App rows keep consistent vertical spacing when package names wrap onto multiple 
 | **Default outbound** | Uses the default outbound chosen in Settings. | Rootful |
 | **Specific server** | Sends the app through a server of your choice. Routing rules still apply. | Rootful |
 | **Always proxied** | With a specific server: sends *all* of the app's traffic through it, ignoring routing rules. | Rootful |
-
-The route picker fades into the dialog background at both ends, matching the main scrolling lists. Servers under **Use specific server** are grouped beneath small subscription-name headings. For longer lists, the standard rectangular **Find servers** field filters by server details or subscription name; the preset routes stay visible.
 
 In rootless mode, rootful-only routes are skipped, and the log says how many were.
 

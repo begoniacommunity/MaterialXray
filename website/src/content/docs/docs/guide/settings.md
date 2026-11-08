@@ -3,7 +3,7 @@ title: Settings
 description: Connectivity, DNS, IPv6, appearance, backups and more.
 ---
 
-A tour of the Settings tab. Some options only show up after you turn on **Show advanced options**.
+Some options only show up after you turn on **Show advanced options**.
 
 ## Connectivity and routing
 
@@ -13,15 +13,14 @@ A tour of the Settings tab. Some options only show up after you turn on **Show a
 | **Routing policy** | *Subscription provider* (default) applies routing and per-app rules from the selected subscription. *User* keeps your own. |
 | **Default outbound** | Where rootful *Default outbound* app routes go. |
 | **IPv6 connections** | **Off**: IPv4 only. **Auto**: uses IPv6 once a quick check through the server passes. **On**: always prefers IPv6 when the network has it. |
-| **TUN interface name** | Names the rootful TUN interface. With advanced options enabled, shown above **Tunnel tethered clients** when **TUN interface** is selected; **Transparent proxy** shows **When another VPN is active** in the same place. |
+| **TUN interface name** | Rootful with **TUN interface** only. Names the TUN interface. |
+| **When another VPN is active** | Rootful with **Transparent proxy** only. How to share the device with another VPN; tap **(?)** next to a mode for details. |
 | **Tunnel tethered clients** | Rootful only. Routes Wi-Fi hotspot and USB tethering traffic through Xray. |
 | **Route app traffic through Xray** | Sends Material Xray's own data updates through the active connection. Latency checks always bypass it. |
-| **Connection health watchdog** | Watches the local Xray API, the tunnel and root routing for failures, without sending external probes. |
-| **Always-on VPN** | Shows whether Android's always-on VPN is enabled for Material Xray. Tap the row below **Auto-connect on boot** to open Android's VPN settings and manage it there. The row is disabled while root service is enabled. |
+| **Connection health watchdog** | Watches the local Xray API, the tunnel and root routing, and recovers the connection when they fail. It sends no external probes. |
+| **Always-on VPN** | Opens Android's VPN settings, where you manage always-on VPN for Material Xray. Not available with root service. |
 
-With **Transparent proxy** and advanced options enabled, **When another VPN is active** uses the same short descriptions in the dropdown and below the selected mode. Tap the **(?)** button beside the description for **Auto** or **Tunnel-in-Tunnel** to read the detailed explanation, then tap **Understand** to close it. **Stand down** has no help button.
-
-If root access is unavailable, **Use root service** shows a **Retry** button. Granting access and retrying restores an off switch; enabling root mode remains your choice. Opening Settings reuses the known root-access result without a new permission check. Root access is checked when you tap Retry, enable root mode, or connect; a running root connection also monitors it. Losing access switches the app back to rootless mode. Android's VPN permission is required to connect in rootless mode.
+If root access is unavailable, **Use root service** shows a **Retry** button: grant access in your root manager, then tap it. Root access is checked when you tap Retry, enable root mode or connect, and a running root connection keeps checking it; if access is lost, the app switches to rootless mode. Rootless mode needs Android's VPN permission.
 
 ## Device VPN and local proxy server
 
@@ -41,35 +40,25 @@ Xray answers every port-53 query itself, so names routed through the proxy are n
 - **Proxied domains**: the resolver for every name routed through the proxy.
 - **Direct domains**: the resolver for LAN hosts and direct rules. These queries leave over your normal connection. The default, **System**, uses the resolver of the network you're on. In rootless mode it goes through Android, so it also follows your Private DNS setting. In root mode it asks the network's resolvers directly and reconnects when they change.
 - **Encrypt queries**: use encrypted DNS.
-- **Prefer profile DNS**: when a JSON profile defines its own DNS, use it. A subscription can override this for its own servers with [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json). While the selected server comes from such a subscription, the toggle shows the provider's choice, and switching it changes the choice for that subscription only.
+- **Prefer profile DNS**: when a JSON profile defines its own DNS, use it. A subscription can decide this for its own servers with [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json); switching it then changes the choice for that subscription only.
 
 Resolvers are comma-separated and tried in order. Each one is an IP address or a DoH URL like `https://dns.quad9.net/dns-query`.
 
 ## Core
 
-**Choose Xray-core version** opens the core manager. Its preview shows the version alone for GitHub releases, “(custom)” for a core installed from a file, and “(built-in)” for the bundled core. Old cores show only their version. **Check for new Xray-core versions automatically** has a separate switch and interval picker: tap the text to choose **3 days**, **1 week** (default), **2 weeks**, or **1 month** (30 days). Changing this interval does not affect app update checks. When checks are enabled, choose whether to be notified of a new core or install it automatically. The interval is included in backups. Loaded version pages are cached across app restarts; reopening the picker reuses them. Tap Refresh to fetch the latest list. A failed refresh keeps the cached list available, while automatic update checks always request current releases.
+**Choose Xray-core version** opens the core manager, where you can install a GitHub release or a core from a file. **Check for new Xray-core versions automatically** checks every 3 days, 1 week (default), 2 weeks or 1 month; tap its text to change the interval, which is separate from app update checks. Choose whether a new core only notifies you or installs automatically.
 
-**Follow provider core requirements** (on by default) lets a subscription that sends [`mxray-min-core-version` or `mxray-max-core-version`](/docs/providers/response-headers/#mxray-min-core-version) pick the core: when you connect to one of its servers from the Home screen, or switch to one while connected, with a core out of range, the app switches to the newest release in range, downloading it if needed. Automatic updates skip releases outside the selected server's range. With it off, connecting warns you instead and offers a core in range. It is included in backups.
-
-Dependent controls expand and collapse smoothly when their parent option changes, including root-service options, custom DNS fields and update settings. Hidden controls leave no empty gaps. Ordinary settings use compact 6 dp spacing, text and dropdown fields use 8 dp, and section headers retain extra separation.
-
-Dialog titles are centered when an icon appears above them, including titles that wrap to several lines. Dialog titles without an icon remain aligned to the start.
+**Follow provider core requirements** (on by default) lets a subscription that sends [`mxray-min-core-version` or `mxray-max-core-version`](/docs/providers/response-headers/#mxray-min-core-version) pick the core: connecting to one of its servers switches to the newest release in its range, downloading it if needed, and automatic updates skip releases outside that range. With it off, connecting warns you instead and offers a core in range.
 
 Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, and geodata URLs and update interval.
 
-Geodata downloads, subscription refreshes, app update checks and Xray version-list refreshes use a quick shrinking and growing icon transition. A completed operation shows **Check** for about two seconds; a failed operation shows **Error** for the same time. The original download or refresh icon then returns with the same transition. Core downloads and file installations use the same result indicators. Cancelling an operation does not show an error.
-
 ## Appearance and notifications
 
-The navigation bar and rail stay in place while tab content moves within its viewport, so the selected highlight animates continuously. The active tab label smoothly changes to semibold weight. Detail screens, including DNS and Xray-core settings, use the same directional fade-and-slide as the tabs, moving both the outgoing page and the incoming page. Predictive Back follows the same motion and can be cancelled; on wide windows, the detail sheet uses that transition and dims the controls beneath it.
-
 - **App language**: English or Russian, or follow the system.
-- **Shortcut name**: choose **Material Xray** (the default) or **MXray** below App icon. The choice changes the native launcher entry, is independent of the icon, and survives restarts and backup restore.
-- **App icon**: the default icon or a Material-style alternative, each with a small preview of the actual launcher icon. Both use the vector logo, with padding that keeps it inside adaptive launcher masks. The default uses the brand colors on white; the alternative and themed icons use the monochrome shape. The splash screen uses brand colors in light mode and monochrome in dark mode. The optional title-bar logo is always monochrome and matches the title text color in either theme. Notification icons always use monochrome.
-- **Floating connect button**: a small corner button instead of the large power button. A check mark indicates an active always-on VPN connection; tapping it opens Android's VPN settings.
-- **Notification fields**: pick what the connection notification shows and how often it updates. Configure fields lists enabled fields in your chosen order, using “and” before the last of two or three fields. If more are enabled, it shows the first three separated by commas, followed by “, and X more”. Only the first label is capitalized; Xray and RAM keep their spelling.
-  Hold a field's handle, then drag to reorder it. Haptic feedback marks the long press before any movement, and each subsequent change of position. Neighboring fields slide smoothly into place.
-  In rootful mode, **Pinned interface** can be selected alongside metrics such as ping and traffic speed, and reordered with them. It is hidden in rootless mode. With no fields selected, the notification still shows the connection status and interface as before.
+- **Shortcut name**: the name under the launcher icon, **Material Xray** (default) or **MXray**.
+- **App icon**: the default icon or a Material-style alternative.
+- **Floating connect button**: a small corner button instead of the large power button. A check mark on it means always-on VPN is active; tapping it then opens Android's VPN settings.
+- **Notification fields**: pick what the connection notification shows, in what order, and how often it updates. Drag a field's handle to reorder it. **Pinned interface** is available in rootful mode. With no fields selected, the notification still shows the connection status.
 
 ## Quick Settings tile
 
@@ -78,7 +67,7 @@ Add the Material Xray tile to toggle the connection from the notification shade.
 ## Data
 
 - **Export / Import**: a backup of subscriptions, servers, app routes, settings and a hand-edited runtime config. Downloaded geodata and Xray cores are not included; they download again. Importing replaces the current configuration.
-- **Clear geodata**: available with advanced options enabled. Deletes downloaded geoip and geosite files. It shares a row with Export and Import when there is enough room and wraps below them on narrower screens.
+- **Clear geodata**: deletes downloaded geoip and geosite files. Advanced options only.
 
 ## Diagnostics
 
