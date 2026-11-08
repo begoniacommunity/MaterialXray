@@ -8,10 +8,6 @@
     <string name="network_server_unavailable">Assigned server is unavailable. Choose another server.</string>
     <string name="network_ssid_active">Wi-Fi network override is active for SSID %1$s.</string>
     <string name="network_ssid_rules">Wi-Fi network overrides</string>
-    <string name="network_ssid_permission_description">Android requires location enabled, with precise location permission to be granted, in order to read SSIDs used for Wi-Fi network overrides. For automatic switching in the background, you need to allow location access all the time in app permissions.\n\nGlobal defaults for Wi-Fi and mobile networks work without these permissions.</string>
-    <string name="network_grant_location">Allow precise location</string>
-    <string name="network_background_location">Allow location all the time</string>
-    <string name="network_enable_location">Enable location</string>
     <string name="network_add_ssid">Add Wi-Fi network</string>
     <string name="network_remove_ssid">Remove Wi-Fi rule</string>
     <string name="network_ssid">Network name (SSID)</string>
@@ -19,5 +15,17 @@
     <string name="network_pick_server">Choose server</string>
     <string name="network_blocked_override">Automatic switching is paused while a manually edited active config is saved.</string>
     <string name="network_blocked_core">The assigned server requires another core version. Select a compatible core or server.</string>
-    <string name="network_open_permissions">Open location permissions</string>
+    <string name="network_ssid_permission_description">Wi-Fi network overrides need the name of the current Wi-Fi network, and Android only shares it with location access. Global Wi-Fi and mobile defaults work without it.</string>
+    <string name="network_location_service">Device location</string>
+    <string name="network_location_service_summary">Android hides Wi-Fi names while location is off</string>
+    <string name="network_location_precise">Precise location</string>
+    <string name="network_location_precise_summary">Lets the app read the current Wi-Fi name</string>
+    <string name="network_location_background">Location all the time</string>
+    <string name="network_location_background_summary">Lets overrides switch servers in the background</string>
+    <string name="network_location_background_blocked">Allow precise location first</string>
+    <string name="network_location_done">Done</string>
+    <string name="network_location_missing">Required</string>
+    <string name="network_location_title">Location access</string>
+    <string name="network_location_continue">Continue anyway</string>
+    <string name="network_location_ready">Continue</string>
 </resources>

@@ -1,13 +1,18 @@
 package com.material.xray.feature.routing.network
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -15,6 +20,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,9 +34,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -49,16 +60,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import androidx.lifecycle.Lifecycle
@@ -83,13 +97,20 @@ fun NetworkRoutingContent(contentBottomPadding: Dp, viewModel: NetworkRoutingVie
     val activeOverrideSsid by viewModel.activeOverrideSsid.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<String?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var askingLocation by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val resources = LocalResources.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var permissionsRevision by remember { mutableIntStateOf(0) }
-    val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+    val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         permissionsRevision++
         viewModel.refreshNetwork()
+        // Android answers a permanently denied request without a prompt; only app settings can grant it then.
+        val denied = results.filterValues { !it }.keys
+        if (activity != null && denied.isNotEmpty() && denied.none { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }) {
+            viewModel.openLocationPermissions()
+        }
     }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -101,9 +122,22 @@ fun NetworkRoutingContent(contentBottomPadding: Dp, viewModel: NetworkRoutingVie
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
+    if (askingLocation) {
+        // Quick settings toggles location without pausing the activity.
+        DisposableEffect(context) {
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    permissionsRevision++
+                }
+            }
+            ContextCompat.registerReceiver(context, receiver, IntentFilter(LocationManager.MODE_CHANGED_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED)
+            onDispose { context.unregisterReceiver(receiver) }
+        }
+    }
     val fine = remember(permissionsRevision) { ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED }
     val background = remember(permissionsRevision) { Build.VERSION.SDK_INT < 29 || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED }
     val location = remember(permissionsRevision) { LocationManagerCompat.isLocationEnabled(context.getSystemService(LocationManager::class.java)) }
+    val access = LocationAccess(service = location, precise = fine, background = background)
     fun title(id: Long?): String = when (id) {
         null -> resources.getString(R.string.network_server_unchanged)
         else -> choices.firstOrNull { it.id == id }?.name ?: resources.getString(R.string.network_server_unavailable)
@@ -156,21 +190,22 @@ fun NetworkRoutingContent(contentBottomPadding: Dp, viewModel: NetworkRoutingVie
             ListItem(
                 headlineContent = { Text(stringResource(R.string.network_add_ssid), color = MaterialTheme.colorScheme.primary) },
                 leadingContent = { Icon(painterResource(R.drawable.ic_add_24), contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                modifier = Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(24.dp)).clickable { adding = true },
+                modifier = Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(24.dp)).clickable { if (access.ready) adding = true else askingLocation = true },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
         }
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.Start,
-            ) {
-                Icon(painterResource(R.drawable.info_24px), contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(stringResource(R.string.network_ssid_permission_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Start)
-                NetworkLocationAccess(fine, background, location, onRequest = { requestPermission.launch(it) }, onOpenPermissions = viewModel::openLocationPermissions)
-            }
-        }
+    }
+    if (askingLocation) {
+        NetworkLocationDialog(
+            access,
+            onRequest = { requestPermission.launch(it) },
+            onOpenPermissions = viewModel::openLocationPermissions,
+            onDismiss = { askingLocation = false },
+            onContinue = {
+                askingLocation = false
+                adding = true
+            },
+        )
     }
     if (adding) {
         SsidDialog(network.ssid, onDismiss = { adding = false }) { ssid ->
@@ -286,31 +321,84 @@ private fun NetworkServerPicker(choices: List<NetworkServerChoice>, selected: Lo
     )
 }
 
+private data class LocationAccess(val service: Boolean, val precise: Boolean, val background: Boolean) {
+    val ready get() = service && precise && background
+}
+
 @Composable
-private fun NetworkLocationAccess(fine: Boolean, background: Boolean, location: Boolean, onRequest: (Array<String>) -> Unit, onOpenPermissions: () -> Unit) {
+private fun NetworkLocationDialog(
+    access: LocationAccess,
+    onRequest: (Array<String>) -> Unit,
+    onOpenPermissions: () -> Unit,
+    onDismiss: () -> Unit,
+    onContinue: () -> Unit,
+) {
     val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.Start) {
-        if (!fine) {
-            TextButton(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp), onClick = { onRequest(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)) }) {
-                Text(stringResource(R.string.network_grant_location), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
-            }
-        }
-        if (fine && !background) {
-            TextButton(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp), onClick = {
-                if (Build.VERSION.SDK_INT == 29) {
-                    onRequest(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
-                } else {
-                    onOpenPermissions()
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+        title = { Text(stringResource(R.string.network_location_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(R.string.network_ssid_permission_description))
+                Column(modifier = Modifier.clip(RoundedCornerShape(20.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    LocationRequirementRow(R.string.network_location_service, R.string.network_location_service_summary, done = access.service) {
+                        context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    }
+                    LocationRequirementRow(R.string.network_location_precise, R.string.network_location_precise_summary, done = access.precise) {
+                        onRequest(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    }
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        LocationRequirementRow(
+                            R.string.network_location_background,
+                            if (access.precise) R.string.network_location_background_summary else R.string.network_location_background_blocked,
+                            done = access.background,
+                            enabled = access.precise,
+                        ) {
+                            // Android 11+ only grants background location from the permission screen.
+                            if (Build.VERSION.SDK_INT == 29) onRequest(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) else onOpenPermissions()
+                        }
+                    }
                 }
-            }) { Text(stringResource(R.string.network_background_location), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start) }
-        }
-        if (!location) {
-            TextButton(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp), onClick = { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }) {
-                Text(stringResource(R.string.network_enable_location), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
             }
-        }
-        TextButton(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp), onClick = { onOpenPermissions() }) {
-            Text(stringResource(R.string.network_open_permissions), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
-        }
+        },
+        confirmButton = {
+            TextButton(onClick = onContinue) {
+                Text(stringResource(if (access.ready) R.string.network_location_ready else R.string.network_location_continue))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun LocationRequirementRow(@StringRes title: Int, @StringRes summary: Int, done: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    val actionable = !done && enabled
+    ListItem(
+        headlineContent = { Text(stringResource(title)) },
+        supportingContent = { Text(stringResource(summary)) },
+        leadingContent = { LocationRequirementStatus(done) },
+        trailingContent = if (actionable) {
+            { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
+        } else {
+            null
+        },
+        modifier = Modifier.clickable(enabled = actionable, onClick = onClick).alpha(if (done || enabled) 1f else 0.6f),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+    )
+}
+
+@Composable
+private fun LocationRequirementStatus(done: Boolean) {
+    val description = stringResource(if (done) R.string.network_location_done else R.string.network_location_missing)
+    if (done) {
+        Icon(Icons.Filled.CheckCircle, contentDescription = description, tint = MaterialTheme.colorScheme.primary)
+    } else {
+        // An empty ring marks a step that is still open, like an unchecked list item.
+        Box(
+            modifier = Modifier.size(24.dp).padding(2.dp)
+                .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                .semantics { contentDescription = description },
+        )
     }
 }

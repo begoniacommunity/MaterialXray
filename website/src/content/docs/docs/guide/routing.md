@@ -66,6 +66,6 @@ Open **Routing → Network** and turn on **Use specific server per network**. Ch
 
 Add a **Wi-Fi network override** to use a server on one exact SSID. Names are case-sensitive and spaces count. An override takes priority over the general Wi-Fi choice.
 
-SSID overrides need **precise location** permission with **Location** turned on, and on Android 10 and later location access **all the time** to work in the background. The general Wi-Fi and mobile choices don't need these permissions; without them, the general Wi-Fi choice applies. The app does not scan for Wi-Fi networks or log SSIDs.
+SSID overrides need **precise location** permission with **Location** turned on, and on Android 10 and later location access **all the time** to work in the background. When one is missing, **Add Wi-Fi network** asks for it first; you can continue without it. The general Wi-Fi and mobile choices don't need these permissions; without them, the general Wi-Fi choice applies. The app does not scan for Wi-Fi networks or log SSIDs.
 
 Automatic switching pauses when it would discard an edited active configuration, or when the assigned server needs an incompatible core; the Network page shows why. Choose a compatible core or remove the edit, then reconnect. Assignments follow a server when a subscription refresh replaces it, but a removed server is not guessed by name.
