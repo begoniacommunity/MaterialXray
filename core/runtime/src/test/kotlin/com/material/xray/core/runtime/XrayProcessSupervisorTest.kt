@@ -445,7 +445,7 @@ class XrayProcessSupervisorTest {
             configPath: String,
             workingDir: String,
             logPath: String,
-            tunFd: Int,
+            tunFd: Int?,
             environment: Map<String, String>,
         ): Int {
             startedEnvironment = environment

@@ -34,6 +34,9 @@ val TopLevelKeys: List<TopLevelKey> = listOf(HomeKey, RoutingKey, LogsKey, Setti
 data object DnsSettingsKey : DetailKey
 
 @Serializable
+data object LocalProxySettingsKey : DetailKey
+
+@Serializable
 data object XrayCoreSettingsKey : DetailKey
 
 @Serializable

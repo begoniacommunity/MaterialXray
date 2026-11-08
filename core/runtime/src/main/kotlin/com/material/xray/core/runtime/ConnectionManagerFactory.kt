@@ -76,6 +76,7 @@ internal class AndroidConnectionEnvironment(
     override fun describe(error: ConnectionError): String = when (error) {
         ConnectionError.Unknown -> localized(R.string.error_unknown)
         ConnectionError.VpnPermissionRequired -> localized(R.string.connection_error_vpn_permission_required)
+        ConnectionError.NothingToStart -> localized(R.string.connection_error_nothing_to_start)
         ConnectionError.MissingProcessId -> localized(R.string.connection_error_missing_process_id)
         ConnectionError.CleanupFailed -> localized(R.string.connection_error_cleanup_failed)
         ConnectionError.TunNameDetection -> localized(R.string.connection_error_tun_name_detection)

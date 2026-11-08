@@ -6,6 +6,9 @@ sealed interface ConnectionError {
 
     data object VpnPermissionRequired : ConnectionError
 
+    /** Both the device tunnel and the local proxy are switched off. */
+    data object NothingToStart : ConnectionError
+
     data object MissingProcessId : ConnectionError
 
     data object CleanupFailed : ConnectionError

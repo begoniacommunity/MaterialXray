@@ -23,6 +23,17 @@ With **Transparent proxy** and advanced options enabled, **When another VPN is a
 
 If root access is unavailable, **Use root service** shows a **Retry** button. Granting access and retrying restores an off switch; enabling root mode remains your choice. Opening Settings reuses the known root-access result without a new permission check. Root access is checked when you tap Retry, enable root mode, or connect; a running root connection also monitors it. Losing access switches the app back to rootless mode. Android's VPN permission is required to connect in rootless mode.
 
+## Device VPN and local proxy server
+
+**Device VPN** (on by default) routes this device's apps through Xray. **Local proxy server** opens a port that SOCKS5 and HTTP clients can connect to; tap its name to configure it. Turn on either or both. The proxy server alone (Device VPN off) needs neither VPN permission nor root.
+
+Proxy traffic follows your routing rules and DNS settings, but not per-app rules.
+
+On the **Local proxy server** page:
+
+- **Allow LAN access**: lets other devices on your network connect too.
+- **Connection details**: what a client needs, including a ready-made `socks5://` link. HTTP clients use the same address, port and credentials. Tap the pencil to change the port, username or password.
+
 ## DNS
 
 Xray answers every port-53 query itself, so names routed through the proxy are never looked up on the network you're on.

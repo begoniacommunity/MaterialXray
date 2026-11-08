@@ -318,7 +318,7 @@ internal class UserXrayProcessSupervisor(
     // only lends the raw descriptor number, so duplicating it into the child has to happen before
     // the caller can reach a suspension point and let a teardown close it underneath us. fork and
     // execve do not wait on IO, so there is nothing to move off the caller's thread anyway.
-    override fun start(binDir: String, tunFd: Int): Int {
+    override fun start(binDir: String, tunFd: Int?): Int {
         val command = requireNotNull(xrayBinary.userCommand) { "xray binary is unavailable" }
         // A fast server switch skips the binary check that otherwise creates it.
         File(binDir, CORE_SOCKET_DIR).mkdirs()
@@ -444,13 +444,13 @@ internal fun parseStatmResidentPages(buffer: ByteArray, length: Int): Long? {
 private fun Byte.isAsciiWhitespace(): Boolean = this == ASCII_SPACE || this == ASCII_TAB || this == ASCII_NEWLINE
 
 internal interface UserXrayProcessLauncher {
-    /** Starts [command] followed by `run -c` [configPath], handing it [tunFd]. */
+    /** Starts [command] followed by `run -c` [configPath], handing it [tunFd] when there is one. */
     fun start(
         command: List<String>,
         configPath: String,
         workingDir: String,
         logPath: String,
-        tunFd: Int,
+        tunFd: Int?,
         environment: Map<String, String>,
     ): Int
 
@@ -465,13 +465,13 @@ class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
         configPath: String,
         workingDir: String,
         logPath: String,
-        tunFd: Int,
+        tunFd: Int?,
         environment: Map<String, String>,
     ): Int {
         val env = (System.getenv() + environment)
             .map { (key, value) -> "$key=$value" }
             .toTypedArray()
-        return nativeStart(command.toTypedArray(), configPath, workingDir, logPath, tunFd, env)
+        return nativeStart(command.toTypedArray(), configPath, workingDir, logPath, tunFd ?: NO_TUN_FD, env)
     }
 
     override fun isAlive(pid: Int): Boolean = nativeIsAlive(pid)
@@ -479,6 +479,9 @@ class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
     override fun kill(pid: Int, signal: Int): Boolean = nativeKill(pid, signal)
 
     private companion object {
+        /** Tells the native launcher to start the core without a tunnel descriptor. */
+        private const val NO_TUN_FD = -1
+
         init {
             System.loadLibrary("xray_launcher")
         }

@@ -207,6 +207,9 @@ class XrayService(
     @Volatile
     private var sessionAllowIpv6: Boolean? = null
 
+    /** Whether the current session runs the device tunnel; false while only the local proxy runs. */
+    @Volatile private var sessionDeviceTunnel = true
+
     /** The Auto verdict the running session was built with; null outside Auto. */
     private var sessionAutoIpv6: Boolean? = null
 
@@ -357,7 +360,7 @@ class XrayService(
                 if (connectionManager.isUsingRootRuntime) {
                     connectionManager.isRootTrafficAvailable(TunInterfaceDetector.isInterfaceUp(state.tunName))
                 } else {
-                    vpnInterface?.fileDescriptor?.valid() == true
+                    !sessionDeviceTunnel || vpnInterface?.fileDescriptor?.valid() == true
                 }
             },
             runtimeModeRecoveryReason = ::runtimeModeRecoveryReason,
@@ -775,6 +778,7 @@ class XrayService(
                 providerRoutingCoordinator.refreshSelectedServer(ProviderRoutingActiveUpdate.DEFER)
             },
         )
+        val forceVpnService = isRunningAlwaysOnVpn()
         val runtimeSettings = executeStep(
             ConnectionStep(
                 "Load runtime settings",
@@ -783,9 +787,17 @@ class XrayService(
             ) {
                 settingsRepo.runtimeSettingsSnapshot()
             },
-        )
+        ).let { loaded ->
+            when {
+                // Always-on VPN is Android asking for the tunnel, whatever the app's own switch says.
+                forceVpnService -> loaded.copy(deviceTunnel = true)
+                // Root only routes the tunnel, so without one there is no root runtime to start.
+                !loaded.deviceTunnel -> loaded.copy(useRootService = false)
+                else -> loaded
+            }
+        }
+        sessionDeviceTunnel = runtimeSettings.deviceTunnel
         rootServiceRequested = runtimeSettings.useRootService
-        val forceVpnService = isRunningAlwaysOnVpn()
         val rootServiceAvailable = if (runtimeSettings.useRootService && !forceVpnService) {
             executeStep(
                 ConnectionStep(
@@ -841,7 +853,7 @@ class XrayService(
             logBuffer.append(LogSource.APP, "TPROXY IPv6 is unavailable; using IPv4-only TPROXY")
         }
         sessionAllowIpv6 = effectiveRuntimeSettings.allowIpv6
-        val rootlessNetworkPlan = if (effectiveRuntimeSettings.useRootService) {
+        val rootlessNetworkPlan = if (effectiveRuntimeSettings.useRootService || !effectiveRuntimeSettings.deviceTunnel) {
             null
         } else {
             planRootlessVpnNetwork(effectiveRuntimeSettings.allowIpv6)
@@ -1434,6 +1446,9 @@ class XrayService(
                 lastNotificationContent = null
                 updateNotification()
             }
+        }
+        if (!sessionDeviceTunnel) {
+            return "Always-on VPN enabled; starting the device tunnel...".takeIf { alwaysOnVpn }
         }
         val shouldRunRootService = (rootServiceRequested ?: return null) && !alwaysOnVpn
         if (connectionManager.isUsingRootRuntime == shouldRunRootService) return null

@@ -13,6 +13,7 @@ import org.junit.Test
 class AppNavKeySerializationTest {
     private val keys: List<AppNavKey> = TopLevelKeys + listOf(
         DnsSettingsKey,
+        LocalProxySettingsKey,
         XrayCoreSettingsKey,
         ConfigViewerKey(ConfigViewerTarget.Running),
         ConfigViewerKey(ConfigViewerTarget.Server(serverId = 42, name = "Tokyo \"edge\"")),

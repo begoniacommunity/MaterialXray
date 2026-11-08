@@ -32,10 +32,10 @@ interface UserXrayProcessController : XrayProcessProbe {
     suspend fun prepareLogFile()
 
     /**
-     * Starts the core against [tunFd], which the caller still owns. Implementations must not
-     * suspend before the descriptor has been duplicated into the child.
+     * Starts the core against [tunFd], which the caller still owns, or with no tunnel when it is
+     * null. Implementations must not suspend before the descriptor has been duplicated into the child.
      */
-    fun start(binDir: String, tunFd: Int): Int
+    fun start(binDir: String, tunFd: Int?): Int
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun stop()
     suspend fun stopOrphan(pid: Int)

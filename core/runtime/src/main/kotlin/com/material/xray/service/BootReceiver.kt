@@ -47,8 +47,8 @@ class BootReceiver(
         )
         if (!autoConnect && !recoverAfterReplacement) return
 
-        val useRootService = settingsRepo.useRootService.first()
-        val vpnPermissionGranted = useRootService || VpnService.prepare(context) == null
+        val needsVpnConsent = settingsRepo.deviceTunnel.first() && !settingsRepo.useRootService.first()
+        val vpnPermissionGranted = !needsVpnConsent || VpnService.prepare(context) == null
         if (!vpnPermissionGranted) return
 
         if (recoverAfterReplacement) {

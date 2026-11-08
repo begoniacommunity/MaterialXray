@@ -15,6 +15,7 @@ import com.material.xray.core.navigation.ConfigViewerKey
 import com.material.xray.core.navigation.ConfigViewerTarget
 import com.material.xray.core.navigation.DnsSettingsKey
 import com.material.xray.core.navigation.HomeKey
+import com.material.xray.core.navigation.LocalProxySettingsKey
 import com.material.xray.core.navigation.LogsKey
 import com.material.xray.core.navigation.Navigator
 import com.material.xray.core.navigation.RoutingKey
@@ -34,6 +35,7 @@ import com.material.xray.feature.routing.RoutingRuleViewerScreen
 import com.material.xray.feature.routing.RoutingScreen
 import com.material.xray.feature.routing.RoutingViewModel
 import com.material.xray.feature.settings.DnsSettingsScreen
+import com.material.xray.feature.settings.LocalProxySettingsScreen
 import com.material.xray.feature.settings.OptionalSettingsPage
 import com.material.xray.feature.settings.SettingsScreen
 import com.material.xray.feature.settings.SettingsViewModel
@@ -83,6 +85,7 @@ internal fun appEntryProvider(
         SettingsScreen(
             showTitleBarLogo = settings.value.showTitleBarLogo,
             onOpenDnsSettings = { navigator.openDetail(DnsSettingsKey) },
+            onOpenLocalProxySettings = { navigator.openDetail(LocalProxySettingsKey) },
             onOpenXrayCore = { navigator.openDetail(XrayCoreSettingsKey) },
             xrayCorePage = xrayCoreSettingsPage,
             viewModel = activitySettingsViewModel(),
@@ -90,6 +93,9 @@ internal fun appEntryProvider(
     }
     entry<DnsSettingsKey> {
         DnsSettingsScreen(settings = settings.value, viewModel = activitySettingsViewModel(), onBack = navigator::closeDetail)
+    }
+    entry<LocalProxySettingsKey> {
+        LocalProxySettingsScreen(settings = settings.value, viewModel = activitySettingsViewModel(), onBack = navigator::closeDetail)
     }
     entry<XrayCoreSettingsKey> {
         val settingsViewModel = activitySettingsViewModel()

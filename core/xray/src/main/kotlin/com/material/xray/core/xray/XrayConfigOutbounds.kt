@@ -57,21 +57,7 @@ internal fun buildTunInbound(
             put("MTU", mtu)
         },
     )
-    put(
-        "sniffing",
-        buildJsonObject {
-            put("enabled", true)
-            put("routeOnly", true)
-            put(
-                "destOverride",
-                buildJsonArray {
-                    add("http")
-                    add("tls")
-                    add("quic")
-                },
-            )
-        },
-    )
+    put("sniffing", routeOnlySniffing())
     put("tag", tag)
 }
 
@@ -101,21 +87,7 @@ internal fun buildTproxyInbound(
             put("followRedirect", true)
         },
     )
-    put(
-        "sniffing",
-        buildJsonObject {
-            put("enabled", true)
-            put("routeOnly", true)
-            put(
-                "destOverride",
-                buildJsonArray {
-                    add("http")
-                    add("tls")
-                    add("quic")
-                },
-            )
-        },
-    )
+    put("sniffing", routeOnlySniffing())
     put(
         "streamSettings",
         buildJsonObject {
@@ -128,6 +100,53 @@ internal fun buildTproxyInbound(
         },
     )
     put("tag", tag)
+}
+
+/** One port for both SOCKS5 and HTTP clients, which Xray calls `mixed`; both are held to the same account. */
+internal fun buildMixedInbound(
+    listen: String,
+    port: Int,
+    username: String,
+    password: String,
+    tag: String,
+) = buildJsonObject {
+    require(port in 1..65_535) { "Invalid proxy port: $port" }
+    put("listen", listen)
+    put("port", port)
+    put("protocol", "mixed")
+    put(
+        "settings",
+        buildJsonObject {
+            put("auth", "password")
+            put(
+                "accounts",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("user", username)
+                            put("pass", password)
+                        },
+                    )
+                },
+            )
+            put("udp", true)
+        },
+    )
+    put("sniffing", routeOnlySniffing())
+    put("tag", tag)
+}
+
+private fun routeOnlySniffing() = buildJsonObject {
+    put("enabled", true)
+    put("routeOnly", true)
+    put(
+        "destOverride",
+        buildJsonArray {
+            add("http")
+            add("tls")
+            add("quic")
+        },
+    )
 }
 
 /** The socket is inside the app-private directory; group access lets the app reach a root-mode core, which shares its gid. */

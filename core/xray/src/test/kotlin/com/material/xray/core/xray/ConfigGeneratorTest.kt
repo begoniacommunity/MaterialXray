@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.core.model.LocalProxySettings
 import com.material.xray.core.model.ProfileRoutingOverride
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.RoutingRuleCatalog
@@ -98,6 +99,32 @@ class ConfigGeneratorTest {
                 it.jsonObject["tag"]?.jsonPrimitive?.content == "dns-out"
             }.jsonObject.getValue("protocol").jsonPrimitive.content,
         )
+    }
+
+    @Test
+    fun `local proxy is a password-protected mixed inbound that shares the traffic rules`() {
+        val proxy = LocalProxySettings(port = 10808, username = "user1234", password = "pass5678", allowLan = false)
+        val json = Json.parseToJsonElement(
+            generator.generate(
+                server = vlessReality,
+                inbounds = listOf(XrayInbound.Tun("tun0", TUN_INBOUND_TAG), XrayInbound.Mixed(proxy)),
+            ),
+        ).jsonObject
+
+        val mixed = json.getValue("inbounds").jsonArray.single { it.jsonObject["tag"]?.jsonPrimitive?.content == XRAY_LOCAL_PROXY_INBOUND_TAG }.jsonObject
+        assertEquals("mixed", mixed.getValue("protocol").jsonPrimitive.content)
+        assertEquals("127.0.0.1", mixed.getValue("listen").jsonPrimitive.content)
+        val settings = mixed.getValue("settings").jsonObject
+        assertEquals("password", settings.getValue("auth").jsonPrimitive.content)
+        val account = settings.getValue("accounts").jsonArray.single().jsonObject
+        assertEquals("user1234", account.getValue("user").jsonPrimitive.content)
+        assertEquals("pass5678", account.getValue("pass").jsonPrimitive.content)
+        assertTrue(settings.getValue("udp").jsonPrimitive.content.toBoolean())
+        // The DNS interception rule covers every traffic inbound, so the proxy's port 53 traffic is answered too.
+        val dnsRule = json.getValue("routing").jsonObject.getValue("rules").jsonArray.first {
+            it.jsonObject["outboundTag"]?.jsonPrimitive?.content == "dns-out"
+        }.jsonObject
+        assertTrue(XRAY_LOCAL_PROXY_INBOUND_TAG in dnsRule.getValue("inboundTag").jsonArray.map { it.jsonPrimitive.content })
     }
 
     @Test

@@ -19,4 +19,5 @@
     <string name="connection_error_stop_runtime">Could not stop the active Xray connection</string>
     <string name="connection_error_tproxy_unsupported">TPROXY is not supported: %1$s</string>
     <string name="connection_error_tproxy_health_check">TPROXY routing did not pass its activation check</string>
+    <string name="connection_error_nothing_to_start">Turn on the device VPN or the local proxy server</string>
 </resources>

@@ -110,10 +110,6 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
     int failure_errno = 0;
     jint result = -1;
 
-    if (tun_fd < 0) {
-        throw_state(env, "invalid TUN fd", EBADF);
-        return -1;
-    }
     if (env_values == NULL) {
         throw_state(env, "environment array is null", EINVAL);
         return -1;
@@ -136,19 +132,21 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         goto cleanup;
     }
 
-    // The duplicate stays close-on-exec until the child clears it, so an exec on another thread
-    // cannot inherit the tunnel descriptor.
-    child_tun_fd = fcntl(tun_fd, F_DUPFD_CLOEXEC, 3);
-    if (child_tun_fd < 0) {
-        failure = "failed to duplicate TUN fd";
-        failure_errno = errno;
-        goto cleanup;
-    }
-
+    // A negative tun_fd starts the core without a tunnel, serving only its local proxy. The
+    // duplicate stays close-on-exec until the child clears it, so an exec on another thread cannot
+    // inherit the tunnel descriptor.
     char fd_env[64];
-    snprintf(fd_env, sizeof(fd_env), "xray.tun.fd=%d", child_tun_fd);
     char fd_env_compat[64];
-    snprintf(fd_env_compat, sizeof(fd_env_compat), "XRAY_TUN_FD=%d", child_tun_fd);
+    if (tun_fd >= 0) {
+        child_tun_fd = fcntl(tun_fd, F_DUPFD_CLOEXEC, 3);
+        if (child_tun_fd < 0) {
+            failure = "failed to duplicate TUN fd";
+            failure_errno = errno;
+            goto cleanup;
+        }
+        snprintf(fd_env, sizeof(fd_env), "xray.tun.fd=%d", child_tun_fd);
+        snprintf(fd_env_compat, sizeof(fd_env_compat), "XRAY_TUN_FD=%d", child_tun_fd);
+    }
 
     spawn_env = calloc((size_t) env_count + 3, sizeof(char *));
     if (spawn_env == NULL) {
@@ -159,9 +157,10 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
     for (jsize i = 0; i < env_count; i++) {
         spawn_env[i] = child_env[i];
     }
-    spawn_env[env_count] = fd_env;
-    spawn_env[env_count + 1] = fd_env_compat;
-    spawn_env[env_count + 2] = NULL;
+    if (child_tun_fd >= 0) {
+        spawn_env[env_count] = fd_env;
+        spawn_env[env_count + 1] = fd_env_compat;
+    }
 
     // The command is either the core itself or the system linker followed by the core.
     argv = calloc((size_t) command_count + 4, sizeof(char *));
@@ -200,7 +199,7 @@ Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeStart(
         }
         // Without this the core inherits a closed descriptor and fails in a way that only shows up
         // as an opaque crash, so a failure here has to stop the child instead.
-        if (fcntl(child_tun_fd, F_SETFD, 0) < 0) _exit(127);
+        if (child_tun_fd >= 0 && fcntl(child_tun_fd, F_SETFD, 0) < 0) _exit(127);
         execve(argv[0], argv, spawn_env);
         _exit(127);
     }

@@ -211,4 +211,24 @@
     <string name="settings_shortcut_name_title">Название ярлыка</string>
     <string name="settings_notification_fields_join">%1$s и %2$s</string>
     <string name="settings_notification_fields_more">%1$s и ещё %2$d</string>
+    <string name="settings_device_tunnel_title">VPN устройства</string>
+    <string name="settings_device_tunnel_description">Направлять трафик приложений этого устройства через Xray</string>
+    <string name="settings_device_tunnel_nothing_to_start">Пока выключены и VPN, и локальный прокси-сервер, запускать нечего</string>
+    <string name="settings_local_proxy_title">Локальный прокси-сервер</string>
+    <string name="settings_local_proxy_row_on">Настроен на порту %1$d</string>
+    <string name="settings_local_proxy_detection_warning">Другие приложения на устройстве могут найти запущенный прокси, просканировав локальные порты, и некоторые так определяют, что вы пользуетесь прокси или VPN. Пароль не даёт им пользоваться прокси, но не скрывает его.</string>
+    <string name="settings_local_proxy_allow_lan_title">Доступ из локальной сети</string>
+    <string name="settings_local_proxy_allow_lan_description">Принимать подключения с других устройств в вашей сети</string>
+    <string name="settings_local_proxy_port_label">Порт</string>
+    <string name="settings_local_proxy_port_supporting_text">От %1$d до %2$d. По умолчанию: %3$d</string>
+    <string name="settings_local_proxy_details_title">Параметры подключения</string>
+    <string name="settings_local_proxy_no_lan_address">Адрес в локальной сети не найден. Подключитесь к Wi-Fi или включите точку доступа; до тех пор показан адрес самого устройства.</string>
+    <string name="settings_local_proxy_host_label">Адрес</string>
+    <string name="settings_local_proxy_username_label">Имя пользователя</string>
+    <string name="settings_local_proxy_password_label">Пароль</string>
+    <string name="settings_local_proxy_link_label">Ссылка для подключения</string>
+    <string name="settings_local_proxy_credential_supporting_text">До %1$d букв и цифр</string>
+    <string name="settings_local_proxy_edit">Изменить: %1$s</string>
+    <string name="settings_local_proxy_copy">Копировать: %1$s</string>
+    <string name="settings_local_proxy_copied">Скопировано: %1$s</string>
 </resources>

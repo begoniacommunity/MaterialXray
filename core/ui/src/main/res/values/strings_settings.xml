@@ -207,4 +207,24 @@
     <string name="settings_shortcut_name_title">Shortcut name</string>
     <string name="settings_notification_fields_join">%1$s and %2$s</string>
     <string name="settings_notification_fields_more">%1$s, and %2$d more</string>
+    <string name="settings_device_tunnel_title">Device VPN</string>
+    <string name="settings_device_tunnel_description">Route this device\'s apps through Xray</string>
+    <string name="settings_device_tunnel_nothing_to_start">Nothing will start while both this and the local proxy server are off</string>
+    <string name="settings_local_proxy_title">Local proxy server</string>
+    <string name="settings_local_proxy_row_on">Configured on port %1$d</string>
+    <string name="settings_local_proxy_detection_warning">Other apps on this device can find a running proxy by scanning local ports, and some use that to tell you are using a proxy or VPN. The password stops them from using it, but not from noticing it.</string>
+    <string name="settings_local_proxy_allow_lan_title">Allow LAN access</string>
+    <string name="settings_local_proxy_allow_lan_description">Accept connections from other devices on your network</string>
+    <string name="settings_local_proxy_port_label">Port</string>
+    <string name="settings_local_proxy_port_supporting_text">%1$d to %2$d. Default: %3$d</string>
+    <string name="settings_local_proxy_details_title">Connection details</string>
+    <string name="settings_local_proxy_no_lan_address">No LAN address found. Connect to Wi-Fi or turn on the hotspot; until then, the details show this device\'s own address.</string>
+    <string name="settings_local_proxy_host_label">Address</string>
+    <string name="settings_local_proxy_username_label">Username</string>
+    <string name="settings_local_proxy_password_label">Password</string>
+    <string name="settings_local_proxy_link_label">Connection link</string>
+    <string name="settings_local_proxy_credential_supporting_text">Up to %1$d letters and digits</string>
+    <string name="settings_local_proxy_edit">Edit %1$s</string>
+    <string name="settings_local_proxy_copy">Copy %1$s</string>
+    <string name="settings_local_proxy_copied">%1$s copied</string>
 </resources>

@@ -146,17 +146,15 @@ internal class VpnServiceXrayRuntimeStrategy(
 
     override suspend fun prepareLogFile() = processSupervisor.prepareLogFile()
 
-    // The caller still owns the descriptor, so it is handed over without suspending first.
+    // The caller still owns the descriptor, so it is handed over without suspending first. A core
+    // started without one serves only the local proxy.
     override suspend fun startProcess(
         binDir: String,
         vpnInterfaceFd: Int?,
         tun: RootTunDevice?,
     ): Int {
         require(tun == null) { "A rootless runtime cannot create its own TUN interface" }
-        return processSupervisor.start(
-            binDir = binDir,
-            tunFd = requireNotNull(vpnInterfaceFd) { "A rootless runtime cannot start without a tunnel" },
-        )
+        return processSupervisor.start(binDir = binDir, tunFd = vpnInterfaceFd)
     }
 
     override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = workingDirApiEndpoint(environment)

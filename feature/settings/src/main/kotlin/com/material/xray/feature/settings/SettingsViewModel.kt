@@ -20,6 +20,7 @@ import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LauncherIcon
 import com.material.xray.core.model.LauncherName
+import com.material.xray.core.model.LocalProxySettings
 import com.material.xray.core.model.NotificationField
 import com.material.xray.core.model.NotificationStyle
 import com.material.xray.core.model.OtherVpnMode
@@ -252,6 +253,44 @@ class SettingsViewModel(
         settingsRepo.setTunnelTetheredClients(enabled)
         reloadActiveConnectionIfConnected()
     }
+    fun setDeviceTunnel(enabled: Boolean) = viewModelScope.launch {
+        if (enabled == currentSettings().deviceTunnel) return@launch
+        settingsRepo.setDeviceTunnel(enabled)
+        reloadActiveConnectionIfConnected()
+    }
+    fun setLocalProxyEnabled(enabled: Boolean) = viewModelScope.launch {
+        if (enabled == currentSettings().localProxyEnabled) return@launch
+        settingsRepo.setLocalProxyEnabled(enabled)
+        reloadActiveConnectionIfConnected()
+    }
+    fun setLocalProxyAllowLan(enabled: Boolean) = viewModelScope.launch {
+        val settings = currentSettings()
+        if (enabled == settings.localProxy.allowLan) return@launch
+        settingsRepo.setLocalProxyAllowLan(enabled)
+        if (settings.localProxyEnabled) reloadActiveConnectionIfConnected()
+    }
+    fun setLocalProxyPort(port: Int) = viewModelScope.launch {
+        val settings = currentSettings()
+        if (port == settings.localProxy.port || !LocalProxySettings.isValidPort(port)) return@launch
+        settingsRepo.setLocalProxyPort(port)
+        if (settings.localProxyEnabled) reloadActiveConnectionIfConnected()
+    }
+
+    fun setLocalProxyUsername(username: String) = viewModelScope.launch {
+        val settings = currentSettings()
+        if (username == settings.localProxy.username || !LocalProxySettings.isValidCredential(username)) return@launch
+        settingsRepo.setLocalProxyUsername(username)
+        if (settings.localProxyEnabled) reloadActiveConnectionIfConnected()
+    }
+    fun setLocalProxyPassword(password: String) = viewModelScope.launch {
+        val settings = currentSettings()
+        if (password == settings.localProxy.password || !LocalProxySettings.isValidCredential(password)) return@launch
+        settingsRepo.setLocalProxyPassword(password)
+        if (settings.localProxyEnabled) reloadActiveConnectionIfConnected()
+    }
+
+    /** This device's address on the local network, for the local proxy's connection details. */
+    suspend fun lanAddress(): String? = withContext(ioDispatcher) { deviceLanAddress() }
     fun setOtherVpnMode(mode: OtherVpnMode) = viewModelScope.launch {
         if (mode == currentSettings().otherVpnMode) return@launch
         settingsRepo.setOtherVpnMode(mode)

@@ -214,8 +214,10 @@ class HomeViewModel(
         .map { it?.selectedServerId ?: -1L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), homeData.value?.selectedServerId ?: -1L)
 
-    val useRootService: StateFlow<Boolean> = settingsRepo.useRootService
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    /** Whether connecting needs Android's VPN consent: only the rootless device tunnel does. */
+    val needsVpnConsent: StateFlow<Boolean> = combine(settingsRepo.useRootService, settingsRepo.deviceTunnel) { root, tunnel ->
+        tunnel && !root
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val showAdvancedOptions: StateFlow<Boolean> = settingsRepo.showAdvancedOptions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)

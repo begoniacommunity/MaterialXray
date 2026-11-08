@@ -188,6 +188,7 @@ import org.xmlpull.v1.XmlPullParser
 fun SettingsScreen(
     showTitleBarLogo: Boolean,
     onOpenDnsSettings: () -> Unit,
+    onOpenLocalProxySettings: () -> Unit,
     onOpenXrayCore: () -> Unit,
     xrayCorePage: OptionalSettingsPage? = null,
     viewModel: SettingsViewModel = koinViewModel(),
@@ -203,6 +204,7 @@ fun SettingsScreen(
             viewModel = viewModel,
             settings = loaded,
             onOpenDnsSettings = onOpenDnsSettings,
+            onOpenLocalProxySettings = onOpenLocalProxySettings,
             xrayCorePage = xrayCorePage,
             onOpenXrayCore = onOpenXrayCore,
         )
@@ -216,6 +218,7 @@ private fun SettingsScreenContent(
     viewModel: SettingsViewModel,
     settings: SettingsSnapshot,
     onOpenDnsSettings: () -> Unit,
+    onOpenLocalProxySettings: () -> Unit,
     xrayCorePage: OptionalSettingsPage?,
     onOpenXrayCore: () -> Unit,
 ) {
@@ -426,6 +429,9 @@ private fun SettingsScreenContent(
                             }
                         },
                         actions = SettingsServiceActions(
+                            onDeviceTunnelChange = viewModel::setDeviceTunnel,
+                            onOpenLocalProxySettings = onOpenLocalProxySettings,
+                            onLocalProxyEnabledChange = viewModel::setLocalProxyEnabled,
                             onUseRootServiceChange = viewModel::setUseRootService,
                             onRetryRootAccess = viewModel::retryRootAccess,
                             onRootConnectionBackendChange = viewModel::setRootConnectionBackend,
@@ -1176,6 +1182,9 @@ private fun BackupOperationEventEffect(viewModel: SettingsViewModel) {
 
 /** What the service section's controls change. */
 private data class SettingsServiceActions(
+    val onDeviceTunnelChange: (Boolean) -> Unit,
+    val onOpenLocalProxySettings: () -> Unit,
+    val onLocalProxyEnabledChange: (Boolean) -> Unit,
     val onUseRootServiceChange: (Boolean) -> Unit,
     val onRetryRootAccess: () -> Unit,
     val onRootConnectionBackendChange: (RootConnectionBackend) -> Unit,
@@ -1205,6 +1214,27 @@ private fun SettingsServiceSection(
     )
 
     Column {
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_device_tunnel_title),
+            description = stringResource(
+                if (settings.deviceTunnel || settings.localProxyEnabled) {
+                    R.string.settings_device_tunnel_description
+                } else {
+                    R.string.settings_device_tunnel_nothing_to_start
+                },
+            ),
+            checked = settings.deviceTunnel,
+            onCheckedChange = actions.onDeviceTunnelChange,
+        )
+        Spacer(Modifier.height(SettingsItemSpacing))
+        UpdateChecksSetting(
+            title = stringResource(R.string.settings_local_proxy_title),
+            checked = settings.localProxyEnabled,
+            description = stringResource(R.string.settings_local_proxy_row_on, settings.localProxy.port),
+            onClick = actions.onOpenLocalProxySettings,
+            onCheckedChange = actions.onLocalProxyEnabledChange,
+        )
+        Spacer(Modifier.height(SettingsItemSpacing))
         if (rootAvailable == false) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -1365,7 +1395,7 @@ private fun SettingsRadioRow(
  * [action] is optional because some notes are only an explanation and have nothing to act on.
  */
 @Composable
-private fun SettingsNotice(
+internal fun SettingsNotice(
     text: String,
     action: @Composable (ColumnScope.() -> Unit)? = null,
 ) {

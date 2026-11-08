@@ -93,17 +93,21 @@ internal class XrayConfigWriter(
                 acceptNonLoopback = tproxyPlan.runtimeState.tetherUpstreamInterface != null,
             )
         }
+        val tunnelInbounds: List<XrayInbound> = when {
+            !runtimeSettings.deviceTunnel -> emptyList()
+            tproxyInbounds != null -> tproxyInbounds
+            else -> listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))
+        }
+        val trafficInbounds = tunnelInbounds + listOfNotNull(runtimeSettings.localProxy?.let { XrayInbound.Mixed(it) })
         val effectiveInbounds = if (runtimeSettings.routeMxrayTrafficThroughXray) {
-            val trafficInbounds: List<XrayInbound> = tproxyInbounds
-                ?: listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))
             val socket = coreSocket(environment.binDir, "mxray-http-${java.util.UUID.randomUUID().toString().take(12)}.sock")
             trafficInbounds + XrayInbound.PrivateHttp(path = socket.path, listenPath = socket.listenPath)
         } else {
-            tproxyInbounds
+            trafficInbounds
         }
         // The live ping times requests through the running core here instead of starting its own core.
         val probeSocket = coreSocket(environment.binDir, "mxray-probe-${java.util.UUID.randomUUID().toString().take(12)}.sock")
-        val generatedInbounds = (effectiveInbounds ?: listOf(XrayInbound.Tun(runtimeSettings.tunName, TUN_INBOUND_TAG, runtimeSettings.tunMtu))) +
+        val generatedInbounds = effectiveInbounds +
             XrayInbound.PrivateHttp(path = probeSocket.path, tag = XRAY_LATENCY_PROBE_INBOUND_TAG, listenPath = probeSocket.listenPath)
         // Xray's GID-exempt sockets follow Android's current default route in both local and
         // tethered TPROXY. The tether firewall still tracks the upstream separately.

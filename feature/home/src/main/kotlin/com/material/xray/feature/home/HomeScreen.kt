@@ -381,7 +381,7 @@ fun HomeScreen(
     val onConnectionClick = {
         connectionUiState.handleClick(
             context = context,
-            useRootService = uiState.useRootService,
+            needsVpnConsent = uiState.needsVpnConsent,
             disconnect = {
                 armConnectionHaptic()
                 viewModel.disconnect()
@@ -1165,7 +1165,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
     val selectedServer by viewModel.selectedServer.collectAsStateWithLifecycle()
     val activeBalancer by viewModel.activeBalancer.collectAsStateWithLifecycle()
     val selectedServerId by viewModel.selectedServerId.collectAsStateWithLifecycle()
-    val useRootService by viewModel.useRootService.collectAsStateWithLifecycle()
+    val needsVpnConsent by viewModel.needsVpnConsent.collectAsStateWithLifecycle()
     val showAdvancedOptions by viewModel.showAdvancedOptions.collectAsStateWithLifecycle()
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val serversBySubscription by viewModel.serversBySubscription.collectAsStateWithLifecycle()
@@ -1192,7 +1192,7 @@ private fun collectHomeUiState(viewModel: HomeViewModel): HomeUiState {
         selectedServer = selectedServer,
         activeBalancer = activeBalancer,
         selectedServerId = selectedServerId,
-        useRootService = useRootService,
+        needsVpnConsent = needsVpnConsent,
         showAdvancedOptions = showAdvancedOptions,
         subscriptions = subscriptions,
         serversBySubscription = serversBySubscription,
@@ -1256,7 +1256,7 @@ private data class HomeUiState(
     val selectedServer: ServerConfig?,
     val activeBalancer: ActiveBalancerState?,
     val selectedServerId: Long,
-    val useRootService: Boolean,
+    val needsVpnConsent: Boolean,
     val showAdvancedOptions: Boolean,
     /** `null` until the home data snapshot has loaded; distinct from a loaded empty list. */
     val subscriptions: List<SubscriptionEntity>?,
@@ -1747,7 +1747,7 @@ internal fun formatCoreUptime(elapsedMillis: Long): String {
 
 private fun ConnectionUiState.handleClick(
     context: Context,
-    useRootService: Boolean,
+    needsVpnConsent: Boolean,
     disconnect: () -> Unit,
     connectRoot: () -> Unit,
     connectVpn: () -> Unit,
@@ -1760,8 +1760,8 @@ private fun ConnectionUiState.handleClick(
             disconnect()
         }
         isConnected -> disconnect()
-        !isTransitioning && useRootService -> connectRoot()
-        !isTransitioning -> connectVpn()
+        !isTransitioning && needsVpnConsent -> connectVpn()
+        !isTransitioning -> connectRoot()
     }
 }
 

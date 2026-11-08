@@ -16,6 +16,7 @@ import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
 import com.material.xray.core.model.LauncherIcon
 import com.material.xray.core.model.LauncherName
+import com.material.xray.core.model.LocalProxySettings
 import com.material.xray.core.model.NotificationField
 import com.material.xray.core.model.NotificationSettings
 import com.material.xray.core.model.NotificationStyle
@@ -54,6 +55,9 @@ data class SettingsSnapshot(
     val rootConnectionBackend: RootConnectionBackend,
     val bypassLan: Boolean,
     val tunnelTetheredClients: Boolean,
+    val deviceTunnel: Boolean,
+    val localProxyEnabled: Boolean,
+    val localProxy: LocalProxySettings,
     val otherVpnMode: OtherVpnMode,
     val ipv6Mode: Ipv6Mode,
     val xrayBufferSizeKiB: Int,
@@ -106,6 +110,12 @@ class SettingsRepository(
         val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
         val BYPASS_LAN = booleanPreferencesKey("bypass_lan")
         val TUNNEL_TETHERED_CLIENTS = booleanPreferencesKey("tunnel_tethered_clients")
+        val DEVICE_TUNNEL = booleanPreferencesKey("device_tunnel")
+        val LOCAL_PROXY_ENABLED = booleanPreferencesKey("local_proxy_enabled")
+        val LOCAL_PROXY_PORT = intPreferencesKey("local_proxy_port")
+        val LOCAL_PROXY_ALLOW_LAN = booleanPreferencesKey("local_proxy_allow_lan")
+        val LOCAL_PROXY_USERNAME = stringPreferencesKey("local_proxy_username")
+        val LOCAL_PROXY_PASSWORD = stringPreferencesKey("local_proxy_password")
         val OTHER_VPN_MODE = stringPreferencesKey("other_vpn_mode")
         val IPV6_MODE = stringPreferencesKey("ipv6_mode")
 
@@ -199,6 +209,12 @@ class SettingsRepository(
     val autoConnect: Flow<Boolean> = store.data.map { it[AUTO_CONNECT] ?: false }
     val bypassLan: Flow<Boolean> = store.data.map { it[BYPASS_LAN] ?: true }
     val tunnelTetheredClients: Flow<Boolean> = store.data.map { it[TUNNEL_TETHERED_CLIENTS] ?: false }
+    val deviceTunnel: Flow<Boolean> = store.data.map { it[DEVICE_TUNNEL] ?: true }
+
+    /** The local proxy to open, or null while it is off. */
+    val localProxy: Flow<LocalProxySettings?> = store.data.map { prefs ->
+        prefs.localProxySettings().takeIf { prefs[LOCAL_PROXY_ENABLED] == true }
+    }
     val otherVpnMode: Flow<OtherVpnMode> = store.data.map { OtherVpnMode.fromValue(it[OTHER_VPN_MODE]) }
     val ipv6Mode: Flow<Ipv6Mode> = store.data.map { Ipv6Mode.fromValue(it[IPV6_MODE]) }
     val lastServerId: Flow<Long> = store.data.map { it[LAST_SERVER_ID] ?: -1L }
@@ -370,6 +386,9 @@ class SettingsRepository(
             rootConnectionBackend = RootConnectionBackend.fromValue(prefs[ROOT_CONNECTION_BACKEND]),
             bypassLan = prefs[BYPASS_LAN] ?: true,
             tunnelTetheredClients = prefs[TUNNEL_TETHERED_CLIENTS] ?: false,
+            deviceTunnel = prefs[DEVICE_TUNNEL] ?: true,
+            localProxyEnabled = prefs[LOCAL_PROXY_ENABLED] ?: false,
+            localProxy = prefs.localProxySettings(),
             otherVpnMode = OtherVpnMode.fromValue(prefs[OTHER_VPN_MODE]),
             ipv6Mode = Ipv6Mode.fromValue(prefs[IPV6_MODE]),
             xrayBufferSizeKiB = XrayRuntimeSettings.normalizeXrayBufferSizeKiB(prefs[XRAY_BUFFER_SIZE_KIB]),
@@ -444,6 +463,8 @@ class SettingsRepository(
             routingDomainMatcher = routingDomainMatcher.first(),
             routingFallbackOutbound = routingFallbackOutbound.first(),
             routeMxrayTrafficThroughXray = routeMxrayTrafficThroughXray.first(),
+            deviceTunnel = deviceTunnel.first(),
+            localProxy = localProxy.first(),
         )
     }
 
@@ -469,6 +490,21 @@ class SettingsRepository(
     suspend fun setAutoConnect(enabled: Boolean) = store.edit { it[AUTO_CONNECT] = enabled }
     suspend fun setBypassLan(enabled: Boolean) = store.edit { it[BYPASS_LAN] = enabled }
     suspend fun setTunnelTetheredClients(enabled: Boolean) = store.edit { it[TUNNEL_TETHERED_CLIENTS] = enabled }
+    suspend fun setDeviceTunnel(enabled: Boolean) = store.edit { it[DEVICE_TUNNEL] = enabled }
+    suspend fun setLocalProxyEnabled(enabled: Boolean) = store.edit { it[LOCAL_PROXY_ENABLED] = enabled }
+    suspend fun setLocalProxyPort(port: Int) {
+        require(LocalProxySettings.isValidPort(port))
+        store.edit { it[LOCAL_PROXY_PORT] = port }
+    }
+    suspend fun setLocalProxyAllowLan(enabled: Boolean) = store.edit { it[LOCAL_PROXY_ALLOW_LAN] = enabled }
+    suspend fun setLocalProxyUsername(username: String) {
+        require(LocalProxySettings.isValidCredential(username))
+        store.edit { it[LOCAL_PROXY_USERNAME] = username }
+    }
+    suspend fun setLocalProxyPassword(password: String) {
+        require(LocalProxySettings.isValidCredential(password))
+        store.edit { it[LOCAL_PROXY_PASSWORD] = password }
+    }
     suspend fun setOtherVpnMode(mode: OtherVpnMode) = store.edit { it[OTHER_VPN_MODE] = mode.persistedValue }
     suspend fun setIpv6Mode(mode: Ipv6Mode) = store.edit { it[IPV6_MODE] = mode.persistedValue }
     suspend fun setLastServerId(id: Long) = store.edit { it[LAST_SERVER_ID] = id }
@@ -754,6 +790,17 @@ class SettingsRepository(
             map["tunnel_tethered_clients"]
                 ?.toBooleanStrictOrNull()
                 ?.let { prefs[TUNNEL_TETHERED_CLIENTS] = it }
+            map["device_tunnel"]?.toBooleanStrictOrNull()?.let { prefs[DEVICE_TUNNEL] = it }
+            map["local_proxy_enabled"]?.toBooleanStrictOrNull()?.let { prefs[LOCAL_PROXY_ENABLED] = it }
+            map["local_proxy_port"]
+                ?.toIntOrNull()
+                ?.takeIf(LocalProxySettings::isValidPort)
+                ?.let { prefs[LOCAL_PROXY_PORT] = it }
+            map["local_proxy_allow_lan"]?.toBooleanStrictOrNull()?.let { prefs[LOCAL_PROXY_ALLOW_LAN] = it }
+            map["local_proxy_username"]?.takeIf(LocalProxySettings::isValidCredential)?.let { prefs[LOCAL_PROXY_USERNAME] = it }
+            map["local_proxy_password"]?.takeIf(LocalProxySettings::isValidCredential)?.let { prefs[LOCAL_PROXY_PASSWORD] = it }
+            // Clearing dropped the credentials, and a backup from before the proxy carries none.
+            prefs.ensureLocalProxyCredentials()
             map["other_vpn_mode"]?.let { prefs[OTHER_VPN_MODE] = OtherVpnMode.fromValue(it).persistedValue }
             map["ipv6_mode"]?.let { prefs[IPV6_MODE] = Ipv6Mode.fromValue(it).persistedValue }
             map["allow_ipv6"]?.toBooleanStrictOrNull()?.let { prefs[LEGACY_ALLOW_IPV6] = it }

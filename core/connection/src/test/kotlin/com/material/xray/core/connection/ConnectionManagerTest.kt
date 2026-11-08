@@ -9,6 +9,7 @@ import com.material.xray.core.connection.routing.TunManager
 import com.material.xray.core.model.ActiveBalancerSelection
 import com.material.xray.core.model.BalancerOutbound
 import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.LocalProxySettings
 import com.material.xray.core.model.OtherVpnMode
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.RootConnectionBackend
@@ -1200,6 +1201,65 @@ class ConnectionManagerTest {
     }
 
     @Test
+    fun `proxy only starts the core without a tunnel or root`() = runTest {
+        val harness = Harness()
+        val proxy = LocalProxySettings(port = 10808, username = "user1234", password = "pass5678", allowLan = false)
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(useRootService = true, deviceTunnel = false, localProxy = proxy, tunName = "tun0"),
+            establishVpnInterface = { error("proxy only must not establish a VPN interface") },
+        )
+
+        assertEquals(listOf<Int?>(null), harness.userProcess.startedTunFds)
+        assertEquals(0, harness.rootProcess.startCalls)
+        assertEquals(0, harness.rootRuntime.openCalls)
+        val inbounds = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject.getValue("inbounds").jsonArray
+        val protocols = inbounds.map { it.jsonObject.getValue("protocol").jsonPrimitive.content }
+        assertFalse("tun" in protocols)
+        val mixed = inbounds.single { it.jsonObject.getValue("protocol").jsonPrimitive.content == "mixed" }.jsonObject
+        assertEquals("127.0.0.1", mixed.getValue("listen").jsonPrimitive.content)
+        assertEquals(10808, mixed.getValue("port").jsonPrimitive.content.toInt())
+    }
+
+    @Test
+    fun `tunnel and proxy run in one core`() = runTest {
+        val harness = Harness()
+        val proxy = LocalProxySettings(port = 10808, username = "user1234", password = "pass5678", allowLan = true)
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(useRootService = false, localProxy = proxy, tunName = "tun0"),
+            establishVpnInterface = { 7 },
+        )
+
+        assertEquals(listOf<Int?>(7), harness.userProcess.startedTunFds)
+        val inbounds = Json.parseToJsonElement(requireNotNull(harness.binary.configJson)).jsonObject.getValue("inbounds").jsonArray
+        val protocols = inbounds.map { it.jsonObject.getValue("protocol").jsonPrimitive.content }
+        assertTrue("tun" in protocols)
+        val mixed = inbounds.single { it.jsonObject.getValue("protocol").jsonPrimitive.content == "mixed" }.jsonObject
+        assertEquals("0.0.0.0", mixed.getValue("listen").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `refuses to start with both the tunnel and the proxy off`() = runTest {
+        val harness = Harness()
+
+        harness.manager.connect(
+            server(),
+            runtimeSettings().copy(useRootService = false, deviceTunnel = false, localProxy = null),
+            establishVpnInterface = { error("nothing should start") },
+        )
+
+        assertTrue(harness.userProcess.startedTunFds.isEmpty())
+        assertNull(harness.binary.configJson)
+        assertEquals(
+            ConnectionState.Error(harness.environment.message(ConnectionError.NothingToStart::class), retryable = false),
+            harness.stateCoordinator.state.value,
+        )
+    }
+
+    @Test
     fun `rootless VPN starts after routing data and config are ready`() = runTest {
         val harness = Harness()
         harness.stateStore.state = XrayState(xrayPid = 42, physicalInterface = VPN_SERVICE_INTERFACE_LABEL)
@@ -1607,9 +1667,13 @@ class ConnectionManagerTest {
 
     private class FakeUserProcess : UserXrayProcessController {
         var stopCalls = 0
+        val startedTunFds = mutableListOf<Int?>()
 
         override suspend fun prepareLogFile() = Unit
-        override fun start(binDir: String, tunFd: Int): Int = 42
+        override fun start(binDir: String, tunFd: Int?): Int {
+            startedTunFds += tunFd
+            return 42
+        }
         override suspend fun isAlive(pid: Int): Boolean = true
         override suspend fun kill(pid: Int, signal: Int): Boolean = true
 

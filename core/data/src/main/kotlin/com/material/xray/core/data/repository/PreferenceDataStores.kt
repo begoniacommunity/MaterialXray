@@ -39,7 +39,11 @@ object PreferenceDataStores {
     fun settings(
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         produceFile: () -> File,
-    ): DataStore<Preferences> = create(listOf(SettingsDefaultMigration()), ioDispatcher, produceFile)
+    ): DataStore<Preferences> = create(
+        listOf(SettingsDefaultMigration(), LocalProxyCredentialsMigration()),
+        ioDispatcher,
+        produceFile,
+    )
 
     fun appUpdate(
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,

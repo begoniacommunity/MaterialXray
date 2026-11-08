@@ -127,7 +127,13 @@ class ConnectionManager(
         val routeTable = runtimeSettings.routeTable
         log.clear(LogSource.XRAY)
         log.append(LogSource.APP, "Connecting to ${server.name} (${server.address}:${server.port})")
-        val strategy = strategyFor(useRootService = runtimeSettings.useRootService)
+        if (!runtimeSettings.hasTrafficSource) {
+            fail(environment.describe(ConnectionError.NothingToStart), retryable = false)
+            return
+        }
+        if (!runtimeSettings.deviceTunnel) log.append(LogSource.APP, "Device tunnel is off; starting only the local proxy")
+        // Without the tunnel there is nothing for root to route, so the core runs as this app's child.
+        val strategy = strategyFor(useRootService = runtimeSettings.useRootService && runtimeSettings.deviceTunnel)
         val managesSystemRouting = strategy.managesSystemRouting
         val rootBackend = effectiveRootBackend(managesSystemRouting, runtimeSettings.rootConnectionBackend)
         runtimeState = XrayRuntimeState.Starting(strategy)
@@ -212,7 +218,7 @@ class ConnectionManager(
                 tproxyPlan,
                 syntheticDnsAddress,
             )
-            val vpnInterface = if (managesSystemRouting) {
+            val vpnInterface = if (managesSystemRouting || !runtimeSettings.deviceTunnel) {
                 null
             } else {
                 executeStep(

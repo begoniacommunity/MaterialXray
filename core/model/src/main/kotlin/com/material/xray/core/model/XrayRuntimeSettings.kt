@@ -23,7 +23,14 @@ data class XrayRuntimeSettings(
     val routingDomainMatcher: String? = null,
     val routingFallbackOutbound: XrayOutbound? = null,
     val routeMxrayTrafficThroughXray: Boolean = true,
+    /** Whether the device's traffic goes through the core; off leaves only [localProxy] to start. */
+    val deviceTunnel: Boolean = true,
+    val localProxy: LocalProxySettings? = null,
 ) {
+    /** Whether there is anything to start: the tunnel, the local proxy, or both. */
+    val hasTrafficSource: Boolean
+        get() = deviceTunnel || localProxy != null
+
     companion object {
         const val DEFAULT_XRAY_BUFFER_SIZE_KIB = 64
         const val MIN_XRAY_BUFFER_SIZE_KIB = 1
