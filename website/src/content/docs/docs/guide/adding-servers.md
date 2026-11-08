@@ -46,6 +46,8 @@ To keep a server from being replaced on the next refresh, use **Lock configurati
 
 Server rows show a pencil for an edited configuration, a lock for a locked one, and a routing icon for edited routing rules.
 
+Providers often list notices as servers, such as "Subscription expired" or a support contact. Rows that cannot carry traffic (an `0.0.0.0` address, or a JSON configuration without a proxy outbound) show an ⓘ instead of the selection circle. They cannot be selected and are skipped by latency tests; long-press one to open its viewer.
+
 ## Hardware ID
 
 Some providers require a device identifier (HWID). Material Xray sends one by default; turn it off under **Settings → Send hardware ID (HWID)**. HWID can help link traffic to your device. If a subscription [requires HWID](/docs/providers/response-headers/#subscription-always-hwid-enable) while sending is off, the app asks before adding it: **Proceed** sends HWID for that subscription only. While such a subscription is selected, the Settings switch stays on.

@@ -81,6 +81,8 @@ data class ServerListItem(
     val latency: ServerLatencyState?,
     val configurationEdited: Boolean = entity.edited,
     val routingEdited: Boolean = false,
+    /** A provider's notice listed as a server; it cannot be selected or probed. */
+    val isPlaceholder: Boolean = false,
 )
 
 data class ServerLatencyState(
@@ -420,6 +422,7 @@ class HomeViewModel(
     }
 
     fun selectServer(serverId: Long) {
+        if (serverId in placeholderServerIds()) return
         serverSelectionJob?.cancel()
         serverSelectionJob = viewModelScope.launch {
             selectServerChecked(serverId)
@@ -624,7 +627,9 @@ class HomeViewModel(
 
     /** Restarts the probes of [servers] only; probes of every other server keep running. */
     private fun startLatencyTests(servers: List<ServerEntity>, sortSubscriptionId: Long? = null) {
-        val targetServers = servers.distinctBy { it.id }
+        // Placeholders always fail; left untested, the latency sort still moves them to the end.
+        val placeholderIds = placeholderServerIds()
+        val targetServers = servers.distinctBy { it.id }.filterNot { it.id in placeholderIds }
         if (targetServers.isEmpty()) return
         val pingMethod = defaultPingMethod.value
         val pingMethods = if (showBothLatencyResults.value) {
@@ -646,10 +651,14 @@ class HomeViewModel(
         if (sortSubscriptionId != null) {
             latencySortJobs.remove(sortSubscriptionId)?.cancel()
             latencySortJobs[sortSubscriptionId] = viewModelScope.launch {
-                if (settingsRepo.sortOutboundsByLatency.first()) sortWhileProbing(targetServers)
+                if (settingsRepo.sortOutboundsByLatency.first()) sortWhileProbing(servers.distinctBy { it.id })
             }
         }
     }
+
+    private fun placeholderServerIds(): Set<Long> = homeData.value?.serverItems.orEmpty()
+        .filter { it.isPlaceholder }
+        .mapTo(HashSet()) { it.entity.id }
 
     private fun startLatencyProbe(server: ServerEntity, primaryMethod: PingMethod, methods: List<PingMethod>) {
         latencyProbeJobs.remove(server.id)?.cancel()

@@ -76,10 +76,16 @@ fun ServerConfig.endpointSummary(): String {
     )
 }
 
-fun ServerConfig.proxyOutboundCount(): Int? = (
-    extra[SERVER_EXTRA_PROXY_OUTBOUND_COUNT]?.toIntOrNull()
-        ?: rawConfigJson.proxyOutboundCountOrNull()
-    )?.takeIf { it > 1 }
+fun ServerConfig.proxyOutboundCount(): Int? = anyProxyOutboundCount()?.takeIf { it > 1 }
+
+/**
+ * Providers list notices ("subscription expired", support contacts, section headers) as servers
+ * that cannot carry traffic: a link to an unspecified address, or a JSON config without a proxy outbound.
+ */
+fun ServerConfig.isPlaceholder(): Boolean = address.trim() in UNSPECIFIED_ADDRESSES || (protocol == Protocol.RAW && anyProxyOutboundCount() == 0)
+
+private fun ServerConfig.anyProxyOutboundCount(): Int? = extra[SERVER_EXTRA_PROXY_OUTBOUND_COUNT]?.toIntOrNull()
+    ?: rawConfigJson.proxyOutboundCountOrNull()
 
 internal data class ProxyConfigDisplay(
     val protocol: String,
@@ -149,6 +155,7 @@ private fun String?.normalizedDisplayPart(): String? = this
 
 private fun String.takeUnlessNone(): String? = takeUnless { equals("none", ignoreCase = true) }
 
+private val UNSPECIFIED_ADDRESSES = setOf("0.0.0.0", "::", "[::]")
 private val VLESS_ENCRYPTION_METHODS = setOf("native", "xorpub", "random")
 private const val PROXY_CONFIG_SEPARATOR = " • "
 

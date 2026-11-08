@@ -16,6 +16,7 @@ import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
 import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.model.endpointSummary
+import com.material.xray.core.model.isPlaceholder
 import com.material.xray.core.model.proxyOutboundCount
 import com.material.xray.core.ui.R
 import java.util.Locale
@@ -121,6 +122,7 @@ class HomeDataState(
                 latency = null,
                 configurationEdited = presentation.configurationEdited,
                 routingEdited = presentation.routingEdited || entity.subscriptionId == modifiedSubscription,
+                isPlaceholder = presentation.isPlaceholder,
             )
         }
         endpointSummaryCache = cache
@@ -139,11 +141,16 @@ class HomeDataState(
                 outboundCount,
             )
         }
-        ServerPresentation(summary, config.configurationEdited ?: entity.edited, config.profileRoutingOverrides.isNotEmpty())
+        ServerPresentation(summary, config.configurationEdited ?: entity.edited, config.profileRoutingOverrides.isNotEmpty(), config.isPlaceholder())
     }.getOrElse {
         val unknown = context.localizedString(R.string.home_server_endpoint_unknown)
-        ServerPresentation("${entity.protocol.lowercase(Locale.ROOT)} • $unknown • $unknown", entity.edited, false)
+        ServerPresentation("${entity.protocol.lowercase(Locale.ROOT)} • $unknown • $unknown", entity.edited, false, false)
     }
 
-    private data class ServerPresentation(val summary: String, val configurationEdited: Boolean, val routingEdited: Boolean)
+    private data class ServerPresentation(
+        val summary: String,
+        val configurationEdited: Boolean,
+        val routingEdited: Boolean,
+        val isPlaceholder: Boolean,
+    )
 }

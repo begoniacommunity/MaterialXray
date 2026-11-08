@@ -2692,7 +2692,18 @@ private fun ServerRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onTestLatency),
+            .then(
+                // A provider's notice cannot be selected, so a long press opens it instead of probing it.
+                if (server.isPlaceholder) {
+                    Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = onOpenConfig,
+                        onLongClickLabel = stringResource(R.string.config_viewer_open),
+                    )
+                } else {
+                    Modifier.combinedClickable(onClick = onClick, onLongClick = onTestLatency)
+                },
+            ),
         color = if (isSelected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
         } else {
@@ -2710,11 +2721,22 @@ private fun ServerRow(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(contentPadding),
+                    .padding(contentPadding)
+                    // Without the chevron strip the content would run into the row's end.
+                    .padding(end = if (server.isPlaceholder) ServerRowDefaults.placeholderEndPadding else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CompactSelectionDot(isSelected = isSelected)
+                if (server.isPlaceholder) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.info_24px),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    CompactSelectionDot(isSelected = isSelected)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -2750,13 +2772,15 @@ private fun ServerRow(
                             }
                         }
                     }
-                    Text(
-                        text = server.endpointSummary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (!server.isPlaceholder) {
+                        Text(
+                            text = server.endpointSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 if (latency != null) {
                     Surface(
@@ -2771,22 +2795,24 @@ private fun ServerRow(
                     }
                 }
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(
-                        onClick = onOpenConfig,
-                        onClickLabel = stringResource(R.string.config_viewer_open),
+            if (!server.isPlaceholder) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .clickable(
+                            onClick = onOpenConfig,
+                            onClickLabel = stringResource(R.string.config_viewer_open),
+                        )
+                        .padding(horizontal = ServerRowDefaults.chevronHorizontalPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = stringResource(R.string.config_viewer_open),
+                        modifier = Modifier.size(ServerRowDefaults.chevronIconSize),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    .padding(horizontal = ServerRowDefaults.chevronHorizontalPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.config_viewer_open),
-                    modifier = Modifier.size(ServerRowDefaults.chevronIconSize),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                }
             }
         }
     }
@@ -2922,6 +2948,7 @@ private object ServerRowDefaults {
 
     val chevronHorizontalPadding = 7.dp
     val chevronIconSize = 20.dp
+    val placeholderEndPadding = 12.dp
 }
 
 private const val LATENCY_SHIMMER_DURATION_MS = 850

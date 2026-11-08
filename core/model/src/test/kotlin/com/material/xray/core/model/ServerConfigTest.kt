@@ -1,6 +1,8 @@
 package com.material.xray.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ServerConfigTest {
@@ -199,5 +201,42 @@ class ServerConfigTest {
         val config = ServerConfig(Protocol.VLESS, "Node", "example.com", 443, "id")
 
         assertEquals(null, config.withProfileDnsOverride(false).subscriptionUseProfileDns)
+    }
+
+    @Test
+    fun `links to an unspecified address are placeholders`() {
+        assertTrue(ServerConfig(Protocol.VLESS, "Subscription disabled", "0.0.0.0", 1, "00000000-0000-0000-0000-000000000000").isPlaceholder())
+        assertTrue(ServerConfig(Protocol.TROJAN, "Support", "::", 1, "x").isPlaceholder())
+    }
+
+    @Test
+    fun `json configs without a proxy outbound are placeholders`() {
+        val config = ServerConfig(
+            protocol = Protocol.RAW,
+            name = "Donate",
+            address = "",
+            port = 10808,
+            password = "",
+            rawConfigJson = """{"outbounds":[{"protocol":"blackhole"},{"protocol":"freedom","tag":"direct"}]}""",
+        )
+
+        assertTrue(config.isPlaceholder())
+        assertTrue(config.copy(rawConfigJson = "", extra = mapOf(SERVER_EXTRA_PROXY_OUTBOUND_COUNT to "0")).isPlaceholder())
+    }
+
+    @Test
+    fun `real servers are not placeholders`() {
+        val raw = ServerConfig(
+            protocol = Protocol.RAW,
+            name = "Auto",
+            address = "",
+            port = 10808,
+            password = "",
+            rawConfigJson = """{"outbounds":[{"protocol":"vless"},{"protocol":"freedom"}]}""",
+        )
+
+        assertFalse(raw.isPlaceholder())
+        assertFalse(raw.copy(rawConfigJson = "").isPlaceholder())
+        assertFalse(ServerConfig(Protocol.VLESS, "Node", "example.com", 443, "id", rawConfigJson = "{\"outbounds\":[]}").isPlaceholder())
     }
 }
