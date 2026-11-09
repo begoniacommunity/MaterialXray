@@ -1924,6 +1924,10 @@ class XrayService(
     }
 
     private suspend fun retargetNetworkUntilStable(reason: String) {
+        // Waits outside the command lock, so a per-network server switch, which restarts the core
+        // anyway, goes first and leaves the new network recorded instead of restarting twice.
+        // Outside the step too, so its timing reports only the work and not this deliberate wait.
+        if (!connectionManager.isUsingRootRuntime) delay(ROOTLESS_NETWORK_FOLLOW_DELAY_MS)
         executeStep(
             ConnectionStep(
                 label = "Stabilize physical network route",
@@ -1937,9 +1941,6 @@ class XrayService(
     private suspend fun retargetNetworkUntilStableOnce(reason: String): NetworkRetargetRetryOutcome {
         val requiresPassiveMonitoring = reason == PERIODIC_ROOT_ROUTE_VERIFICATION_REASON
         if (requiresPassiveMonitoring && !passiveHealthMonitoringEnabled) return NetworkRetargetRetryOutcome.Stopped
-        // Waits outside the command lock, so a per-network server switch, which restarts the core
-        // anyway, goes first and leaves the new network recorded instead of restarting twice.
-        if (!connectionManager.isUsingRootRuntime) delay(ROOTLESS_NETWORK_FOLLOW_DELAY_MS)
         val outcome = retryNetworkRetarget(
             retryDelaysMs = NETWORK_RETARGET_RETRY_DELAYS_MS,
             shouldContinue = {
