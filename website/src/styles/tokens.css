@@ -5,6 +5,13 @@
  * resolves (including "auto"), and the landing page reuses the same script and storage key.
  */
 
+/* Self-hosted, so pages make no third-party requests. Neither Google Sans Flex nor Google Sans
+   Code has Cyrillic, which falls back to Google Sans and Roboto Mono. */
+@import '@fontsource-variable/google-sans-flex/opsz.css';
+@import '@fontsource-variable/google-sans';
+@import '@fontsource-variable/google-sans-code';
+@import '@fontsource-variable/roboto-mono';
+
 :root {
 	--md-primary: #0b57d0;
 	--md-on-primary: #ffffff;
@@ -49,8 +56,8 @@
 	--md-shape-xxl: 48px;
 	--md-shape-full: 999px;
 
-	--md-font: 'Google Sans Flex', 'Google Sans', Roboto, system-ui, sans-serif;
-	--md-font-code: 'Google Sans Code', 'Roboto Mono', 'JetBrains Mono', ui-monospace, monospace;
+	--md-font: 'Google Sans Flex Variable', 'Google Sans Variable', Roboto, system-ui, sans-serif;
+	--md-font-code: 'Google Sans Code Variable', 'Roboto Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
 
 	--md-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
 	--md-motion-spring: cubic-bezier(0.34, 1.4, 0.64, 1);

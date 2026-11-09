@@ -32,15 +32,6 @@ export default defineConfig({
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://materialxray.app/og.jpg' } },
 				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
 				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
-				{ tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
-				{ tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
-				{
-					tag: 'link',
-					attrs: {
-						rel: 'stylesheet',
-						href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,wght@6..144,400..800&family=Google+Sans:opsz,wght@17..18,400..700&family=Roboto+Mono:wght@400;500&display=swap',
-					},
-				},
 			],
 			expressiveCode: {
 				themes: ['github-dark-default', 'github-light-default'],

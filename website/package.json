@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.6",
+    "@fontsource-variable/google-sans": "^5.3.2",
+    "@fontsource-variable/google-sans-code": "^5.3.2",
+    "@fontsource-variable/google-sans-flex": "^5.3.2",
+    "@fontsource-variable/roboto-mono": "^5.3.0",
     "astro": "^7.4.0",
     "sharp": "^0.35.3"
   }
