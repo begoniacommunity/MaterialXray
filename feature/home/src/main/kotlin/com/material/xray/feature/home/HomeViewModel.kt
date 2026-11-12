@@ -18,6 +18,7 @@ import com.material.xray.core.database.entity.ServerEntity
 import com.material.xray.core.database.entity.SubscriptionEntity
 import com.material.xray.core.model.AppUpdate
 import com.material.xray.core.model.ConnectionState
+import com.material.xray.core.model.LatencyTestConcurrency
 import com.material.xray.core.model.PingMethod
 import com.material.xray.core.model.RoutingPolicyControl
 import com.material.xray.core.model.ServerConfig
@@ -158,7 +159,8 @@ class HomeViewModel(
     // Keyed by server and subscription id; like the rest of the latency state, only touched on the main thread.
     private val latencyProbeJobs = mutableMapOf<Long, Job>()
     private val latencySortJobs = mutableMapOf<Long, Job>()
-    private val latencySemaphore = Semaphore(MAX_CONCURRENT_LATENCY_TESTS)
+    private var latencySemaphore = Semaphore(LatencyTestConcurrency.DEFAULT)
+    private var latencySemaphoreLimit = LatencyTestConcurrency.DEFAULT
 
     val connectionState: StateFlow<ConnectionState> = connectionStateCoordinator.state
     internal val connectionProgress = connectionStateCoordinator.connectionProgress
@@ -665,7 +667,8 @@ class HomeViewModel(
         // Started only once registered, so a probe that finishes without suspending still unregisters itself.
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                val latency = latencySemaphore.withPermit { latencyMeasurer.measure(server, primaryMethod, methods) }
+                val semaphore = latencySemaphore(settingsRepo.latencyTestConcurrency.first())
+                val latency = semaphore.withPermit { latencyMeasurer.measure(server, primaryMethod, methods) }
                 latencyByServerId.update { it + (server.id to latency) }
             } finally {
                 if (latencyProbeJobs[server.id] === coroutineContext.job) latencyProbeJobs.remove(server.id)
@@ -673,6 +676,15 @@ class HomeViewModel(
         }
         latencyProbeJobs[server.id] = job
         job.start()
+    }
+
+    /** Probes already holding or awaiting the old semaphore finish under the old limit. */
+    private fun latencySemaphore(limit: Int): Semaphore {
+        if (limit != latencySemaphoreLimit) {
+            latencySemaphore = Semaphore(limit)
+            latencySemaphoreLimit = limit
+        }
+        return latencySemaphore
     }
 
     /** Re-sorts [servers] until none of them is being probed, whichever request started the probe. */
@@ -759,7 +771,6 @@ class HomeViewModel(
     }
 
     private companion object {
-        const val MAX_CONCURRENT_LATENCY_TESTS = 25
         const val LATENCY_SORT_INTERVAL_MILLIS = 750L
         const val LIVE_READING_GRACE_MILLIS = 5_000L
     }

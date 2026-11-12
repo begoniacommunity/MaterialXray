@@ -50,7 +50,7 @@ Resolvers are comma-separated and tried in order. Each one is an IP address or a
 
 **Follow provider core requirements** (on by default) lets a subscription that sends [`mxray-min-core-version` or `mxray-max-core-version`](/docs/providers/response-headers/#mxray-min-core-version) pick the core: connecting to one of its servers switches to the newest release in its range, downloading it if needed, and automatic updates skip releases outside that range. With it off, connecting warns you instead and offers a core in range.
 
-Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, and geodata URLs and update interval.
+Advanced options cover the Xray log level, buffer size, TUN MTU, a RAM threshold that restarts the core, the latency-check URL, how many servers a latency test checks at once (10 by default; each httping check starts its own Xray core, so high values can freeze slow devices), and geodata URLs and update interval.
 
 ## Appearance and notifications
 

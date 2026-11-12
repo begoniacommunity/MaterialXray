@@ -141,6 +141,7 @@ import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
+import com.material.xray.core.model.LatencyTestConcurrency
 import com.material.xray.core.model.LauncherIcon
 import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.NotificationField
@@ -269,6 +270,7 @@ private fun SettingsScreenContent(
     val geositeUrl = settings.geositeUrl
     val geoDataUpdateIntervalHours = settings.geoDataUpdateIntervalHours
     val latencyCheckUrl = settings.latencyCheckUrl
+    val latencyTestConcurrency = settings.latencyTestConcurrency
     val sortOutboundsByLatency = settings.sortOutboundsByLatency
     val appUpdateChecksEnabled = settings.appUpdateChecksEnabled
     val diagnosticsEnabled = settings.diagnosticsEnabled
@@ -325,6 +327,9 @@ private fun SettingsScreenContent(
         TextFieldState(geoDataUpdateIntervalHours.toString())
     }
     val editingLatencyCheckUrl = rememberSaveable(latencyCheckUrl, saver = TextFieldState.Saver) { TextFieldState(latencyCheckUrl) }
+    val editingLatencyTestConcurrency = rememberSaveable(latencyTestConcurrency, saver = TextFieldState.Saver) {
+        TextFieldState(latencyTestConcurrency.toString())
+    }
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val hasTunNameChanges by remember(editingTunName, tunName) { derivedStateOf { editingTunName.text.toString() != tunName } }
     val parsedXrayBufferSizeKiB by remember(editingXrayBufferSizeKiB) {
@@ -378,6 +383,15 @@ private fun SettingsScreenContent(
     }
     val hasLatencyCheckUrlChanges by remember(editingLatencyCheckUrl, latencyCheckUrl) {
         derivedStateOf { editingLatencyCheckUrl.text.toString().trim() != latencyCheckUrl }
+    }
+    val parsedLatencyTestConcurrency by remember(editingLatencyTestConcurrency) {
+        derivedStateOf { editingLatencyTestConcurrency.text.toString().toIntOrNull() }
+    }
+    val isLatencyTestConcurrencyValid by remember(parsedLatencyTestConcurrency) {
+        derivedStateOf { parsedLatencyTestConcurrency?.let(LatencyTestConcurrency::isValid) == true }
+    }
+    val hasLatencyTestConcurrencyChanges by remember(editingLatencyTestConcurrency, latencyTestConcurrency) {
+        derivedStateOf { editingLatencyTestConcurrency.text.toString() != latencyTestConcurrency.toString() }
     }
     val xrayCoreVersionText = xrayCoreVersionText(xrayCoreVersion)
     val appUpdateCheckInProgress = appUpdateCheckStatus?.isInProgress == true
@@ -940,6 +954,24 @@ private fun SettingsScreenContent(
                             Text(stringResource(R.string.settings_save))
                         }
                     }
+                }
+            }
+
+            settingsItem(key = "latency_test_concurrency", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    AdvancedIntegerSetting(
+                        state = editingLatencyTestConcurrency,
+                        label = stringResource(R.string.settings_latency_test_concurrency_label),
+                        supportingText = stringResource(
+                            R.string.settings_latency_test_concurrency_supporting_text,
+                            LatencyTestConcurrency.MIN,
+                            LatencyTestConcurrency.MAX,
+                            LatencyTestConcurrency.DEFAULT,
+                        ),
+                        isValid = isLatencyTestConcurrencyValid,
+                        hasChanges = hasLatencyTestConcurrencyChanges,
+                        onSave = { parsedLatencyTestConcurrency?.let(viewModel::setLatencyTestConcurrency) },
+                    )
                 }
             }
 
@@ -1912,16 +1944,16 @@ private fun AdvancedIntegerSetting(
     state: TextFieldState,
     label: String,
     supportingText: String,
-    suffix: String,
     isValid: Boolean,
     hasChanges: Boolean,
     onSave: () -> Unit,
+    suffix: String? = null,
 ) {
     OutlinedTextField(
         state = state,
         label = { Text(label) },
         supportingText = { Text(supportingText) },
-        suffix = { Text(suffix) },
+        suffix = suffix?.let { { Text(it) } },
         isError = state.text.isNotEmpty() && !isValid,
         inputTransformation = digitsOnly(maxLength = 5),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

@@ -55,6 +55,8 @@
     <string name="settings_hours_abbreviation">h</string>
     <string name="settings_latency_check_url_label">Latency Check URL</string>
     <string name="settings_latency_check_url_supporting_text">HTTP endpoint is used for node latency checks.</string>
+    <string name="settings_latency_test_concurrency_label">Parallel latency tests</string>
+    <string name="settings_latency_test_concurrency_supporting_text">How many servers a latency test checks at once. Each httping check starts its own Xray core, so high values can freeze slow devices. Range: %1$d-%2$d. Default: %3$d.</string>
     <string name="settings_save">Save</string>
     <string name="settings_updating">Updating&#8230;</string>
     <string name="settings_section_appearance">Appearance</string>

@@ -18,6 +18,7 @@ import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
+import com.material.xray.core.model.LatencyTestConcurrency
 import com.material.xray.core.model.LauncherIcon
 import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.LocalProxySettings
@@ -472,6 +473,10 @@ class SettingsViewModel(
         settingsRepo.setGeoDataUpdateIntervalHours(hours)
     }
     fun setLatencyCheckUrl(url: String) = viewModelScope.launch { settingsRepo.setLatencyCheckUrl(url) }
+    fun setLatencyTestConcurrency(concurrency: Int) = viewModelScope.launch {
+        if (!LatencyTestConcurrency.isValid(concurrency)) return@launch
+        settingsRepo.setLatencyTestConcurrency(concurrency)
+    }
     fun setSortOutboundsByLatency(enabled: Boolean) = viewModelScope.launch {
         settingsRepo.setSortOutboundsByLatency(enabled)
     }

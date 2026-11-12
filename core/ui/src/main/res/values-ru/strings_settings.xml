@@ -55,6 +55,8 @@
     <string name="settings_hours_abbreviation">ч</string>
     <string name="settings_latency_check_url_label">URL-адрес для проверки задержки</string>
     <string name="settings_latency_check_url_supporting_text">HTTP-адрес используется для проверки задержки узлов.</string>
+    <string name="settings_latency_test_concurrency_label">Параллельные проверки задержки</string>
+    <string name="settings_latency_test_concurrency_supporting_text">Сколько серверов проверка задержки проверяет одновременно. Каждая проверка httping запускает своё ядро Xray, поэтому большие значения могут подвешивать медленные устройства. Диапазон: %1$d–%2$d. По умолчанию: %3$d.</string>
     <string name="settings_save">Сохранить</string>
     <string name="settings_updating">Обновление&#8230;</string>
     <string name="settings_section_appearance">Оформление</string>

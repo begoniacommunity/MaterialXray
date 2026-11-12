@@ -14,6 +14,7 @@ import com.material.xray.core.model.AppUpdateInterval
 import com.material.xray.core.model.DnsPreset
 import com.material.xray.core.model.GeoDataUpdateInterval
 import com.material.xray.core.model.Ipv6Mode
+import com.material.xray.core.model.LatencyTestConcurrency
 import com.material.xray.core.model.LauncherIcon
 import com.material.xray.core.model.LauncherName
 import com.material.xray.core.model.LocalProxySettings
@@ -79,6 +80,7 @@ data class SettingsSnapshot(
     val geositeUrl: String,
     val geoDataUpdateIntervalHours: Int,
     val latencyCheckUrl: String,
+    val latencyTestConcurrency: Int,
     val sortOutboundsByLatency: Boolean,
     val showBothLatencyResults: Boolean,
     val appUpdateChecksEnabled: Boolean,
@@ -126,6 +128,7 @@ class SettingsRepository(
         val GEOSITE_URL = stringPreferencesKey("geosite_url")
         val GEO_DATA_UPDATE_INTERVAL_HOURS = intPreferencesKey("geo_data_update_interval_hours")
         val LATENCY_CHECK_URL = stringPreferencesKey("latency_check_url")
+        val LATENCY_TEST_CONCURRENCY = intPreferencesKey("latency_test_concurrency")
         val DEFAULT_PING_METHOD = stringPreferencesKey("default_ping_method")
         val SORT_OUTBOUNDS_BY_LATENCY = booleanPreferencesKey("sort_outbounds_by_latency")
         val SHOW_BOTH_LATENCY_RESULTS = booleanPreferencesKey("show_both_latency_results")
@@ -264,6 +267,9 @@ class SettingsRepository(
     }
     val latencyCheckUrl: Flow<String> = store.data.map { prefs ->
         prefs[LATENCY_CHECK_URL] ?: DEFAULT_LATENCY_CHECK_URL
+    }
+    val latencyTestConcurrency: Flow<Int> = store.data.map { prefs ->
+        LatencyTestConcurrency.normalize(prefs[LATENCY_TEST_CONCURRENCY])
     }
     val defaultPingMethod: Flow<PingMethod> = store.data.map { prefs ->
         PingMethod.fromValue(prefs[DEFAULT_PING_METHOD])
@@ -428,6 +434,7 @@ class SettingsRepository(
                 ?: DEFAULT_GEOSITE_URL,
             geoDataUpdateIntervalHours = GeoDataUpdateInterval.normalize(prefs[GEO_DATA_UPDATE_INTERVAL_HOURS]),
             latencyCheckUrl = prefs[LATENCY_CHECK_URL] ?: DEFAULT_LATENCY_CHECK_URL,
+            latencyTestConcurrency = LatencyTestConcurrency.normalize(prefs[LATENCY_TEST_CONCURRENCY]),
             sortOutboundsByLatency = prefs[SORT_OUTBOUNDS_BY_LATENCY] ?: false,
             showBothLatencyResults = prefs[SHOW_BOTH_LATENCY_RESULTS] ?: false,
             appUpdateChecksEnabled = prefs[APP_UPDATE_CHECKS_ENABLED] ?: true,
@@ -631,6 +638,10 @@ class SettingsRepository(
     suspend fun setLatencyCheckUrl(url: String) = store.edit { prefs ->
         val trimmedUrl = url.trim()
         if (trimmedUrl.isEmpty()) prefs.remove(LATENCY_CHECK_URL) else prefs[LATENCY_CHECK_URL] = trimmedUrl
+    }
+    suspend fun setLatencyTestConcurrency(concurrency: Int) {
+        require(LatencyTestConcurrency.isValid(concurrency))
+        store.edit { prefs -> prefs[LATENCY_TEST_CONCURRENCY] = concurrency }
     }
     suspend fun setDefaultPingMethod(method: PingMethod) = store.edit { prefs ->
         prefs[DEFAULT_PING_METHOD] = method.value
@@ -871,6 +882,10 @@ class SettingsRepository(
                 ?.let(GeoDataUpdateInterval::normalize)
                 ?.let { prefs[GEO_DATA_UPDATE_INTERVAL_HOURS] = it }
             map["latency_check_url"]?.takeIf { it.isNotBlank() }?.let { prefs[LATENCY_CHECK_URL] = it }
+            map["latency_test_concurrency"]
+                ?.toIntOrNull()
+                ?.let(LatencyTestConcurrency::normalize)
+                ?.let { prefs[LATENCY_TEST_CONCURRENCY] = it }
             map["default_ping_method"]?.let { prefs[DEFAULT_PING_METHOD] = PingMethod.fromValue(it).value }
             map["sort_outbounds_by_latency"]?.toBooleanStrictOrNull()?.let { prefs[SORT_OUTBOUNDS_BY_LATENCY] = it }
             map["show_both_latency_results"]

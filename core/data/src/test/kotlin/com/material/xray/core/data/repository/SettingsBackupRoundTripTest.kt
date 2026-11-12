@@ -121,6 +121,7 @@ class SettingsBackupRoundTripTest {
             "geosite_url" to "https://example.com/geosite.dat",
             "geo_data_update_interval_hours" to 48,
             "latency_check_url" to "https://example.com/204",
+            "latency_test_concurrency" to 4,
             "default_ping_method" to "httping",
             "sort_outbounds_by_latency" to true,
             "show_both_latency_results" to true,
