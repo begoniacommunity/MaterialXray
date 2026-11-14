@@ -1148,10 +1148,9 @@ class TproxyManagerTest {
                     "-j MARK --set-xmark 0x10200000/0x1fe00000",
             ),
         )
-        assertTrue(command.contains("listeners=\$(ss -lntu)"))
-        assertEquals(1, command.split("ss -lntu").size - 1)
-        assertFalse(command.contains("ss -lnu"))
-        assertEquals(2, command.split("iptables -w 2 -t mangle -S").size - 1)
+        assertEquals(1, command.split("tcp_listeners=\$(ss -lnt)").size - 1)
+        assertEquals(1, command.split("udp_listeners=\$(ss -lnu)").size - 1)
+        assertEquals(2, command.split("\$(iptables -w 2 -t mangle -S").size - 1)
         assertTrue(command.contains("v4_slot_rules=\$(iptables -w 2 -t mangle -S MXOA278b)"))
         assertTrue(command.contains("*\"\$newline\$1\$newline\$2\$newline\"*"))
         assertFalse(command.contains("*\"\$newline\$1\$newline\"*\"\$newline\$2\$newline\"*"))
@@ -1162,6 +1161,22 @@ class TproxyManagerTest {
         assertFalse(command.contains("ip -6 rule show"))
         assertTrue(command.contains("lookup 300([[:space:]]|$)"))
         assertTrue(command.contains("^local default dev lo([[:space:]]|$)"))
+    }
+
+    @Test
+    fun `missing rule report lists only the rule's chain`() {
+        val command = TproxyManager.verifyCommand(plan().runtimeState, APP_UID)
+        val stubs = """
+            iptables() { case "${'$'}*" in *' -S OUTPUT') echo "listed OUTPUT";; esac; }
+            ip6tables() { :; }
+        """.trimIndent()
+        val process = ProcessBuilder("sh", "-c", "$stubs\n$command").start()
+
+        assertEquals(1, process.waitFor())
+        assertEquals(
+            listOf("missing v4 rule: -A OUTPUT -j MXO278b", "listed OUTPUT"),
+            process.errorStream.bufferedReader().readLines(),
+        )
     }
 
     @Test
@@ -1176,13 +1191,18 @@ class TproxyManagerTest {
                     'route show table 300') echo 'local default dev lo table 300';;
                 esac
             }
-            ss() { printf '%s\n' 'tcp LISTEN 0 5 127.0.0.1:48321 0.0.0.0:*' 'udp UNCONN 0 0 127.0.0.1:48321 0.0.0.0:*' 'tcp LISTEN 0 5 127.0.0.1:48322 0.0.0.0:*' 'udp UNCONN 0 0 127.0.0.1:48322 0.0.0.0:*'; }
+            ss() {
+                case "${'$'}1" in
+                    -lnt) printf '%s\n' 'LISTEN 0 5 127.0.0.1:48321 0.0.0.0:*' 'LISTEN 0 5 127.0.0.1:48322 0.0.0.0:*';;
+                    -lnu) printf '%s\n' 'UNCONN 0 0 127.0.0.1:48321 0.0.0.0:*' 'UNCONN 0 0 127.0.0.1:48322 0.0.0.0:*';;
+                esac
+            }
         """.trimIndent()
 
         assertEquals(0, ProcessBuilder("sh", "-c", "$stubs\n$command").start().waitFor())
         val missingHook = stubs.replace("'-A PREROUTING -j MXP278b'", "'-A OTHER -j MXP278b'")
         assertEquals(1, ProcessBuilder("sh", "-c", "$missingHook\n$command").start().waitFor())
-        val missingListener = stubs.replace("'udp UNCONN 0 0 127.0.0.1:48322 0.0.0.0:*'", "")
+        val missingListener = stubs.replace("'UNCONN 0 0 127.0.0.1:48322 0.0.0.0:*'", "")
         assertEquals(1, ProcessBuilder("sh", "-c", "$missingListener\n$command").start().waitFor())
         val splitRule = stubs.replace(
             "echo '9990: from all fwmark 0x10000000/0x10000000 lookup 300'",

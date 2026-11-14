@@ -357,14 +357,7 @@ class TproxyManager internal constructor(
                 add("routes6=\$(ip -6 route show table ${state.routeTable})")
                 add("printf '%s\\n' \"\$routes6\" | grep -Eq '^local default dev lo([[:space:]]|$)'")
             }
-            add("listeners=\$(ss -lntu)")
-            add("tcp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^tcp ')")
-            add("udp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^udp ')")
-            add("has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) false;; esac; }")
-            state.groups.forEach { group ->
-                add("has_port \"\$tcp_listeners\" ${group.port}")
-                add("has_port \"\$udp_listeners\" ${group.port}")
-            }
+            addAll(listenerChecks(state))
         }.shellAnd()
     }
 
@@ -631,12 +624,15 @@ class TproxyManager internal constructor(
             return commands.shellAnd()
         }
 
-        /** Defines `has_<family>`, which reports a missing rule and its chain's actual rules on stderr. */
-        private fun ruleCheckFunction(family: String): String = "has_$family() { case \"\$newline\$${family}_rules\$newline\" in " +
+        /**
+         * Defines `has_<family>`, which reports a missing rule and its chain's actual rules on stderr.
+         * The chain is listed again rather than filtered out of the snapshot: printf is an executable
+         * on Android, and a whole table can exceed the kernel's 128 KiB limit for one argument.
+         */
+        private fun ruleCheckFunction(family: String, listRules: String): String = "has_$family() { case \"\$newline\$${family}_rules\$newline\" in " +
             "*\"\$newline\$1\$newline\"*) true;; *) " +
             "{ printf 'missing $family rule: %s\\n' \"\$1\" >&2; " +
-            "chain=\${1#-A }; chain=\${chain%% *}; printf '%s\\n' \"\$${family}_rules\" | " +
-            "grep -F -- \"-A \$chain \" >&2; return 1; };; esac; }"
+            "chain=\${1#-A }; chain=\${chain%% *}; $listRules \"\$chain\" >&2; return 1; };; esac; }"
 
         fun verifyCommand(state: TproxyRuntimeState, appUid: Int): String {
             val names = chainNames(appUid)
@@ -654,7 +650,7 @@ class TproxyManager internal constructor(
                 "v4_rules=\$($IPV4 -t mangle -S)",
                 "v4_slot_rules=\$($IPV4 -t mangle -S ${names.slot(state.outputChainSlot)})",
                 "newline='\n'",
-                ruleCheckFunction("v4"),
+                ruleCheckFunction("v4", "$IPV4 -t mangle -S"),
                 "has_v4_fragment() { case \"\$v4_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }",
                 "has_v4_order() { case \"\$newline\$v4_slot_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }",
@@ -694,7 +690,7 @@ class TproxyManager internal constructor(
             if (state.ipv6Enabled) {
                 commands += "v6_rules=\$($IPV6 -t mangle -S)"
                 commands += "v6_slot_rules=\$($IPV6 -t mangle -S ${names.slot(state.outputChainSlot)})"
-                commands += ruleCheckFunction("v6")
+                commands += ruleCheckFunction("v6", "$IPV6 -t mangle -S")
                 commands += "has_v6_fragment() { case \"\$v6_slot_rules\" in *\"\$1\"*) true;; *) return 1;; esac; }"
                 commands += "has_v6_order() { case \"\$newline\$v6_slot_rules\$newline\" in " +
                     "*\"\$newline\$1\$newline\$2\$newline\"*) true;; *) return 1;; esac; }"
@@ -734,7 +730,7 @@ class TproxyManager internal constructor(
             } else {
                 commands += "v6_rules=\$($IPV6 -t filter -S)"
                 commands += "v6_slot_rules=\$($IPV6 -t filter -S ${names.slot(state.outputChainSlot)})"
-                commands += ruleCheckFunction("v6")
+                commands += ruleCheckFunction("v6", "$IPV6 -t filter -S")
                 commands += hasV6("OUTPUT -j ${names.output}")
                 commands += hasV6("${names.output} -j ${names.slot(state.outputChainSlot)}")
                 commands += "case \"\$v6_slot_rules\" in *'--reject-with icmp6-no-route'*) true;; *) false;; esac"
@@ -1527,11 +1523,15 @@ class TproxyManager internal constructor(
 
 internal fun tproxyListenerVerifyCommand(state: TproxyRuntimeState): String = listenerChecks(state).shellAnd()
 
+/**
+ * Captures each protocol's listeners straight into a variable. Piping one listing through printf
+ * failed under UDP load: every transparent socket the core opens for UDP replies is listed, and
+ * printf, an executable on Android, rejects an argument over 128 KiB.
+ */
 private fun listenerChecks(state: TproxyRuntimeState): List<String> = buildList {
     add("has_port() { case \"\$1\" in *\":\$2 \"*|*\".\$2 \"*) true;; *) return 1;; esac; }")
-    add("listeners=\$(ss -lntu)")
-    add("tcp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^tcp ')")
-    add("udp_listeners=\$(printf '%s\\n' \"\$listeners\" | grep '^udp ')")
+    add("tcp_listeners=\$(ss -lnt)")
+    add("udp_listeners=\$(ss -lnu)")
     state.groups.forEach { group ->
         add("has_port \"\$tcp_listeners\" ${group.port}")
         add("has_port \"\$udp_listeners\" ${group.port}")
