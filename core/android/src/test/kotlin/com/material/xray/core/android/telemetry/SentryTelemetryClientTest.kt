@@ -40,4 +40,22 @@ class SentryTelemetryClientTest {
         assertNull(event.user?.email)
         assertNull(event.user?.ipAddress)
     }
+
+    @Test
+    fun `sanitizer drops crashes caused by the system server dying`() {
+        val event = SentryEvent().apply {
+            exceptions = listOf(
+                SentryException().apply {
+                    module = "android.os"
+                    type = "DeadSystemException"
+                },
+                SentryException().apply {
+                    module = "java.lang"
+                    type = "RuntimeException"
+                },
+            )
+        }
+
+        assertNull(sanitizeTelemetryEvent(event))
+    }
 }

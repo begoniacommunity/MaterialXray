@@ -152,7 +152,9 @@ internal fun configureTelemetryOptions(options: SentryAndroidOptions, isDebuggab
     options.beforeSend = { event, _ -> sanitizeTelemetryEvent(event) }
 }
 
-internal fun sanitizeTelemetryEvent(event: SentryEvent): SentryEvent {
+internal fun sanitizeTelemetryEvent(event: SentryEvent): SentryEvent? {
+    // Android's system server died, which takes every app down with it and says nothing about this one.
+    if (event.exceptions.orEmpty().any { it.module == "android.os" && it.type == "DeadSystemException" }) return null
     event.request = null
     event.serverName = null
     event.exceptions?.forEach { exception -> exception.value = exception.type }
