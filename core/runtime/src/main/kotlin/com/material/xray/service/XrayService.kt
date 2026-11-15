@@ -1113,6 +1113,7 @@ class XrayService(
                 settingsRepo.compareAndSetLastServerId(restoredServerId, -1)
                 activeConfigOverrideStore.clear()
             }
+            showConnectionFailureNotification(localizedString(R.string.connection_error_selected_server_removed))
             connectionStateCoordinator.markDisconnected()
             updateNotification()
             stopSelf()
@@ -1175,7 +1176,7 @@ class XrayService(
                 failRuntimeRestore("Could not clean the recorded TPROXY runtime")
                 return false
             }
-            reconnectMissingRuntime()?.let { return it }
+            reconnectMissingRuntime(wasRunning = true)?.let { return it }
             connectionManager.clearFailedTransitionGuard()
         } else if (shouldCleanRecordedRootRuntime(staleState, connectIfMissing)) {
             logBuffer.append(LogSource.APP, "Cleaning incompatible recorded root runtime before reconnecting")
@@ -1184,11 +1185,17 @@ class XrayService(
                 return false
             }
         }
-        return if (connectIfMissing) reconnectMissingRuntime() else null
+        return if (connectIfMissing) reconnectMissingRuntime(wasRunning = staleState != null) else null
     }
 
-    private suspend fun reconnectMissingRuntime(): Boolean? {
-        val config = loadLastServerConfig() ?: return null
+    private suspend fun reconnectMissingRuntime(wasRunning: Boolean): Boolean? {
+        val config = loadLastServerConfig()
+        if (config == null) {
+            // A refresh that drops the selected server leaves the running core alone, so this
+            // restart is where the user would otherwise lose the connection without a word.
+            if (wasRunning) showConnectionFailureNotification(localizedString(R.string.connection_error_selected_server_removed))
+            return null
+        }
         connectionLifecycle.updateActiveConfig(config)
         return connectWithCurrentSettings(config)
     }

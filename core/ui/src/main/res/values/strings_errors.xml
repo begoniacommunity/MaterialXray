@@ -7,6 +7,7 @@
     <string name="connection_error_vpn_permission_required">VPN permission is required</string>
     <string name="connection_error_vpn_interface">Could not establish VPN interface</string>
     <string name="connection_error_no_server_selected">Select a server before using always-on VPN</string>
+    <string name="connection_error_selected_server_removed">The server you were connected to is no longer in its subscription. Select a server to reconnect.</string>
     <string name="connection_error_database_unavailable">App data can\'t be read. Open Material Xray to recover it.</string>
     <string name="connection_error_xray_binary_not_found">Xray binary not found</string>
     <string name="connection_error_physical_route_not_found">Could not detect physical network route for Xray bypass</string>

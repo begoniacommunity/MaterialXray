@@ -180,13 +180,11 @@ class SubscriptionRefreshCoordinator(
 
         when (val outcome = selectedServerRefreshOutcome(selectedServer, refreshResult.subscriptionId, refreshResult)) {
             SelectedServerRefreshOutcome.Unchanged -> Unit
+            // The running core keeps its config in memory, so the connection survives the server
+            // leaving the list; only a later cold restart finds nothing selected, and says so.
             SelectedServerRefreshOutcome.Removed -> {
-                try {
-                    connectionShutdown.disconnectIfRunning()
-                } finally {
-                    settingsRepository.compareAndSetLastServerId(selectedServer.id, -1)
-                    activeConfigOverrideStore.clear()
-                }
+                settingsRepository.compareAndSetLastServerId(selectedServer.id, -1)
+                activeConfigOverrideStore.clear()
             }
             is SelectedServerRefreshOutcome.Replaced -> {
                 settingsRepository.compareAndSetLastServerId(selectedServer.id, outcome.serverId)
