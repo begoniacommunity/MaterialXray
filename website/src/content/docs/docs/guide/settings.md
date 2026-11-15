@@ -37,7 +37,7 @@ On the **Local proxy server** page:
 
 Xray answers every port-53 query itself, so names routed through the proxy are never looked up on the network you're on.
 
-- **Proxied domains**: the resolver for every name routed through the proxy.
+- **Proxied domains**: the resolver for every name except LAN hosts and direct rules. With root and **Transparent proxy**, that includes names that *Not proxied* apps look up: Android resolves them on the apps' behalf, so they can't be told apart.
 - **Direct domains**: the resolver for LAN hosts and direct rules. These queries leave over your normal connection. The default, **System**, uses the resolver of the network you're on. In rootless mode it goes through Android, so it also follows your Private DNS setting. In root mode it asks the network's resolvers directly and reconnects when they change.
 - **Encrypt queries**: use encrypted DNS.
 - **Prefer profile DNS**: when a JSON profile defines its own DNS, use it. A subscription can decide this for its own servers with [`mxray-use-dns-from-json`](/docs/providers/response-headers/#mxray-use-dns-from-json); switching it then changes the choice for that subscription only.

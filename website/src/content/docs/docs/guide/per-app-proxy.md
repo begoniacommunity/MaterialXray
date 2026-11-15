@@ -10,7 +10,7 @@ Open **Routing → Apps** to choose a route for each app. Search by name from th
 | Route | Effect | Mode |
 | --- | --- | --- |
 | **Default selected server** | Uses the server selected on the home screen. This is the default. | Both |
-| **Not proxied** | Uses the device network directly. | Both |
+| **Not proxied** | Uses the device network directly. With root and **Transparent proxy**, its DNS lookups still go to the [proxied domains resolver](/docs/guide/settings/#dns). | Both |
 | **Default outbound** | Uses the default outbound chosen in Settings. | Rootful |
 | **Specific server** | Sends the app through a server of your choice. Routing rules still apply. | Rootful |
 | **Always proxied** | With a specific server: sends *all* of the app's traffic through it, ignoring routing rules. | Rootful |
