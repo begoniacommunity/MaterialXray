@@ -13,6 +13,7 @@ import com.material.xray.core.android.locale.localizedString
 import com.material.xray.core.common.connection.ConnectionStateCoordinator
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
+import com.material.xray.core.database.DatabaseOpenChecker
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.runtime.AlwaysOnVpnState
 import com.material.xray.core.runtime.RoutingChangeManager
@@ -42,6 +43,8 @@ class XrayTileService(
     private val alwaysOnVpnState: AlwaysOnVpnState by inject()
 
     private val routingChangeManager: RoutingChangeManager by inject()
+
+    private val databaseOpenChecker: DatabaseOpenChecker by inject()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var listeningJob: Job? = null
@@ -115,6 +118,11 @@ class XrayTileService(
     }
 
     private suspend fun connectSelectedServer() {
+        if (!databaseOpenChecker.canRead()) {
+            // MainActivity shows the recovery screen for an unreadable database.
+            openApp()
+            return
+        }
         val serverConfig = withContext(ioDispatcher) {
             val selectedServerId = settingsRepo.lastServerId.first()
             if (selectedServerId < 0) return@withContext null

@@ -61,6 +61,7 @@ import com.material.xray.core.data.repository.ProviderRoutingCoordinator
 import com.material.xray.core.data.repository.ServerRepository
 import com.material.xray.core.data.repository.SettingsRepository
 import com.material.xray.core.data.repository.SubscriptionRepository
+import com.material.xray.core.database.DatabaseOpenChecker
 import com.material.xray.core.database.dao.AppBypassDao
 import com.material.xray.core.database.entity.AppRouteAssignment
 import com.material.xray.core.database.entity.AppRouteMode
@@ -140,6 +141,8 @@ class XrayService(
     private val rootShell: RootShell by inject()
 
     private val appBypassDao: AppBypassDao by inject()
+
+    private val databaseOpenChecker: DatabaseOpenChecker by inject()
 
     private val serverRepository: ServerRepository by inject()
     private val networkServerManager: NetworkServerManager by inject()
@@ -2230,14 +2233,18 @@ class XrayService(
         telemetryReporter.recordUnexpectedCommandFailure(error)
         val description = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
         logBuffer.append(LogSource.APP, "Connection command failed unexpectedly: $description")
-        val message = localizedString(R.string.notification_unknown_connection_error)
+        // An unreadable database needs MainActivity's recovery screen; retrying cannot fix it.
+        val databaseReadable = databaseOpenChecker.canRead()
+        val message = localizedString(
+            if (databaseReadable) R.string.notification_unknown_connection_error else R.string.connection_error_database_unavailable,
+        )
         stopProcessWatchdog()
         withContext(NonCancellable) {
             runCatching { connectionManager.disconnect(updateState = false, fastCleanup = true) }
         }
         closeVpnInterface()
-        connectionStateCoordinator.markError(message, retryable = true)
-        if (isRunningAlwaysOnVpn()) scheduleAlwaysOnRetry() else showConnectionFailureNotification(message)
+        connectionStateCoordinator.markError(message, retryable = databaseReadable)
+        if (databaseReadable && isRunningAlwaysOnVpn()) scheduleAlwaysOnRetry() else showConnectionFailureNotification(message)
     }
 
     override fun onRevoke() {

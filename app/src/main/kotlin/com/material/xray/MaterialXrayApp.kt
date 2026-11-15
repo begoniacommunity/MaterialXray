@@ -112,7 +112,10 @@ class MaterialXrayApp : Application() {
             }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to schedule initial geodata refresh", error) }
         }
-        appScope.launch { providerGeoDataManager.keepUpToDate() }
+        appScope.launch {
+            databaseOpenChecker.awaitReadable()
+            providerGeoDataManager.keepUpToDate()
+        }
         appScope.launch {
             // Settle IPv6 for the selected server before the user connects, so Auto can start with it.
             if (settingsRepository.ipv6Mode.first() != Ipv6Mode.Auto || !databaseOpenChecker.canRead()) return@launch
@@ -127,7 +130,7 @@ class MaterialXrayApp : Application() {
             }
         }
         appScope.launch {
-            if (!databaseOpenChecker.canRead()) return@launch
+            databaseOpenChecker.awaitReadable()
             runCatching { backupManager.recoverInterruptedRestore() }
                 .onFailure { error -> Log.e(LOG_TAG, "Unable to recover interrupted backup restore", error) }
             runCatching { subscriptionRepository.consolidateLocalServers() }
