@@ -167,11 +167,10 @@ class SubscriptionFetcher(
                         allowInsecureUpdates = allowInsecureUpdates,
                         requireHardwareIdConsent = requireHardwareIdConsent,
                     )
-                } catch (error: SubscriptionHardwareIdRequiredException) {
-                    throw error
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    // A flaky /json must fail the refresh rather than fall back: the base URL may carry
+                    // fewer servers, and losing the selected one used to cost the user their connection.
+                    if (!error.meansNoJsonEndpoint()) throw error
                     null
                 }
                 if (jsonSubscription != null && jsonSubscription.configs.isNotEmpty()) {
@@ -318,6 +317,21 @@ class SubscriptionFetcher(
         if (body.contentLength() > MAX_SUBSCRIPTION_BODY_BYTES) return null
         if (body.source().request(MAX_SUBSCRIPTION_BODY_BYTES + 1)) return null
         return body.string()
+    }
+
+    /**
+     * True when /json answered with something that is not a JSON subscription, so the provider has
+     * no such endpoint. Transport errors, server errors and rate limits say nothing about that.
+     */
+    private fun Exception.meansNoJsonEndpoint(): Boolean = when {
+        this is CancellationException || this is SubscriptionHardwareIdRequiredException -> false
+        this is SubscriptionFetchException && reason == SubscriptionFetchException.Reason.HTTP_STATUS -> {
+            val code = statusCode ?: 0
+            code in 400..499 && code != HTTP_REQUEST_TIMEOUT && code != HTTP_TOO_MANY_REQUESTS
+        }
+        this is SubscriptionFetchException -> true
+        this is IOException -> false
+        else -> true
     }
 
     private fun HttpUrl.jsonEndpointOrNull(): HttpUrl? {
@@ -778,6 +792,8 @@ class SubscriptionFetcher(
 
     private companion object {
         private val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns")
+        private const val HTTP_REQUEST_TIMEOUT = 408
+        private const val HTTP_TOO_MANY_REQUESTS = 429
 
         private object InsecureSubscriptionTrustManager : X509TrustManager {
             override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit

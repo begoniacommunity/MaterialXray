@@ -19,6 +19,7 @@ import com.material.xray.core.model.XrayCoreRequirement
 import com.material.xray.core.model.endpointSummary
 import com.material.xray.core.network.DirectHttpClient
 import java.net.InetAddress
+import java.net.SocketTimeoutException
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -902,6 +903,63 @@ class SubscriptionFetcherTest {
     }
 
     @Test
+    fun `prefer json falls back to base url when json endpoint is not found`() = runTest {
+        val requests = mutableListOf<Request>()
+        val fetcher = requestAwareFetcher(requests) { request ->
+            if (request.url.encodedPath.endsWith("/json")) {
+                TestResponse("Not found", "text/plain", code = 404)
+            } else {
+                TestResponse("vless://uuid@base.example:443?encryption=none&type=tcp#Base", "text/plain")
+            }
+        }
+
+        val subscription = fetcher.fetchWithMetadata(
+            url = "https://subscriptions.example/base",
+            preferJson = true,
+        )
+
+        assertEquals(listOf("/base/json", "/base"), requests.map { it.url.encodedPath })
+        assertEquals("base.example", subscription.configs.single().address)
+    }
+
+    @Test
+    fun `prefer json fails instead of falling back when json endpoint is unreachable`() = runTest {
+        val requests = mutableListOf<Request>()
+        val fetcher = requestAwareFetcher(requests) { request ->
+            if (request.url.encodedPath.endsWith("/json")) throw SocketTimeoutException("timeout")
+            TestResponse("vless://uuid@base.example:443?encryption=none&type=tcp#Base", "text/plain")
+        }
+
+        val error = runCatching {
+            fetcher.fetchWithMetadata(url = "https://subscriptions.example/base", preferJson = true)
+        }.exceptionOrNull()
+
+        assertTrue(error is SocketTimeoutException)
+        assertEquals(listOf("/base/json"), requests.map { it.url.encodedPath })
+    }
+
+    @Test
+    fun `prefer json fails instead of falling back on transient json status`() = runTest {
+        listOf(429, 503).forEach { code ->
+            val requests = mutableListOf<Request>()
+            val fetcher = requestAwareFetcher(requests) { request ->
+                if (request.url.encodedPath.endsWith("/json")) {
+                    TestResponse("busy", "text/plain", code = code)
+                } else {
+                    TestResponse("vless://uuid@base.example:443?encryption=none&type=tcp#Base", "text/plain")
+                }
+            }
+
+            val error = runCatching {
+                fetcher.fetchWithMetadata(url = "https://subscriptions.example/base", preferJson = true)
+            }.exceptionOrNull()
+
+            assertEquals(code, (error as SubscriptionFetchException).statusCode)
+            assertEquals(listOf("/base/json"), requests.map { it.url.encodedPath })
+        }
+    }
+
+    @Test
     fun `disabled json preference fetches only saved url`() = runTest {
         val requests = mutableListOf<Request>()
         val fetcher = requestAwareFetcher(requests) {
@@ -1191,6 +1249,7 @@ class SubscriptionFetcherTest {
     private data class TestResponse(
         val body: String,
         val contentType: String,
+        val code: Int = 200,
     )
 
     private fun requestAwareFetcher(
@@ -1205,7 +1264,7 @@ class SubscriptionFetcherTest {
                 Response.Builder()
                     .request(request)
                     .protocol(OkHttpProtocol.HTTP_1_1)
-                    .code(200)
+                    .code(response.code)
                     .message("OK")
                     .headers(Headers.headersOf("content-type", response.contentType))
                     .body(response.body.toResponseBody(response.contentType.toMediaType()))
