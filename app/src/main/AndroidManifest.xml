@@ -141,7 +141,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Koin initializes WorkManager with its worker factory from MaterialXrayApp.onCreate(). -->
+        <!-- MaterialXrayApp.onCreate() initializes WorkManager with Koin's worker factory. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

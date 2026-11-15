@@ -2,6 +2,8 @@ package com.material.xray
 
 import android.app.Application
 import android.util.Log
+import androidx.work.Configuration
+import androidx.work.WorkManager
 import com.material.xray.core.android.launcher.LauncherIconManager
 import com.material.xray.core.android.locale.initializeAppLocales
 import com.material.xray.core.android.telemetry.diagnosticsConsentMirror
@@ -35,7 +37,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.android.ext.koin.androidContext
-import org.koin.androidx.workmanager.koin.workManagerFactory
+import org.koin.androidx.workmanager.factory.KoinWorkerFactory
 import org.koin.core.annotation.KoinApplication
 import org.koin.core.qualifier.named
 import org.koin.plugin.module.dsl.startKoin
@@ -91,8 +93,8 @@ class MaterialXrayApp : Application() {
         super.onCreate()
         startKoin<MaterialXrayApp> {
             androidContext(this@MaterialXrayApp)
-            workManagerFactory()
         }
+        initializeWorkManager()
         appScope.launch(start = CoroutineStart.UNDISPATCHED) {
             settingsRepository.diagnosticsEnabled.distinctUntilChanged().collectLatest { enabled ->
                 diagnosticsConsentMirror.setEnabled(enabled)
@@ -150,6 +152,19 @@ class MaterialXrayApp : Application() {
             subscriptionUpdateScheduler.schedulePeriodicUpdates()
             subscriptionUpdateScheduler.enqueueDueCheckNow(STARTUP_BACKGROUND_WORK_DELAY_SECONDS)
         }
+    }
+
+    /**
+     * Koin's worker factory, as workManagerFactory() would install it, plus an initialization
+     * handler: WorkManager throws from a background thread when its storage is unreadable, such as
+     * in a profile that is still locked, and nothing could catch that.
+     */
+    private fun initializeWorkManager() {
+        val configuration = Configuration.Builder()
+            .setWorkerFactory(KoinWorkerFactory())
+            .setInitializationExceptionHandler { error -> Log.e(LOG_TAG, "Unable to initialize WorkManager", error) }
+            .build()
+        WorkManager.initialize(this, configuration)
     }
 
     private companion object {
