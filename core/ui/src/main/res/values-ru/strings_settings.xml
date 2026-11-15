@@ -96,6 +96,7 @@
     <string name="settings_section_data">Данные</string>
     <string name="settings_export">Экспорт</string>
     <string name="settings_import">Импорт</string>
+    <string name="settings_file_picker_unavailable">На этом устройстве нет приложения для выбора файлов</string>
     <string name="settings_clear_geodata">Очистить геоданные</string>
     <string name="settings_clearing_geodata">Очистка геоданных&#8230;</string>
     <string name="settings_geodata_cleared">Геоданные очищены</string>

@@ -1,9 +1,11 @@
 package com.material.xray.feature.xraycore
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -303,7 +305,11 @@ fun XrayCoreScreen(
                 TextButton(
                     onClick = {
                         showFileWarning = false
-                        fileLauncher.launch(arrayOf("*/*"))
+                        try {
+                            fileLauncher.launch(arrayOf("*/*"))
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(context, R.string.settings_file_picker_unavailable, Toast.LENGTH_LONG).show()
+                        }
                     },
                 ) { Text(stringResource(R.string.settings_xray_core_choose_file)) }
             },

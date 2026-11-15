@@ -992,13 +992,13 @@ private fun SettingsScreenContent(
                 ) {
                     OutlinedButton(
                         enabled = !backupBusy,
-                        onClick = { exportLauncher.launch("material-xray-backup.json") },
+                        onClick = { context.launchFilePicker { exportLauncher.launch("material-xray-backup.json") } },
                     ) {
                         Text(stringResource(R.string.settings_export))
                     }
                     OutlinedButton(
                         enabled = !backupBusy,
-                        onClick = { importLauncher.launch(arrayOf("application/json")) },
+                        onClick = { context.launchFilePicker { importLauncher.launch(arrayOf("application/json")) } },
                     ) {
                         Text(stringResource(R.string.settings_import))
                     }
@@ -1664,6 +1664,15 @@ internal fun resolveNotificationAccess(
     shouldShowRationale -> NotificationAccess.Rationale
     permissionRequested -> NotificationAccess.SystemSettings
     else -> NotificationAccess.Requestable
+}
+
+// Some TV firmwares ship without a document picker.
+private fun android.content.Context.launchFilePicker(launch: () -> Unit) {
+    try {
+        launch()
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(this, R.string.settings_file_picker_unavailable, Toast.LENGTH_LONG).show()
+    }
 }
 
 private fun android.content.Context.openNotificationSettings() {

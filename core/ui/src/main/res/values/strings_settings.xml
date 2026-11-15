@@ -94,6 +94,7 @@
     <string name="settings_section_data">Data</string>
     <string name="settings_export">Export</string>
     <string name="settings_import">Import</string>
+    <string name="settings_file_picker_unavailable">This device has no app for choosing files</string>
     <string name="settings_clear_geodata">Clear geodata</string>
     <string name="settings_clearing_geodata">Clearing geodata&#8230;</string>
     <string name="settings_geodata_cleared">Geodata cleared</string>
