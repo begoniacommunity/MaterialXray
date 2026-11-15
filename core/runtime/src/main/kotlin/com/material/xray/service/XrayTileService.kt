@@ -1,7 +1,10 @@
 package com.material.xray.service
 
+import android.annotation.SuppressLint
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -131,7 +134,14 @@ class XrayTileService(
         }
 
         routingChangeManager.clearPendingChanges()
-        XrayService.connect(this, serverConfig)
+        try {
+            XrayService.connect(this, serverConfig)
+        } catch (_: IllegalStateException) {
+            // Some OEM system UIs skip the foreground-service start allowance a tile click grants,
+            // so connecting is left to the app.
+            openApp()
+            return
+        }
         updateTile(
             TileSnapshot(
                 state = ConnectionState.Connecting,
@@ -139,6 +149,18 @@ class XrayTileService(
                 alwaysOnVpn = alwaysOnVpnState.active.value,
             ),
         )
+    }
+
+    private fun openApp() {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startActivityAndCollapse(PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE))
+        } else {
+            // The Intent overload only throws from API 34, which takes the branch above.
+            @Suppress("DEPRECATION")
+            @SuppressLint("StartActivityAndCollapseDeprecated")
+            startActivityAndCollapse(intent)
+        }
     }
 
     private fun updateTile(snapshot: TileSnapshot) {
