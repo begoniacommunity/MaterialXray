@@ -19,6 +19,7 @@ import com.material.xray.core.model.XrayLogLevel
 import com.material.xray.core.model.XrayOutbound
 import com.material.xray.core.model.XrayRuntimeSettings
 import com.material.xray.core.xray.ConfigGenerator
+import com.material.xray.core.xray.CoreExit
 import com.material.xray.core.xray.GeoDataStatus
 import com.material.xray.core.xray.OtherVpnDns
 import com.material.xray.core.xray.PROTECTED_FROM_VPN_MARK
@@ -1661,6 +1662,7 @@ class ConnectionManagerTest {
         override suspend fun kill(pid: Int, signal: Int): Boolean = true
         override suspend fun readResidentMemoryMb(pid: Int): Long = 1
         override suspend fun readCrashReason(lines: Int): String = crashReason
+        override suspend fun readExit(): CoreExit = CoreExit(CoreExit.Status.Unknown, CoreExit.LogMarker.None)
         override suspend fun ensureNativeRuntimeExemptions() = Unit
         override suspend fun ensureCoreSocketAccess(): Boolean = coreSocketAccess
     }
@@ -1685,6 +1687,7 @@ class ConnectionManagerTest {
         override fun requestStop() = Unit
         override suspend fun readResidentMemoryMb(pid: Int): Long = 1
         override suspend fun readCrashReason(lines: Int): String = "process failed"
+        override suspend fun readExit(): CoreExit = CoreExit(CoreExit.Status.Exited(2), CoreExit.LogMarker.GoPanic)
         override fun readActiveConnectionCount(pid: Int): Int = 0
     }
 

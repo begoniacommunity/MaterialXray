@@ -5,6 +5,7 @@ import com.material.xray.core.common.platform.elapsedMillis
 import com.material.xray.core.model.ConnectionProgress
 import com.material.xray.core.model.ConnectionState
 import com.material.xray.core.model.RootConnectionBackend
+import com.material.xray.core.xray.CoreExit
 import com.material.xray.core.xray.TproxyCompatibility
 import org.koin.core.annotation.Singleton
 
@@ -324,15 +325,19 @@ class TelemetryReporter(
         recordActiveConnectionAttempt()
     }
 
-    fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean) {
+    /** [exit] describes the core that stopped, when [cause] is [CoreRecoveryCause.ProcessExit]. */
+    fun recordCoreRecovery(cause: CoreRecoveryCause, succeeded: Boolean, exit: CoreExit? = null) {
         val attributes = mapOf("cause" to cause.value, "succeeded" to succeeded)
         count("core.recovery", attributes)
         addBreadcrumb("core.recovery", cause.value, mapOf("succeeded" to succeeded))
         if (cause == CoreRecoveryCause.ProcessExit && shouldReportIssue("core_exit")) {
+            val exitTags = exit?.let {
+                mapOf("exit_status" to it.status.telemetryValue(), "log_marker" to it.logMarker.telemetryValue())
+            }.orEmpty()
             captureSafeMessage(
                 message = "Xray core exited unexpectedly",
                 fingerprint = "core-exit",
-                tags = mapOf("cause" to cause.value, "recovery_succeeded" to succeeded.toString()),
+                tags = mapOf("cause" to cause.value, "recovery_succeeded" to succeeded.toString()) + exitTags,
             )
         }
     }
@@ -361,6 +366,19 @@ class TelemetryReporter(
     private fun addBreadcrumb(category: String, message: String, data: Map<String, Any>) {
         if (!enabled) return
         client.addBreadcrumb(category, message, data)
+    }
+
+    private fun CoreExit.Status.telemetryValue(): String = when (this) {
+        is CoreExit.Status.Exited -> "exit_$code"
+        is CoreExit.Status.Signaled -> "signal_$signal"
+        CoreExit.Status.Unknown -> "unknown"
+    }
+
+    private fun CoreExit.LogMarker.telemetryValue(): String = when (this) {
+        CoreExit.LogMarker.GoPanic -> "go_panic"
+        CoreExit.LogMarker.GoOutOfMemory -> "go_out_of_memory"
+        CoreExit.LogMarker.GoFatalError -> "go_fatal_error"
+        CoreExit.LogMarker.None -> "none"
     }
 
     private fun captureSafeMessage(message: String, fingerprint: String, tags: Map<String, String>) {

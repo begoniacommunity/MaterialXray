@@ -1671,6 +1671,8 @@ class XrayService(
                         action = {
                             stopProcessWatchdog()
                             logBuffer.append(LogSource.APP, reason)
+                            // The restart truncates the log and forgets the exit status.
+                            val exit = if (cause == CoreRecoveryCause.ProcessExit) connectionManager.readCoreExit() else null
 
                             if (pidToKill != null) {
                                 connectionManager.killProcess(pidToKill, signal = 9)
@@ -1679,7 +1681,7 @@ class XrayService(
                             connectionStateCoordinator.startConnection(ConnectionState.Connecting)
                             updateNotification(localizedString(R.string.notification_status_recovering_core))
                             val restarted = restartRuntime(config, reconnectDelayMs = PROCESS_RESTART_DELAY_MS)
-                            telemetryReporter.recordCoreRecovery(cause, restarted)
+                            telemetryReporter.recordCoreRecovery(cause, restarted, exit)
                             restarted
                         },
                     ),

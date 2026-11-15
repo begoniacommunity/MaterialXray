@@ -15,6 +15,7 @@ import com.material.xray.core.root.RootShell
 import com.material.xray.core.root.shellQuote
 import com.material.xray.core.xray.CORE_SOCKET_DIR
 import com.material.xray.core.xray.CORE_WORKING_DIR
+import com.material.xray.core.xray.CoreExit
 import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME
 import com.material.xray.core.xray.coreWorkingDirPath
 import com.material.xray.core.xray.xrayGoMaxProcsEnvironment
@@ -194,6 +195,12 @@ internal class XrayProcessSupervisor(
         return crashLog.lines().lastOrNull { it.isNotBlank() } ?: "xray process exited"
     }
 
+    override suspend fun readExit(): CoreExit {
+        val line = commandRunner.execute("grep -m 1 -E ${shellQuote(CoreExit.LogMarker.LINE_PATTERN)} ${shellQuote(logFile)} 2>/dev/null")
+            .output.trim()
+        return CoreExit(CoreExit.Status.Unknown, CoreExit.LogMarker.of(line))
+    }
+
     override suspend fun ensureCoreSocketAccess(): Boolean {
         if (coreSocketAccess.confirmed) return true
         val appContext = environment.selinuxContext
@@ -308,6 +315,10 @@ internal class UserXrayProcessSupervisor(
     // cross-thread visibility.
     @Volatile
     private var pid: Int = -1
+
+    // Only the probe that reaps the child sees its status, so it is kept for the recovery that follows.
+    @Volatile
+    private var lastExitStatus: CoreExit.Status = CoreExit.Status.Unknown
     private val logFile: File
         get() = environment.filesDir.resolve(XRAY_LOG_FILE_NAME)
 
@@ -323,6 +334,7 @@ internal class UserXrayProcessSupervisor(
         val command = requireNotNull(xrayBinary.userCommand) { "xray binary is unavailable" }
         // A fast server switch skips the binary check that otherwise creates it.
         File(binDir, CORE_SOCKET_DIR).mkdirs()
+        lastExitStatus = CoreExit.Status.Unknown
         pid = processLauncher.start(
             command = command,
             configPath = xrayBinary.configPath(),
@@ -336,14 +348,15 @@ internal class UserXrayProcessSupervisor(
 
     override suspend fun isAlive(pid: Int): Boolean {
         if (pid <= 0 || this.pid != pid) return false
-        val alive = processLauncher.isAlive(pid)
-        if (!alive && this.pid == pid) {
+        val exitStatus = processLauncher.poll(pid) ?: return true
+        if (this.pid == pid) {
             // The liveness probe reaps the child, so from here the kernel is free to recycle the
             // PID. Dropping it now keeps later stop/kill calls from signalling whatever process
             // inherits the number.
             this.pid = -1
+            lastExitStatus = exitStatus
         }
-        return alive
+        return false
     }
 
     override suspend fun kill(pid: Int, signal: Int): Boolean {
@@ -384,6 +397,15 @@ internal class UserXrayProcessSupervisor(
             ?.lastOrNull { it.isNotBlank() }
     }.getOrNull() ?: "xray process exited"
 
+    override suspend fun readExit(): CoreExit = CoreExit(
+        status = lastExitStatus,
+        logMarker = withContext(ioDispatcher) {
+            runCatching {
+                logFile.useLines { lines -> CoreExit.LogMarker.of(lines.firstOrNull(GO_RUNTIME_LINE::containsMatchIn)) }
+            }.getOrDefault(CoreExit.LogMarker.None)
+        },
+    )
+
     override fun readActiveConnectionCount(pid: Int): Int? = File("/proc/$pid/fd")
         .takeIf { it.isDirectory }
         ?.listFiles()
@@ -394,12 +416,13 @@ internal class UserXrayProcessSupervisor(
         private const val STOP_GRACE_TIMEOUT_MS = 1_000L
         private const val KILL_GRACE_TIMEOUT_MS = 500L
         private const val STOP_POLL_INTERVAL_MS = 50L
+        private val GO_RUNTIME_LINE = Regex(CoreExit.LogMarker.LINE_PATTERN)
     }
 
     private suspend fun waitUntilStopped(pid: Int, timeoutMs: Long): Boolean {
         var elapsedMs = 0L
         while (elapsedMs <= timeoutMs) {
-            if (!processLauncher.isAlive(pid)) return true
+            if (processLauncher.poll(pid) != null) return true
             delay(STOP_POLL_INTERVAL_MS)
             elapsedMs += STOP_POLL_INTERVAL_MS
         }
@@ -455,7 +478,8 @@ internal interface UserXrayProcessLauncher {
         environment: Map<String, String>,
     ): Int
 
-    fun isAlive(pid: Int): Boolean
+    /** Null while [pid] runs. Collecting its status reaps the child, so only the first poll after it ends sees how. */
+    fun poll(pid: Int): CoreExit.Status?
 
     fun kill(pid: Int, signal: Int): Boolean
 }
@@ -475,13 +499,22 @@ class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
         return nativeStart(command.toTypedArray(), configPath, workingDir, logPath, tunFd ?: NO_TUN_FD, env)
     }
 
-    override fun isAlive(pid: Int): Boolean = nativeIsAlive(pid)
+    override fun poll(pid: Int): CoreExit.Status? = when (val result = nativePoll(pid)) {
+        POLL_RUNNING -> null
+        in 0 until POLL_SIGNAL_OFFSET -> CoreExit.Status.Exited(result)
+        in POLL_SIGNAL_OFFSET..Int.MAX_VALUE -> CoreExit.Status.Signaled(result - POLL_SIGNAL_OFFSET)
+        else -> CoreExit.Status.Unknown
+    }
 
     override fun kill(pid: Int, signal: Int): Boolean = nativeKill(pid, signal)
 
     private companion object {
         /** Tells the native launcher to start the core without a tunnel descriptor. */
         private const val NO_TUN_FD = -1
+
+        // The encoding of nativePoll's result, shared with xray_launcher.c.
+        private const val POLL_RUNNING = -1
+        private const val POLL_SIGNAL_OFFSET = 256
 
         init {
             System.loadLibrary("xray_launcher")
@@ -498,7 +531,7 @@ class AndroidUserXrayProcessLauncher : UserXrayProcessLauncher {
         ): Int
 
         @JvmStatic
-        external fun nativeIsAlive(pid: Int): Boolean
+        external fun nativePoll(pid: Int): Int
 
         @JvmStatic
         external fun nativeKill(pid: Int, signal: Int): Boolean

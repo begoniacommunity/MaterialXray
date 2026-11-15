@@ -220,21 +220,30 @@ cleanup:
     return result;
 }
 
-JNIEXPORT jboolean JNICALL
-Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativeIsAlive(
+// Encoded for nativePoll: an exit code is returned as is and a signal is offset past every code.
+#define POLL_RUNNING (-1)
+#define POLL_GONE (-2)
+#define POLL_SIGNAL_OFFSET 256
+
+JNIEXPORT jint JNICALL
+Java_com_material_xray_core_runtime_AndroidUserXrayProcessLauncher_nativePoll(
         JNIEnv *env,
         jclass clazz,
         jint pid) {
     (void) env;
     (void) clazz;
-    if (pid <= 0) return JNI_FALSE;
+    if (pid <= 0) return POLL_GONE;
 
     int status = 0;
     pid_t waited = waitpid((pid_t) pid, &status, WNOHANG);
-    if (waited == (pid_t) pid) return JNI_FALSE;
-    if (waited == 0) return JNI_TRUE;
-    if (errno == ECHILD) return kill((pid_t) pid, 0) == 0 ? JNI_TRUE : JNI_FALSE;
-    return JNI_FALSE;
+    if (waited == (pid_t) pid) {
+        if (WIFEXITED(status)) return WEXITSTATUS(status);
+        if (WIFSIGNALED(status)) return POLL_SIGNAL_OFFSET + WTERMSIG(status);
+        return POLL_GONE;
+    }
+    if (waited == 0) return POLL_RUNNING;
+    if (errno == ECHILD) return kill((pid_t) pid, 0) == 0 ? POLL_RUNNING : POLL_GONE;
+    return POLL_GONE;
 }
 
 JNIEXPORT jboolean JNICALL

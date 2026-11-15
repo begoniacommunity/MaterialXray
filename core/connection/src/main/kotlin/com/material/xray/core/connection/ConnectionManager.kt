@@ -13,6 +13,7 @@ import com.material.xray.core.model.ServerConfig
 import com.material.xray.core.model.XrayRuntimeSettings
 import com.material.xray.core.telemetry.ConnectionTelemetryStep
 import com.material.xray.core.xray.ConfigGenerator
+import com.material.xray.core.xray.CoreExit
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.XrayState
 import com.material.xray.core.xray.XraySysStats
@@ -1346,6 +1347,10 @@ class ConnectionManager(
     override suspend fun readCrashReason(): String = runCatching {
         runtimeState.strategy?.readCrashReason()
     }.getOrNull() ?: "xray process exited"
+
+    suspend fun readCoreExit(): CoreExit = runCatching {
+        runtimeState.strategy?.readExit()
+    }.getOrNull() ?: CoreExit(CoreExit.Status.Unknown, CoreExit.LogMarker.None)
 
     suspend fun readBalancerSelection(balancerTag: String) = apiClients.readBalancerSelection(balancerTag)
 

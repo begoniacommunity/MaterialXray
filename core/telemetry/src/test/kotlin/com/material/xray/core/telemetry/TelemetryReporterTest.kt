@@ -2,6 +2,7 @@ package com.material.xray.core.telemetry
 
 import com.material.xray.core.model.ConnectionProgress
 import com.material.xray.core.model.RootConnectionBackend
+import com.material.xray.core.xray.CoreExit
 import com.material.xray.core.xray.TproxyCompatibility
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -232,6 +233,32 @@ class TelemetryReporterTest {
             client.messages.single(),
         )
         assertTrue(client.messages.single().toString().contains("secret shell output").not())
+    }
+
+    @Test
+    fun `core exits are reported with how the core ended`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
+
+        reporter.recordCoreRecovery(
+            CoreRecoveryCause.ProcessExit,
+            succeeded = true,
+            exit = CoreExit(CoreExit.Status.Signaled(9), CoreExit.LogMarker.GoOutOfMemory),
+        )
+
+        assertEquals(
+            RecordedMessage(
+                message = "Xray core exited unexpectedly",
+                fingerprint = "core-exit",
+                tags = mapOf(
+                    "cause" to "process_exit",
+                    "recovery_succeeded" to "true",
+                    "exit_status" to "signal_9",
+                    "log_marker" to "go_out_of_memory",
+                ),
+            ),
+            client.messages.single(),
+        )
     }
 
     private fun connection(

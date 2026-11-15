@@ -4,6 +4,7 @@ import com.material.xray.core.common.log.LogBuffer
 import com.material.xray.core.connection.RootTunDevice
 import com.material.xray.core.connection.XrayProcessBinary
 import com.material.xray.core.root.RootShell
+import com.material.xray.core.xray.CoreExit
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
@@ -380,6 +381,51 @@ class XrayProcessSupervisorTest {
     }
 
     @Test
+    fun `user process exit keeps the reaped status and the Go runtime's marker`() = runTest {
+        val directory = Files.createTempDirectory("user-xray-process-test").toFile()
+        val launcher = FakeUserXrayProcessLauncher(alive = { _, _ -> false }, exitStatus = CoreExit.Status.Signaled(9))
+        val supervisor = userSupervisor(environment = FakeRuntimeEnvironment(filesDir = directory), processLauncher = launcher)
+
+        try {
+            supervisor.start(binDir = "/tmp/xray bin", tunFd = 89)
+            directory.resolve(XRAY_LOG_FILE_NAME).writeText(
+                "2026/11/15 10:00:00 [Info] panic: is only a word here\n" +
+                    "fatal error: runtime: out of memory\n\ngoroutine 1 [running]:\npanic: later\n",
+            )
+
+            assertFalse(supervisor.isAlive(42))
+            assertEquals(CoreExit(CoreExit.Status.Signaled(9), CoreExit.LogMarker.GoOutOfMemory), supervisor.readExit())
+
+            supervisor.start(binDir = "/tmp/xray bin", tunFd = 89)
+            assertEquals(CoreExit.Status.Unknown, supervisor.readExit().status)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `root process exit reads the Go runtime's marker from the log`() = runTest {
+        val commands = FakeRootCommandRunner(
+            resultForCommand = { command ->
+                assertEquals("grep -m 1 -E '^(panic|fatal error): ' '/tmp/runtime dir/xray.log' 2>/dev/null", command)
+                RootShell.Result(exitCode = 0, output = "panic: runtime error: index out of range\n", error = "")
+            },
+        )
+
+        assertEquals(CoreExit(CoreExit.Status.Unknown, CoreExit.LogMarker.GoPanic), supervisor(commandRunner = commands).readExit())
+    }
+
+    @Test
+    fun `every way the Go runtime reports running out of memory counts as one`() {
+        listOf(
+            "fatal error: runtime: out of memory",
+            "fatal error: out of memory",
+            "fatal error: runtime: cannot allocate memory",
+        ).forEach { line -> assertEquals(line, CoreExit.LogMarker.GoOutOfMemory, CoreExit.LogMarker.of(line)) }
+        assertEquals(CoreExit.LogMarker.GoFatalError, CoreExit.LogMarker.of("fatal error: concurrent map writes"))
+    }
+
+    @Test
     fun `user process cleanup can stop an orphan from persisted state`() = runTest {
         val launcher = FakeUserXrayProcessLauncher(
             alive = { pid, killedSignals -> pid == 77 && 9 !in killedSignals },
@@ -453,6 +499,7 @@ class XrayProcessSupervisorTest {
 
     private class FakeUserXrayProcessLauncher(
         private val alive: (pid: Int, killedSignals: List<Int>) -> Boolean = { pid, _ -> pid == 42 },
+        private val exitStatus: CoreExit.Status = CoreExit.Status.Unknown,
     ) : UserXrayProcessLauncher {
         val killedSignals = mutableListOf<Int>()
         var startedEnvironment: Map<String, String>? = null
@@ -469,7 +516,7 @@ class XrayProcessSupervisorTest {
             return 42
         }
 
-        override fun isAlive(pid: Int): Boolean = alive(pid, killedSignals)
+        override fun poll(pid: Int): CoreExit.Status? = if (alive(pid, killedSignals)) null else exitStatus
 
         override fun kill(pid: Int, signal: Int): Boolean {
             killedSignals += signal

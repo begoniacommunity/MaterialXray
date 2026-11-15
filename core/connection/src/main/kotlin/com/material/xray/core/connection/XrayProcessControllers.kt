@@ -1,5 +1,7 @@
 package com.material.xray.core.connection
 
+import com.material.xray.core.xray.CoreExit
+
 interface XrayProcessProbe {
     suspend fun isAlive(pid: Int): Boolean
 }
@@ -19,6 +21,9 @@ interface RootXrayProcessController : XrayProcessProbe {
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
+
+    /** How the core that last ran ended, for a core that has stopped. */
+    suspend fun readExit(): CoreExit
     suspend fun ensureNativeRuntimeExemptions()
 
     /**
@@ -43,6 +48,9 @@ interface UserXrayProcessController : XrayProcessProbe {
     fun requestStop()
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
+
+    /** How the core that last ran ended, for a core that has stopped. */
+    suspend fun readExit(): CoreExit
     fun readActiveConnectionCount(pid: Int): Int?
 }
 

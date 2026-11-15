@@ -1,5 +1,6 @@
 package com.material.xray.core.connection
 
+import com.material.xray.core.xray.CoreExit
 import com.material.xray.core.xray.XRAY_API_SOCKET_NAME_PREFIX
 import com.material.xray.core.xray.XrayApiEndpoint
 import com.material.xray.core.xray.coreSocket
@@ -25,6 +26,8 @@ internal interface XrayRuntimeProcess {
     suspend fun readProcessMetrics(pid: Int): ProcessMetrics?
 
     suspend fun readCrashReason(): String
+
+    suspend fun readExit(): CoreExit
 }
 
 /**
@@ -120,6 +123,8 @@ internal class RootXrayRuntimeStrategy(
 
     override suspend fun readCrashReason(): String = processSupervisor.readCrashReason()
 
+    override suspend fun readExit(): CoreExit = processSupervisor.readExit()
+
     override suspend fun release(fastCleanup: Boolean, preserveTproxyGuard: Boolean): Boolean = if (
         fastCleanup && cleanup.ensureKnownStateStopped(preserveTproxyGuard = preserveTproxyGuard)
     ) {
@@ -178,6 +183,8 @@ internal class VpnServiceXrayRuntimeStrategy(
     )
 
     override suspend fun readCrashReason(): String = processSupervisor.readCrashReason()
+
+    override suspend fun readExit(): CoreExit = processSupervisor.readExit()
 
     // Nothing is installed outside the process, so stopping the child and dropping the record it
     // left behind is the whole teardown.
