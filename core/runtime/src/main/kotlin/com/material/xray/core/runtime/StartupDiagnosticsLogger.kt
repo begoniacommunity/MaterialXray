@@ -75,6 +75,7 @@ class StartupDiagnosticsLogger(
             tunName = runtimeSettings.tunName,
             tunMtu = runtimeSettings.tunMtu,
             xrayBufferSizeKiB = runtimeSettings.xrayBufferSizeKiB,
+            xrayGoMaxProcs = runtimeSettings.xrayGoMaxProcs,
             memoryRestartThresholdMiB = settingsRepository.xrayMemoryRestartThresholdMiB.first(),
             bypassLan = runtimeSettings.bypassLan,
             ipv6Mode = settingsRepository.ipv6Mode.first().persistedValue,
@@ -125,6 +126,7 @@ internal data class StartupDiagnosticSnapshot(
     val tunName: String,
     val tunMtu: Int,
     val xrayBufferSizeKiB: Int,
+    val xrayGoMaxProcs: Int,
     val memoryRestartThresholdMiB: Int,
     val bypassLan: Boolean,
     val ipv6Mode: String,
@@ -155,7 +157,7 @@ internal fun formatStartupDiagnostics(snapshot: StartupDiagnosticSnapshot): List
         "Connection settings: mode=$serviceMode, autoConnect=$autoConnect, passiveWatchdog=$passiveHealthMonitoring, " +
             "bypassLan=$bypassLan, ipv6=$ipv6Mode",
         "Xray settings: tun=${tunName.diagnosticValue()}, mtu=$tunMtu, buffer=$xrayBufferSizeKiB KiB, " +
-            "memoryRestart=$memoryRestartThresholdMiB MiB, outbound=${defaultOutbound.diagnosticValue()}, " +
+            "gomaxprocs=${if (xrayGoMaxProcs > 0) xrayGoMaxProcs else "auto"}, memoryRestart=$memoryRestartThresholdMiB MiB, outbound=${defaultOutbound.diagnosticValue()}, " +
             "logLevel=${xrayLogLevel.diagnosticValue()}",
         "DNS settings: primary=${dnsServers.diagnosticValue()}, domestic=${domesticDnsServers.diagnosticValue()}",
         "Routing settings: strategy=${routingDomainStrategy.diagnosticValue()}, " +

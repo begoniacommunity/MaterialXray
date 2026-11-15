@@ -58,12 +58,13 @@ internal interface XrayRuntimeStrategy : XrayRuntimeProcess {
      * Launches the core. [vpnInterfaceFd] stays owned by the caller, so an implementation that needs
      * it must not suspend before the descriptor has been handed to the child. [tun] is the TUN
      * interface a root-managed core creates for itself; the rootless core is handed its interface
-     * instead.
+     * instead. A positive [goMaxProcs] is passed as GOMAXPROCS.
      */
     suspend fun startProcess(
         binDir: String,
         vpnInterfaceFd: Int?,
         tun: RootTunDevice? = null,
+        goMaxProcs: Int,
     ): Int
 
     /** Picks an address for the core's API that this runtime can actually reach. */
@@ -101,7 +102,8 @@ internal class RootXrayRuntimeStrategy(
         binDir: String,
         vpnInterfaceFd: Int?,
         tun: RootTunDevice?,
-    ): Int = processSupervisor.start(binDir, tun)
+        goMaxProcs: Int,
+    ): Int = processSupervisor.start(binDir, tun, goMaxProcs)
 
     // The socket is group-only, and the core shares only its gid with this app.
     override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = workingDirApiEndpoint(environment)
@@ -152,9 +154,10 @@ internal class VpnServiceXrayRuntimeStrategy(
         binDir: String,
         vpnInterfaceFd: Int?,
         tun: RootTunDevice?,
+        goMaxProcs: Int,
     ): Int {
         require(tun == null) { "A rootless runtime cannot create its own TUN interface" }
-        return processSupervisor.start(binDir = binDir, tunFd = vpnInterfaceFd)
+        return processSupervisor.start(binDir = binDir, tunFd = vpnInterfaceFd, goMaxProcs = goMaxProcs)
     }
 
     override fun nextApiEndpoint(environment: ConnectionEnvironment): XrayApiEndpoint = workingDirApiEndpoint(environment)

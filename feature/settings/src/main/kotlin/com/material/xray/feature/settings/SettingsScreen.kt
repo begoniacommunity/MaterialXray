@@ -253,6 +253,7 @@ private fun SettingsScreenContent(
     val xrayBufferSizeKiB = settings.xrayBufferSizeKiB
     val tunMtu = settings.tunMtu
     val xrayMemoryRestartThresholdMiB = settings.xrayMemoryRestartThresholdMiB
+    val xrayGoMaxProcs = settings.xrayGoMaxProcs
     val passiveHealthMonitoringEnabled = settings.passiveHealthMonitoringEnabled
     val xrayLogLevel = settings.xrayLogLevel
     val geoDataOperationInProgress = geoipUpdating || geositeUpdating || geoDataClearing
@@ -318,6 +319,7 @@ private fun SettingsScreenContent(
     val editingTunName = rememberSaveable(tunName, saver = TextFieldState.Saver) { TextFieldState(tunName) }
     val editingXrayBufferSizeKiB = rememberSaveable(xrayBufferSizeKiB, saver = TextFieldState.Saver) { TextFieldState(xrayBufferSizeKiB.toString()) }
     val editingTunMtu = rememberSaveable(tunMtu, saver = TextFieldState.Saver) { TextFieldState(tunMtu.toString()) }
+    val editingXrayGoMaxProcs = rememberSaveable(xrayGoMaxProcs, saver = TextFieldState.Saver) { TextFieldState(xrayGoMaxProcs.toString()) }
     val editingXrayMemoryRestartThresholdMiB = rememberSaveable(xrayMemoryRestartThresholdMiB, saver = TextFieldState.Saver) {
         TextFieldState(xrayMemoryRestartThresholdMiB.toString())
     }
@@ -336,6 +338,15 @@ private fun SettingsScreenContent(
         derivedStateOf { editingXrayBufferSizeKiB.text.toString().toIntOrNull() }
     }
     val parsedTunMtu by remember(editingTunMtu) { derivedStateOf { editingTunMtu.text.toString().toIntOrNull() } }
+    val parsedXrayGoMaxProcs by remember(editingXrayGoMaxProcs) {
+        derivedStateOf { editingXrayGoMaxProcs.text.toString().toIntOrNull() }
+    }
+    val isXrayGoMaxProcsValid by remember(parsedXrayGoMaxProcs) {
+        derivedStateOf { parsedXrayGoMaxProcs?.let(XrayRuntimeSettings::isValidXrayGoMaxProcs) == true }
+    }
+    val hasXrayGoMaxProcsChanges by remember(editingXrayGoMaxProcs, xrayGoMaxProcs) {
+        derivedStateOf { editingXrayGoMaxProcs.text.toString() != xrayGoMaxProcs.toString() }
+    }
     val parsedXrayMemoryRestartThresholdMiB by remember(editingXrayMemoryRestartThresholdMiB) {
         derivedStateOf { editingXrayMemoryRestartThresholdMiB.text.toString().toIntOrNull() }
     }
@@ -704,6 +715,23 @@ private fun SettingsScreenContent(
                         isValid = isXrayBufferSizeKiBValid,
                         hasChanges = hasXrayBufferSizeKiBChanges,
                         onSave = { parsedXrayBufferSizeKiB?.let(viewModel::setXrayBufferSizeKiB) },
+                    )
+                }
+            }
+
+            settingsItem(key = "xray_gomaxprocs", visible = showAdvancedOptions, spaceAfter = SettingsFieldSpacing) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    AdvancedIntegerSetting(
+                        state = editingXrayGoMaxProcs,
+                        label = stringResource(R.string.settings_xray_gomaxprocs_label),
+                        supportingText = stringResource(
+                            R.string.settings_xray_gomaxprocs_supporting_text,
+                            XrayRuntimeSettings.MIN_XRAY_GOMAXPROCS,
+                            XrayRuntimeSettings.MAX_XRAY_GOMAXPROCS,
+                        ),
+                        isValid = isXrayGoMaxProcsValid,
+                        hasChanges = hasXrayGoMaxProcsChanges,
+                        onSave = { parsedXrayGoMaxProcs?.let(viewModel::setXrayGoMaxProcs) },
                     )
                 }
             }

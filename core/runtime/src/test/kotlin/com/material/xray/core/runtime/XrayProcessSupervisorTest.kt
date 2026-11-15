@@ -22,7 +22,7 @@ class XrayProcessSupervisorTest {
                 assertTrue(command.contains("cd '/tmp/xray bin'"))
                 assertTrue(command.contains("export XRAY_LOCATION_ASSET='/proc/self/cwd'"))
                 assertTrue(command.contains("SSL_CERT_FILE='/proc/self/cwd/xray-ca-certificates.pem'"))
-                assertTrue(command.contains("GOMAXPROCS='2'"))
+                assertFalse(command.contains("GOMAXPROCS"))
                 assertFalse(command.contains("xray.location.asset"))
                 assertFalse(command.contains(" env "))
                 assertTrue(command.contains("> '/tmp/runtime dir/xray.log' 2>&1 & fi"))
@@ -319,7 +319,24 @@ class XrayProcessSupervisorTest {
                 File("/tmp/xray bin", XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath,
                 launcher.startedEnvironment?.get("SSL_CERT_FILE"),
             )
-            assertEquals("2", launcher.startedEnvironment?.get("GOMAXPROCS"))
+            assertFalse(launcher.startedEnvironment.orEmpty().containsKey("GOMAXPROCS"))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cores get the configured GOMAXPROCS`() = runTest {
+        val directory = Files.createTempDirectory("user-xray-process-test").toFile()
+        val launcher = FakeUserXrayProcessLauncher()
+        val commands = FakeRootCommandRunner(resultForCommand = { RootShell.Result(exitCode = 0, output = "1234", error = "") })
+        try {
+            userSupervisor(environment = FakeRuntimeEnvironment(filesDir = directory), processLauncher = launcher)
+                .start(binDir = "/tmp/xray bin", tunFd = 89, goMaxProcs = 3)
+            supervisor(commandRunner = commands).start("/tmp/xray bin", goMaxProcs = 3)
+
+            assertEquals("3", launcher.startedEnvironment?.get("GOMAXPROCS"))
+            assertTrue(commands.commands.single().contains("GOMAXPROCS='3'"))
         } finally {
             directory.deleteRecursively()
         }

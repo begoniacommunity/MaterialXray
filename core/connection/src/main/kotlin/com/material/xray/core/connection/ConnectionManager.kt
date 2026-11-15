@@ -244,6 +244,7 @@ class ConnectionManager(
                 // Matches XrayConfigWriter.write, which gives the core a TUN inbound exactly when there is
                 // no TPROXY plan to give it TPROXY inbounds instead.
                 tun = RootTunDevice(tunName, runtimeSettings.tunMtu).takeIf { managesSystemRouting && tproxyPlan == null },
+                goMaxProcs = runtimeSettings.xrayGoMaxProcs,
             )
 
             if (pid <= 0) {
@@ -612,7 +613,8 @@ class ConnectionManager(
     private suspend fun startXrayProcess(
         strategy: XrayRuntimeStrategy,
         vpnInterface: Int?,
-        tun: RootTunDevice? = null,
+        tun: RootTunDevice?,
+        goMaxProcs: Int,
     ): Int {
         log.append(LogSource.APP, "Starting xray process...")
         return executeStep(
@@ -626,6 +628,7 @@ class ConnectionManager(
                         binDir = environment.binDir,
                         vpnInterfaceFd = vpnInterface,
                         tun = tun,
+                        goMaxProcs = goMaxProcs,
                     )
                 },
             ),

@@ -33,6 +33,8 @@
     <string name="settings_xray_log_level_label">Xray Log Level</string>
     <string name="settings_xray_buffer_size_label">Xray buffer size</string>
     <string name="settings_xray_buffer_size_supporting_text">Per-request userspace buffer. Range: %1$d-%2$d KiB. Default: %3$d KiB.</string>
+    <string name="settings_xray_gomaxprocs_label">Xray CPU threads (GOMAXPROCS)</string>
+    <string name="settings_xray_gomaxprocs_supporting_text">How many CPU cores each Xray core may run on at once, including the cores latency tests start. Lower values can save battery and keep slow devices responsive. 0 lets Xray use every core. Range: %1$d-%2$d. Default: 0.</string>
     <string name="settings_tun_mtu_label">TUN MTU</string>
     <string name="settings_tun_mtu_supporting_text">Packet MTU used by Android VPN and rootful TUN, not TPROXY. Range: %1$d-%2$d bytes. Default: %3$d bytes.</string>
     <string name="settings_xray_memory_restart_threshold_label">Core RAM restart threshold</string>

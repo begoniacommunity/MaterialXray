@@ -18,6 +18,8 @@ data class XrayRuntimeSettings(
     val routingRules: List<RoutingRule>,
     val profileRoutingInsertIndex: Int? = null,
     val xrayBufferSizeKiB: Int = DEFAULT_XRAY_BUFFER_SIZE_KIB,
+    /** Passed to the core as GOMAXPROCS; 0 leaves it to Go, which uses every CPU core. */
+    val xrayGoMaxProcs: Int = DEFAULT_XRAY_GOMAXPROCS,
     val tunMtu: Int = DEFAULT_TUN_MTU,
     val routingDomainStrategy: String = SubscriptionRouting.DEFAULT_DOMAIN_STRATEGY,
     val routingDomainMatcher: String? = null,
@@ -35,6 +37,9 @@ data class XrayRuntimeSettings(
         const val DEFAULT_XRAY_BUFFER_SIZE_KIB = 64
         const val MIN_XRAY_BUFFER_SIZE_KIB = 1
         const val MAX_XRAY_BUFFER_SIZE_KIB = 10_240
+        const val DEFAULT_XRAY_GOMAXPROCS = 0
+        const val MIN_XRAY_GOMAXPROCS = 0
+        const val MAX_XRAY_GOMAXPROCS = 64
         const val DEFAULT_TUN_MTU = 1500
         const val MIN_TUN_MTU = 1280
         const val MAX_TUN_MTU = 1500
@@ -47,6 +52,10 @@ data class XrayRuntimeSettings(
         fun normalizeXrayBufferSizeKiB(value: Int?): Int = value
             ?.takeIf(::isValidXrayBufferSizeKiB)
             ?: DEFAULT_XRAY_BUFFER_SIZE_KIB
+
+        fun isValidXrayGoMaxProcs(value: Int): Boolean = value in MIN_XRAY_GOMAXPROCS..MAX_XRAY_GOMAXPROCS
+
+        fun normalizeXrayGoMaxProcs(value: Int?): Int = value?.takeIf(::isValidXrayGoMaxProcs) ?: DEFAULT_XRAY_GOMAXPROCS
 
         fun isValidTunMtu(value: Int): Boolean = value in MIN_TUN_MTU..MAX_TUN_MTU
 

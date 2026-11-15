@@ -104,6 +104,7 @@ class SettingsBackupRoundTripTest {
             "xray_buffer_size_kib" to 1024,
             "tun_mtu" to 1400,
             "xray_memory_restart_threshold_mib" to 256,
+            "xray_gomaxprocs" to 2,
             "passive_health_monitoring_enabled" to false,
             "auto_connect" to true,
             "bypass_lan" to false,

@@ -37,6 +37,7 @@ import com.material.xray.core.model.reorderedBy
 import com.material.xray.core.network.CoreTrafficRoutingSetting
 import com.material.xray.core.xray.GeoDataDefaults
 import com.material.xray.core.xray.GeoDataUrlSettings
+import com.material.xray.core.xray.XrayGoMaxProcsSetting
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -62,6 +63,7 @@ data class SettingsSnapshot(
     val otherVpnMode: OtherVpnMode,
     val ipv6Mode: Ipv6Mode,
     val xrayBufferSizeKiB: Int,
+    val xrayGoMaxProcs: Int,
     val tunMtu: Int,
     val xrayMemoryRestartThresholdMiB: Int,
     val passiveHealthMonitoringEnabled: Boolean,
@@ -90,12 +92,13 @@ data class SettingsSnapshot(
 )
 
 @Suppress("TooManyFunctions")
-@Singleton(binds = [CoreTrafficRoutingSetting::class, GeoDataUrlSettings::class])
+@Singleton(binds = [CoreTrafficRoutingSetting::class, GeoDataUrlSettings::class, XrayGoMaxProcsSetting::class])
 class SettingsRepository(
     @SettingsDataStore private val store: DataStore<Preferences>,
     private val diagnosticsConsentMirror: DiagnosticsConsentMirroring,
 ) : CoreTrafficRoutingSetting,
-    GeoDataUrlSettings {
+    GeoDataUrlSettings,
+    XrayGoMaxProcsSetting {
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {
@@ -108,6 +111,7 @@ class SettingsRepository(
         val XRAY_BUFFER_SIZE_KIB = intPreferencesKey("xray_buffer_size_kib")
         val TUN_MTU = intPreferencesKey("tun_mtu")
         val XRAY_MEMORY_RESTART_THRESHOLD_MIB = intPreferencesKey("xray_memory_restart_threshold_mib")
+        val XRAY_GOMAXPROCS = intPreferencesKey("xray_gomaxprocs")
         val PASSIVE_HEALTH_MONITORING_ENABLED = booleanPreferencesKey("passive_health_monitoring_enabled")
         val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
         val BYPASS_LAN = booleanPreferencesKey("bypass_lan")
@@ -202,6 +206,9 @@ class SettingsRepository(
     }
     val tunMtu: Flow<Int> = store.data.map { prefs ->
         XrayRuntimeSettings.normalizeTunMtu(prefs[TUN_MTU])
+    }
+    override val xrayGoMaxProcs: Flow<Int> = store.data.map { prefs ->
+        XrayRuntimeSettings.normalizeXrayGoMaxProcs(prefs[XRAY_GOMAXPROCS])
     }
     val xrayMemoryRestartThresholdMiB: Flow<Int> = store.data.map { prefs ->
         XrayRuntimeSettings.normalizeXrayMemoryRestartThresholdMiB(prefs[XRAY_MEMORY_RESTART_THRESHOLD_MIB])
@@ -398,6 +405,7 @@ class SettingsRepository(
             otherVpnMode = OtherVpnMode.fromValue(prefs[OTHER_VPN_MODE]),
             ipv6Mode = Ipv6Mode.fromValue(prefs[IPV6_MODE]),
             xrayBufferSizeKiB = XrayRuntimeSettings.normalizeXrayBufferSizeKiB(prefs[XRAY_BUFFER_SIZE_KIB]),
+            xrayGoMaxProcs = XrayRuntimeSettings.normalizeXrayGoMaxProcs(prefs[XRAY_GOMAXPROCS]),
             tunMtu = XrayRuntimeSettings.normalizeTunMtu(prefs[TUN_MTU]),
             xrayMemoryRestartThresholdMiB =
             XrayRuntimeSettings.normalizeXrayMemoryRestartThresholdMiB(prefs[XRAY_MEMORY_RESTART_THRESHOLD_MIB]),
@@ -465,6 +473,7 @@ class SettingsRepository(
             routingRules = ordered.rules,
             profileRoutingInsertIndex = ordered.profileInsertIndex,
             xrayBufferSizeKiB = xrayBufferSizeKiB.first(),
+            xrayGoMaxProcs = xrayGoMaxProcs.first(),
             tunMtu = tunMtu.first(),
             routingDomainStrategy = routingDomainStrategy.first(),
             routingDomainMatcher = routingDomainMatcher.first(),
@@ -486,6 +495,10 @@ class SettingsRepository(
     suspend fun setTunMtu(mtu: Int) {
         require(XrayRuntimeSettings.isValidTunMtu(mtu))
         store.edit { it[TUN_MTU] = mtu }
+    }
+    suspend fun setXrayGoMaxProcs(goMaxProcs: Int) {
+        require(XrayRuntimeSettings.isValidXrayGoMaxProcs(goMaxProcs))
+        store.edit { it[XRAY_GOMAXPROCS] = goMaxProcs }
     }
     suspend fun setXrayMemoryRestartThresholdMiB(thresholdMiB: Int) {
         require(XrayRuntimeSettings.isValidXrayMemoryRestartThresholdMiB(thresholdMiB))
@@ -789,6 +802,10 @@ class SettingsRepository(
                 ?.toIntOrNull()
                 ?.let(XrayRuntimeSettings::normalizeTunMtu)
                 ?.let { prefs[TUN_MTU] = it }
+            map["xray_gomaxprocs"]
+                ?.toIntOrNull()
+                ?.let(XrayRuntimeSettings::normalizeXrayGoMaxProcs)
+                ?.let { prefs[XRAY_GOMAXPROCS] = it }
             map["xray_memory_restart_threshold_mib"]
                 ?.toIntOrNull()
                 ?.let(XrayRuntimeSettings::normalizeXrayMemoryRestartThresholdMiB)

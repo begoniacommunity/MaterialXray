@@ -33,6 +33,8 @@
     <string name="settings_xray_log_level_label">Уровень журналирования Xray</string>
     <string name="settings_xray_buffer_size_label">Размер буфера Xray</string>
     <string name="settings_xray_buffer_size_supporting_text">Буфер пользовательского пространства для каждого запроса. Диапазон: %1$d–%2$d КиБ. По умолчанию: %3$d КиБ.</string>
+    <string name="settings_xray_gomaxprocs_label">Потоки процессора Xray (GOMAXPROCS)</string>
+    <string name="settings_xray_gomaxprocs_supporting_text">Сколько ядер процессора каждое ядро Xray может использовать одновременно, включая ядра, которые запускает проверка задержки. Меньшие значения могут экономить заряд и сохранять отзывчивость медленных устройств. 0 позволяет Xray использовать все ядра. Диапазон: %1$d–%2$d. По умолчанию: 0.</string>
     <string name="settings_tun_mtu_label">MTU интерфейса TUN</string>
     <string name="settings_tun_mtu_supporting_text">MTU пакета для Android VPN и TUN с root-доступом; не применяется к TPROXY. Диапазон: %1$d–%2$d байт. По умолчанию: %3$d байт.</string>
     <string name="settings_xray_memory_restart_threshold_label">Порог ОЗУ для перезапуска ядра</string>

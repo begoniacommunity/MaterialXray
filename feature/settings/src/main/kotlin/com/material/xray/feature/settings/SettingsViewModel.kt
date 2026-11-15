@@ -319,6 +319,11 @@ class SettingsViewModel(
         settingsRepo.setXrayBufferSizeKiB(bufferSizeKiB)
         reloadActiveConnectionIfConnected()
     }
+    fun setXrayGoMaxProcs(goMaxProcs: Int) = viewModelScope.launch {
+        if (goMaxProcs == currentSettings().xrayGoMaxProcs || !XrayRuntimeSettings.isValidXrayGoMaxProcs(goMaxProcs)) return@launch
+        settingsRepo.setXrayGoMaxProcs(goMaxProcs)
+        reloadActiveConnectionIfConnected()
+    }
     fun setTunMtu(mtu: Int) = viewModelScope.launch {
         if (mtu == currentSettings().tunMtu || !XrayRuntimeSettings.isValidTunMtu(mtu)) return@launch
         settingsRepo.setTunMtu(mtu)

@@ -1651,7 +1651,7 @@ class ConnectionManagerTest {
 
         override suspend fun prepareLogFile() = Unit
 
-        override suspend fun start(binDir: String, tun: RootTunDevice?): Int {
+        override suspend fun start(binDir: String, tun: RootTunDevice?, goMaxProcs: Int): Int {
             startCalls += 1
             lastTun = tun
             return 42
@@ -1670,7 +1670,7 @@ class ConnectionManagerTest {
         val startedTunFds = mutableListOf<Int?>()
 
         override suspend fun prepareLogFile() = Unit
-        override fun start(binDir: String, tunFd: Int?): Int {
+        override fun start(binDir: String, tunFd: Int?, goMaxProcs: Int): Int {
             startedTunFds += tunFd
             return 42
         }

@@ -13,9 +13,9 @@ interface RootXrayProcessController : XrayProcessProbe {
     /**
      * Starts the core from root, sandboxed as its own uid with the app's gid. A non-null [tun] is
      * created by the root launcher and handed to the core as an open descriptor, so the interface
-     * lives exactly as long as the core does.
+     * lives exactly as long as the core does. A positive [goMaxProcs] is passed as GOMAXPROCS.
      */
-    suspend fun start(binDir: String, tun: RootTunDevice? = null): Int
+    suspend fun start(binDir: String, tun: RootTunDevice? = null, goMaxProcs: Int = 0): Int
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun readResidentMemoryMb(pid: Int): Long?
     suspend fun readCrashReason(lines: Int = 80): String
@@ -34,8 +34,9 @@ interface UserXrayProcessController : XrayProcessProbe {
     /**
      * Starts the core against [tunFd], which the caller still owns, or with no tunnel when it is
      * null. Implementations must not suspend before the descriptor has been duplicated into the child.
+     * A positive [goMaxProcs] is passed as GOMAXPROCS.
      */
-    fun start(binDir: String, tunFd: Int?): Int
+    fun start(binDir: String, tunFd: Int?, goMaxProcs: Int = 0): Int
     suspend fun kill(pid: Int, signal: Int = 15): Boolean
     suspend fun stop()
     suspend fun stopOrphan(pid: Int)

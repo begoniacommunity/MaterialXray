@@ -3,8 +3,10 @@ package com.material.xray.core.network
 import com.material.xray.core.root.process.RedirectedProcess
 import com.material.xray.core.xray.LocalSockets
 import com.material.xray.core.xray.XrayBinary
+import com.material.xray.core.xray.XrayGoMaxProcsSetting
 import com.material.xray.core.xray.XrayInbound
 import com.material.xray.core.xray.XrayPaths
+import com.material.xray.core.xray.xrayGoMaxProcsEnvironment
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -16,6 +18,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import org.koin.core.annotation.Singleton
@@ -35,6 +38,7 @@ class EphemeralXrayCore(
     private val baseClient: OkHttpClient,
     private val xrayPaths: XrayPaths,
     private val localSockets: LocalSockets,
+    private val goMaxProcsSetting: XrayGoMaxProcsSetting,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val xrayBinary = XrayBinary(xrayPaths)
@@ -101,7 +105,7 @@ class EphemeralXrayCore(
         try {
             val inbound = XrayInbound.PrivateHttp(workDir.resolve("xray-$runId.sock").absolutePath, inboundTag)
             configFile.writeText(buildConfigOrThrow(buildConfig, inbound))
-            val spawned = startProcess(command, binDir, configFile, logFile)
+            val spawned = startProcess(command, binDir, configFile, logFile, goMaxProcsSetting.xrayGoMaxProcs.first())
             process = spawned
             awaitSocketOrThrow(inbound, spawned, logFile, startTimeoutMs)
             started = true
@@ -153,6 +157,7 @@ class EphemeralXrayCore(
         binDir: File,
         configFile: File,
         logFile: File,
+        goMaxProcs: Int,
     ): RedirectedProcess {
         val builder = ProcessBuilder(command + listOf("run", "-c", configFile.absolutePath))
             .directory(binDir)
@@ -160,6 +165,7 @@ class EphemeralXrayCore(
             .apply {
                 environment()["xray.location.asset"] = binDir.absolutePath
                 environment()["XRAY_LOCATION_ASSET"] = binDir.absolutePath
+                environment().putAll(xrayGoMaxProcsEnvironment(goMaxProcs))
             }
         return RedirectedProcess.start(builder, logFile, append = true)
     }

@@ -46,6 +46,7 @@ class StartupDiagnosticsLoggerTest {
         tunName = "tun0",
         tunMtu = 1500,
         xrayBufferSizeKiB = 64,
+        xrayGoMaxProcs = 0,
         memoryRestartThresholdMiB = 200,
         bypassLan = true,
         ipv6Mode = "off",

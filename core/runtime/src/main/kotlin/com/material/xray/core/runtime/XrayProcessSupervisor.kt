@@ -17,6 +17,7 @@ import com.material.xray.core.xray.CORE_SOCKET_DIR
 import com.material.xray.core.xray.CORE_WORKING_DIR
 import com.material.xray.core.xray.XRAY_EXECUTABLE_NAME
 import com.material.xray.core.xray.coreWorkingDirPath
+import com.material.xray.core.xray.xrayGoMaxProcsEnvironment
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -114,7 +115,7 @@ internal class XrayProcessSupervisor(
         }
     }
 
-    override suspend fun start(binDir: String, tun: RootTunDevice?): Int {
+    override suspend fun start(binDir: String, tun: RootTunDevice?, goMaxProcs: Int): Int {
         val binaryPath = requireNotNull(xrayBinary.binaryPath) { "xray binary is unavailable" }
         val launcherPath = requireNotNull(xrayBinary.rootLauncherPath) { "Root launcher is unavailable" }
         val appGid = environment.packageUid
@@ -126,7 +127,7 @@ internal class XrayProcessSupervisor(
             // assignment. Xray falls back from every xray.* name to its XRAY_* spelling, so the
             // names a shell can export carry the whole environment.
             append("cd ${shellQuote(binDir)} && export")
-            xrayEnvironment(CORE_WORKING_DIR, coreWorkingDirPath(XRAY_CERTIFICATE_BUNDLE_FILE))
+            xrayEnvironment(CORE_WORKING_DIR, coreWorkingDirPath(XRAY_CERTIFICATE_BUNDLE_FILE), goMaxProcs)
                 .filterKeys { SHELL_VARIABLE_NAME.matches(it) }
                 .forEach { (key, value) -> append(" $key=${shellQuote(value)}") }
             append(" && exec ${shellQuote(launcherPath)} $ROOT_CORE_UID $appGid ${shellQuote(xrayBinary.configPath())} ")
@@ -318,7 +319,7 @@ internal class UserXrayProcessSupervisor(
     // only lends the raw descriptor number, so duplicating it into the child has to happen before
     // the caller can reach a suspension point and let a teardown close it underneath us. fork and
     // execve do not wait on IO, so there is nothing to move off the caller's thread anyway.
-    override fun start(binDir: String, tunFd: Int?): Int {
+    override fun start(binDir: String, tunFd: Int?, goMaxProcs: Int): Int {
         val command = requireNotNull(xrayBinary.userCommand) { "xray binary is unavailable" }
         // A fast server switch skips the binary check that otherwise creates it.
         File(binDir, CORE_SOCKET_DIR).mkdirs()
@@ -328,7 +329,7 @@ internal class UserXrayProcessSupervisor(
             workingDir = binDir,
             logPath = logFile.absolutePath,
             tunFd = tunFd,
-            environment = xrayEnvironment(binDir, File(binDir, XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath),
+            environment = xrayEnvironment(binDir, File(binDir, XRAY_CERTIFICATE_BUNDLE_FILE).absolutePath, goMaxProcs),
         )
         return pid
     }
@@ -509,15 +510,14 @@ private fun xrayAssetEnvironment(assetDir: String): Map<String, String> = mapOf(
     "XRAY_LOCATION_ASSET" to assetDir,
 )
 
-private fun xrayEnvironment(assetDir: String, certificateBundlePath: String): Map<String, String> = xrayAssetEnvironment(assetDir) + mapOf(
+private fun xrayEnvironment(
+    assetDir: String,
+    certificateBundlePath: String,
+    goMaxProcs: Int,
+): Map<String, String> = xrayAssetEnvironment(assetDir) +
     // Go does not reliably discover Android's CA store, especially in the rootless process.
-    "SSL_CERT_FILE" to certificateBundlePath,
-    // Measured on a Snapdragon 7+ Gen 2: two Ps forward a VLESS/XHTTP/TLS stream at the same speed
-    // as one per core while spending about 30% less CPU, which otherwise goes to idle Ps spinning.
-    "GOMAXPROCS" to XRAY_GOMAXPROCS.toString(),
-)
-
-private const val XRAY_GOMAXPROCS = 2
+    mapOf("SSL_CERT_FILE" to certificateBundlePath) +
+    xrayGoMaxProcsEnvironment(goMaxProcs)
 
 private val SHELL_VARIABLE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
