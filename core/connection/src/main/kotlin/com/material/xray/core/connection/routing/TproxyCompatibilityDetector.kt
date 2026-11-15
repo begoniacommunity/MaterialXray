@@ -168,11 +168,13 @@ class TproxyCompatibilityDetector(
             stage == "route4" -> TproxyCompatibility.Reason.PolicyRoutingUnavailable
             else -> TproxyCompatibility.Reason.TproxyIpv4Unavailable
         }
-        val details = listOf(result.output, result.error)
+        val timedOutAt = if (reason == TproxyCompatibility.Reason.CommandTimedOut) probeTimeoutPoint(result.output, allowIpv6) else null
+        val output = result.output.lineSequence().filterNot { it.startsWith(CHECKPOINT_PREFIX) }.joinToString("\n")
+        val details = listOf(output, result.error)
             .joinToString(" | ")
             .trim(' ', '|')
             .takeIf { it.isNotBlank() }
-        return TproxyCompatibility.Unsupported(reason, details)
+        return TproxyCompatibility.Unsupported(reason, details, timedOutAt)
     }
 
     internal companion object {
@@ -196,6 +198,8 @@ class TproxyCompatibilityDetector(
         private const val PROBE_PRIORITY_SLOTS = 8
         private const val PROBE_TIMEOUT_MS = 15_000L
         private const val MARK_CONFLICT_EXIT_CODE = 42
+        private const val CHECKPOINT_PREFIX = "at="
+        private val CHECKPOINTS = setOf("gid", "conflict", "chains", "route", "hooks", "listeners", "ipv6", "cleanup")
 
         fun markCollisionCommand(appUid: Int): String {
             require(appUid > 0)
@@ -227,14 +231,18 @@ class TproxyCompatibilityDetector(
             val commands = buildList {
                 add("cleanup() { ${cleanup.joinToString("; ")}; }")
                 add("fail() { printf 'stage=%s\\n' \"\$1\"; cleanup; exit 1; }")
+                add(checkpoint("gid"))
                 add("su -g $appUid 0 -c ${shellQuote("[ \"\$(id -u):\$(id -g)\" = \"0:$appUid\" ]")} || fail gid")
+                add(checkpoint("conflict"))
                 add(probeConflictCommand(resources, table, priority, allowIpv6))
                 addAll(ipv4ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid, allowIpv6))
+                add(checkpoint("ipv6"))
                 if (allowIpv6) {
                     addAll(ipv6ProbeCommands(chains, table, priority, prefixHex, groupHex, maskHex, groupMaskHex, appUid))
                 } else {
                     addAll(ipv6BlockingProbeCommands(chains, prefixHex, maskHex, groupMaskHex, appUid))
                 }
+                add(checkpoint("cleanup"))
                 add("cleanup")
                 resources.forEach { resource ->
                     add("${resource.tool} -S ${resource.chain} >/dev/null 2>&1 && fail cleanup")
@@ -246,6 +254,26 @@ class TproxyCompatibilityDetector(
                 add("true")
             }
             return commands.joinToString("; ")
+        }
+
+        /** Where a timed-out [probeCommand] stopped, from the output it managed to print. */
+        fun probeTimeoutPoint(output: String, allowIpv6: Boolean): String {
+            // Only the probe's own names, so nothing else the shell printed can reach telemetry.
+            val checkpoint = output.lineSequence()
+                .lastOrNull { it.startsWith(CHECKPOINT_PREFIX) }
+                ?.removePrefix(CHECKPOINT_PREFIX)
+                ?.takeIf { it in CHECKPOINTS }
+                ?: "start"
+            return "${if (allowIpv6) "dual_stack" else "ipv4"}:$checkpoint"
+        }
+
+        /**
+         * Marks how far the probe got, so a timeout can say which step hung. echo is a builtin in
+         * Android's mksh, unlike printf.
+         */
+        private fun checkpoint(name: String): String {
+            require(name in CHECKPOINTS)
+            return "echo $CHECKPOINT_PREFIX$name"
         }
 
         private fun probeChains(suffix: String): ProbeChains {
@@ -326,6 +354,7 @@ class TproxyCompatibilityDetector(
             val localMatch = if (allowIpv6) "-o lo" else "-d 127.0.0.0/8"
             val onIp = if (allowIpv6) "0.0.0.0" else "127.0.0.1"
             return listOf(
+                checkpoint("chains"),
                 "$IPTABLES -t mangle -N ${chains.ipv4Prerouting} || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -j RETURN || fail iptables",
                 "$IPTABLES -t mangle -A ${chains.ipv4Prerouting} -p tcp -m mark --mark $groupHex/$groupMaskHex " +
@@ -346,14 +375,17 @@ class TproxyCompatibilityDetector(
                     "-j MARK --set-xmark $groupHex/$groupMaskHex || fail mark",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m mark --mark $prefixHex/$maskHex -j RETURN || fail mark",
                 "$IPTABLES -t mangle -A ${chains.ipv4Output} -m owner --uid-owner 0-1 -j DROP || fail owner",
+                checkpoint("route"),
                 "ip route replace local 0.0.0.0/0 dev lo table $table || fail route4",
                 "ip rule add fwmark $prefixHex/$maskHex table $table pref $priority || fail route4",
+                checkpoint("hooks"),
                 "$IPTABLES -t mangle -I PREROUTING 1 -j ${chains.ipv4Prerouting} || fail iptables",
                 "$IPTABLES -t mangle -I OUTPUT 1 -j ${chains.ipv4Output} || fail iptables",
                 "$IPTABLES -t mangle -C PREROUTING -j ${chains.ipv4Prerouting} || fail iptables",
                 "$IPTABLES -t mangle -C OUTPUT -j ${chains.ipv4Output} || fail iptables",
                 "$IPTABLES -t mangle -R ${chains.ipv4Output} 1 -j RETURN || fail iptables",
                 "ip route get 192.0.2.1 mark $groupHex | grep -q 'dev lo' || fail route4",
+                checkpoint("listeners"),
                 "ss -lntu >/dev/null || fail tools",
             )
         }

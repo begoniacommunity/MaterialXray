@@ -11,6 +11,8 @@ sealed interface TproxyCompatibility {
     data class Unsupported(
         val reason: Reason,
         val details: String? = null,
+        /** For [Reason.CommandTimedOut], the probe and the last step it reached, such as `ipv4:gid`. */
+        val timedOutAt: String? = null,
     ) : TproxyCompatibility
 
     enum class Reason {

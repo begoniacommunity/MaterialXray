@@ -236,6 +236,19 @@ class TelemetryReporterTest {
     }
 
     @Test
+    fun `probe timeouts report where the probe stopped`() {
+        val client = FakeTelemetryClient()
+        val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }
+
+        reporter.recordTproxyCompatibility(
+            TproxyCompatibility.Unsupported(TproxyCompatibility.Reason.CommandTimedOut, timedOutAt = "ipv4:gid"),
+            cached = false,
+        )
+
+        assertEquals(mapOf("reason" to "command_timed_out", "timed_out_at" to "ipv4:gid"), client.messages.single().tags)
+    }
+
+    @Test
     fun `core exits are reported with how the core ended`() {
         val client = FakeTelemetryClient()
         val reporter = TelemetryReporter(client) { 0 }.apply { setEnabled(true) }

@@ -286,7 +286,7 @@ class TelemetryReporter(
         captureSafeMessage(
             message = "TPROXY compatibility probe malfunctioned",
             fingerprint = "tproxy-compatibility-$reason",
-            tags = mapOf("reason" to reason),
+            tags = mapOf("reason" to reason) + malfunction.timedOutAt?.let { mapOf("timed_out_at" to it) }.orEmpty(),
         )
     }
 

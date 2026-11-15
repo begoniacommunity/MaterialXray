@@ -42,6 +42,36 @@ class TproxyCompatibilityDetectorTest {
     }
 
     @Test
+    fun `probe checkpoints precede the steps they name`() {
+        val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = false, appUid = APP_UID)
+        val steps = listOf(
+            "echo at=gid; su -g",
+            "echo at=conflict; if ",
+            "echo at=chains; iptables -w 2 -t mangle -N",
+            "echo at=route; ip route replace",
+            "echo at=hooks; iptables -w 2 -t mangle -I PREROUTING",
+            "echo at=listeners; ss -lntu",
+            "echo at=ipv6; ip6tables -w 2 -t mangle -N",
+            "echo at=cleanup; cleanup;",
+        )
+
+        val positions = steps.map(command::indexOf)
+
+        assertFalse(positions.contains(-1))
+        assertEquals(positions.sorted(), positions)
+    }
+
+    @Test
+    fun `a timed out probe reports the last checkpoint it printed`() {
+        assertEquals(
+            "dual_stack:route",
+            TproxyCompatibilityDetector.probeTimeoutPoint("at=gid\nat=conflict\nat=chains\nat=route", allowIpv6 = true),
+        )
+        assertEquals("ipv4:start", TproxyCompatibilityDetector.probeTimeoutPoint("", allowIpv6 = false))
+        assertEquals("ipv4:start", TproxyCompatibilityDetector.probeTimeoutPoint("at=something else", allowIpv6 = false))
+    }
+
+    @Test
     fun `IPv4 only probe covers loopback binding IPv6 blocking and listener checks`() {
         val command = TproxyCompatibilityDetector.probeCommand("abc123", allowIpv6 = false, appUid = APP_UID)
 
