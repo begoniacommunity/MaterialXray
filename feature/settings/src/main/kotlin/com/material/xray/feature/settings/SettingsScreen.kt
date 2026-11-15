@@ -313,7 +313,7 @@ private fun SettingsScreenContent(
     var geoDataToDelete by rememberSaveable { mutableStateOf<GeoDataAsset?>(null) }
     var showClearGeoDataDialog by rememberSaveable { mutableStateOf(false) }
     val rootServiceAvailable = rootAvailable != false
-    val rootServiceActive = useRootService && rootAvailable == true
+    val rootServiceActive = useRootService && rootServiceAvailable
     val rootNotificationFields = rootServiceActive && !rememberSystemState(::isAlwaysOnVpnEnabled).value
 
     val editingTunName = rememberSaveable(tunName, saver = TextFieldState.Saver) { TextFieldState(tunName) }
