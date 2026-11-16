@@ -3,7 +3,6 @@ package com.material.xray.core.ui.components
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
@@ -20,8 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -85,11 +85,7 @@ fun <T : Any> rememberLazyListSelectionGesture(
         }
     }
 
-    val modifier = Modifier.pointerInput(listState) {
-        awaitPointerEventScope {
-            consumeSelectionRelease { gesture != null }
-        }
-    }.pointerInput(listState, enabled, protectedEndPx, rtl, startOnItemOnly, handleTaps) {
+    val modifier = Modifier.pointerInput(listState, enabled, protectedEndPx, rtl, startOnItemOnly, handleTaps) {
         if (!enabled) return@pointerInput
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
@@ -108,12 +104,10 @@ fun <T : Any> rememberLazyListSelectionGesture(
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     extendSelection(fingerY)
                     longPress.consume()
-                    drag(longPress.id) { change ->
+                    dragSelection(longPress.id) { change ->
                         fingerY = change.position.y
                         extendSelection(fingerY)
-                        change.consume()
                     }
-                    currentEvent.changes.forEach { it.consume() }
                 } finally {
                     gesture = null
                 }
@@ -123,11 +117,19 @@ fun <T : Any> rememberLazyListSelectionGesture(
     return LazyListSelectionGesture(modifier, gesture != null)
 }
 
-private suspend fun AwaitPointerEventScope.consumeSelectionRelease(selecting: () -> Boolean) {
+internal suspend fun AwaitPointerEventScope.dragSelection(pointerId: PointerId, onDrag: (PointerInputChange) -> Unit) {
+    var pointer = pointerId
     while (true) {
         val event = awaitPointerEvent(PointerEventPass.Initial)
-        // A completed long press must not become a click in a child card.
-        if (selecting()) event.changes.filter { it.changedToUpIgnoreConsumed() }.forEach { it.consume() }
+        val change = event.changes.firstOrNull { it.id == pointer } ?: return
+        if (change.isConsumed) return
+        val next = change.takeIf { it.pressed } ?: event.changes.firstOrNull { it.pressed }
+        // Once a long press owns the gesture, consume movement before the list can claim it.
+        // Consume release here too, so child cards cannot turn the completed selection into a click.
+        event.changes.forEach { it.consume() }
+        if (next == null) return
+        onDrag(next)
+        pointer = next.id
     }
 }
 
