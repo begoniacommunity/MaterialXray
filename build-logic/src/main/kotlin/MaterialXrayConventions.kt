@@ -41,6 +41,24 @@ internal fun Project.configureAndroidCommon() {
         lint.ignoreTestSources = true
     }
     dependencies.add("coreLibraryDesugaring", libs.lib("desugar-jdk-libs-nio"))
+    alignAndroidXVersions()
+}
+
+/** Use the app's pinned AndroidX family versions in every compile, runtime and lint classpath. */
+private fun Project.alignAndroidXVersions() {
+    val versionsByGroup = listOf(
+        libs.lib("lifecycle-runtime-compose").get(),
+        libs.lib("navigationevent-runtime").get(),
+        libs.lib("savedstate-ktx").get(),
+    ).associate { it.module.group to it.versionConstraint.requiredVersion }
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            versionsByGroup[requested.group]?.let { version ->
+                useVersion(version)
+                because("Align AndroidX components with the app's pinned family version")
+            }
+        }
+    }
 }
 
 /** detekt and ktlint, configured from the root `config/detekt/detekt.yml` and `.editorconfig`. */
