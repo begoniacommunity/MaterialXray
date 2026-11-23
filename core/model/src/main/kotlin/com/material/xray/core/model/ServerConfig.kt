@@ -144,7 +144,7 @@ private fun String.proxyOutboundCountOrNull(): Int? {
         outbounds.count { element ->
             val outbound = element as? JsonObject ?: return@count false
             val protocol = (outbound["protocol"] as? JsonPrimitive)?.contentOrNull?.lowercase()
-            protocol !in SPECIAL_OUTBOUND_PROTOCOLS
+            protocol !in NON_PROXY_OUTBOUND_PROTOCOLS
         }
     }.getOrNull()
 }
@@ -183,5 +183,3 @@ const val SERVER_EXTRA_WIREGUARD_MTU = "wireguardMtu"
 const val SERVER_EXTRA_WIREGUARD_RESERVED = "wireguardReserved"
 const val SERVER_EXTRA_WIREGUARD_KEEP_ALIVE = "wireguardKeepAlive"
 const val SERVER_EXTRA_WIREGUARD_ALLOWED_IPS = "wireguardAllowedIps"
-
-private val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns")

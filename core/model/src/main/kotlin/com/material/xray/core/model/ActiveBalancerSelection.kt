@@ -62,7 +62,7 @@ private fun ServerConfig.rawProxyOutbounds(): List<JsonObject> = rawConfigRoot()
     ?.let { it as? JsonArray }
     .orEmpty()
     .mapNotNull { it as? JsonObject }
-    .filter { outbound -> outbound.string("protocol")?.lowercase() !in SPECIAL_OUTBOUND_PROTOCOLS }
+    .filter { outbound -> outbound.string("protocol")?.lowercase() !in NON_PROXY_OUTBOUND_PROTOCOLS }
 
 private fun ServerConfig.rawConfigRoot(): JsonObject? {
     if (rawConfigJson.isBlank()) return null
@@ -106,6 +106,5 @@ private fun String.maskIpv4OrNull(): String? {
     return "${octets.first()}.**.**.${octets.last()}"
 }
 
-private val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns", "loopback")
 private const val IPV4_BYTE_COUNT = 4
 private const val IPV6_BYTE_COUNT = 16

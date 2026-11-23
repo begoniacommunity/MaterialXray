@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.core.model.NON_PROXY_OUTBOUND_PROTOCOLS
 import com.material.xray.core.model.RoutingRule
 import com.material.xray.core.model.SubscriptionRouting
 import com.material.xray.core.model.XrayLogLevel
@@ -237,7 +238,7 @@ internal class RawConfigTunInjector(
         if (canonicalIndex >= 0) return canonicalIndex
 
         return outbounds.indexOfFirst { outbound ->
-            outbound["protocol"]?.jsonPrimitive?.contentOrNull?.lowercase() !in SPECIAL_OUTBOUND_PROTOCOLS
+            outbound["protocol"]?.jsonPrimitive?.contentOrNull?.lowercase() !in NON_PROXY_OUTBOUND_PROTOCOLS
         }
     }
 

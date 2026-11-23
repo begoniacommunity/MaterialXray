@@ -3,6 +3,7 @@ package com.material.xray.core.data.parser
 import com.material.xray.core.common.platform.PlatformInfo
 import com.material.xray.core.common.platform.deviceModel
 import com.material.xray.core.model.HAPP_USER_AGENT
+import com.material.xray.core.model.NON_PROXY_OUTBOUND_PROTOCOLS
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.SERVER_EXTRA_HYSTERIA_CONGESTION
 import com.material.xray.core.model.SERVER_EXTRA_HYSTERIA_DOWN
@@ -392,7 +393,7 @@ class SubscriptionFetcher(
             ?.filter { outbound ->
                 outbound.findString("protocol")
                     ?.lowercase()
-                    ?.let { it !in SPECIAL_OUTBOUND_PROTOCOLS }
+                    ?.let { it !in NON_PROXY_OUTBOUND_PROTOCOLS }
                     ?: true
             }
             .orEmpty()
@@ -791,7 +792,6 @@ class SubscriptionFetcher(
     )
 
     private companion object {
-        private val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns")
         private const val HTTP_REQUEST_TIMEOUT = 408
         private const val HTTP_TOO_MANY_REQUESTS = 429
 

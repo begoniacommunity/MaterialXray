@@ -1,6 +1,7 @@
 package com.material.xray.core.xray
 
 import com.material.xray.core.common.text.decodeUriComponent
+import com.material.xray.core.model.NON_PROXY_OUTBOUND_PROTOCOLS
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.SERVER_EXTRA_HYSTERIA_CONGESTION
 import com.material.xray.core.model.SERVER_EXTRA_HYSTERIA_DOWN
@@ -40,8 +41,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-
-internal val SPECIAL_OUTBOUND_PROTOCOLS = setOf("freedom", "dns", "blackhole")
 
 internal fun buildTunInbound(
     tunName: String,
@@ -275,7 +274,7 @@ private fun buildRawProxyOutbound(
         outbound["tag"]?.jsonPrimitive?.contentOrNull.equals("proxy", ignoreCase = true)
     } ?: outbounds.firstOrNull { outbound ->
         val protocol = outbound["protocol"]?.jsonPrimitive?.contentOrNull?.lowercase()
-        protocol !in SPECIAL_OUTBOUND_PROTOCOLS
+        protocol !in NON_PROXY_OUTBOUND_PROTOCOLS
     } ?: error("Raw JSON config has no proxy outbound")
 
     val outbound = candidate.toMutableMap()

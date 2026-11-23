@@ -379,6 +379,42 @@ class RawConfigTunInjectorTest {
     }
 
     @Test
+    fun `inject does not take freedom and blackhole aliases for the proxy outbound`() {
+        val result = injector.inject(
+            rawJson = """
+                {
+                  "outbounds": [
+                    {"tag":"direct","protocol":"direct"},
+                    {"tag":"block","protocol":"block"},
+                    {"tag":"node-01","protocol":"vless","settings":{}},
+                    {"tag":"node-02","protocol":"vless","settings":{}}
+                  ],
+                  "routing": {
+                    "rules": [{"network":"tcp,udp","balancerTag":"balance"}],
+                    "balancers": [{"tag":"balance","selector":["node-"]}]
+                  }
+                }
+            """.trimIndent(),
+            tunName = "xray0",
+            fwmark = 1,
+            dnsServers = "1.1.1.1",
+            domesticDnsServers = "",
+            logLevel = XrayLogLevel.Error,
+            defaultOutbound = XrayOutbound.Proxy,
+            bypassLan = false,
+            routingRules = emptyList(),
+            appProxyRoutes = emptyList(),
+            physicalInterface = null,
+        )
+
+        val root = json.parseToJsonElement(result).jsonObject
+        assertEquals(
+            listOf("node-01", "direct", "block", "dns-out", "node-02"),
+            root.getValue("outbounds").jsonArray.map { it.jsonObject.getValue("tag").jsonPrimitive.content },
+        )
+    }
+
+    @Test
     fun `inject preserves raw routing for multi-outbound profiles`() {
         val result = injector.inject(
             rawJson = """

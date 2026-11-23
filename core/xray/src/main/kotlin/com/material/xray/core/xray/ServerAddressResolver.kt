@@ -1,5 +1,6 @@
 package com.material.xray.core.xray
 
+import com.material.xray.core.model.NON_PROXY_OUTBOUND_PROTOCOLS
 import com.material.xray.core.model.Protocol
 import com.material.xray.core.model.ServerConfig
 import java.io.File
@@ -322,6 +323,5 @@ private fun endpointHostname(endpoint: String): String? {
 private fun isIpv6Literal(value: String): Boolean = value.contains(':') &&
     runCatching { InetAddress.getByName(value.substringBefore('%')) is Inet6Address }.getOrDefault(false)
 
-private val NON_PROXY_OUTBOUND_PROTOCOLS = setOf("freedom", "blackhole", "dns", "loopback")
 private val IPV4_ADDRESS = Regex("""\d{1,3}(?:\.\d{1,3}){3}""")
 private val HOSTNAME = Regex("""(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*""")
