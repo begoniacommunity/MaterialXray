@@ -221,7 +221,10 @@ internal class RawConfigTunInjector(
         val normalized = existingOutbounds.mapIndexed { index, outbound ->
             val obj = outbound.toMutableMap()
             val stream = (obj["streamSettings"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
-            stream["sockopt"] = buildSockopt(fwmark, physicalInterface, allowIpv6)
+            val sockopt = buildSockopt(fwmark, physicalInterface, allowIpv6)
+            // A chained outbound dials through another one, so its chain survives the app's options.
+            val dialerProxy = (stream["sockopt"] as? JsonObject)?.get("dialerProxy")
+            stream["sockopt"] = if (dialerProxy == null) sockopt else JsonObject(sockopt + ("dialerProxy" to dialerProxy))
             obj["streamSettings"] = JsonObject(stream)
             if (index == proxyIndex && obj["tag"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()) {
                 obj["tag"] = JsonPrimitive("proxy")

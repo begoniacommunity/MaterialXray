@@ -7,6 +7,7 @@ import com.material.xray.core.model.XrayLogLevel
 import com.material.xray.core.model.XrayOutbound
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -412,6 +413,36 @@ class RawConfigTunInjectorTest {
             listOf("node-01", "direct", "block", "dns-out", "node-02"),
             root.getValue("outbounds").jsonArray.map { it.jsonObject.getValue("tag").jsonPrimitive.content },
         )
+    }
+
+    @Test
+    fun `inject keeps the dialer proxy of chained outbounds`() {
+        val result = injector.inject(
+            rawJson = """
+                {
+                  "outbounds": [
+                    {"tag":"proxy","protocol":"vless","settings":{},"streamSettings":{"sockopt":{"dialerProxy":"fragment","tcpFastOpen":true}}},
+                    {"tag":"fragment","protocol":"freedom","settings":{"fragment":{"packets":"tlshello"}}}
+                  ]
+                }
+            """.trimIndent(),
+            tunName = "xray0",
+            fwmark = 1,
+            dnsServers = "1.1.1.1",
+            domesticDnsServers = "",
+            logLevel = XrayLogLevel.Error,
+            defaultOutbound = XrayOutbound.Proxy,
+            bypassLan = false,
+            routingRules = emptyList(),
+            appProxyRoutes = emptyList(),
+            physicalInterface = null,
+        )
+
+        val outbounds = json.parseToJsonElement(result).jsonObject.getValue("outbounds").jsonArray.map { it.jsonObject }
+        fun sockopt(tag: String) = outbounds.first { it.getValue("tag").jsonPrimitive.content == tag }
+            .getValue("streamSettings").jsonObject.getValue("sockopt").jsonObject
+        assertEquals(buildSockopt(1, null) + ("dialerProxy" to JsonPrimitive("fragment")), sockopt("proxy"))
+        assertEquals(buildSockopt(1, null), sockopt("fragment"))
     }
 
     @Test
