@@ -126,11 +126,14 @@ class SubscriptionRepository(
 
     suspend fun addLink(link: String, confirmHardwareId: suspend () -> Boolean = { false }): Long? = add(name = "", url = link, confirmHardwareId = confirmHardwareId)
 
-    /** Every separated piece must be a share link; anything else is a subscription URL. */
+    /**
+     * Every separated piece must use a share link scheme; anything else is a subscription URL. Links
+     * that do not parse are skipped, so one unsupported entry does not reject the whole list.
+     */
     private fun parseShareLinks(text: String): List<ServerConfig>? {
         val links = text.split(SHARE_LINK_SEPARATOR).map { it.trim().trimEnd(',', ';', '|') }.filter(String::isNotEmpty)
-        if (links.isEmpty()) return null
-        return links.map { shareLinkParser.parse(it) ?: return null }
+        if (links.isEmpty() || !links.all(shareLinkParser::hasShareLinkScheme)) return null
+        return links.mapNotNull(shareLinkParser::parse).ifEmpty { null }
     }
 
     private suspend fun addLocalServers(configs: List<ServerConfig>): Long = database.withWriteTransaction {

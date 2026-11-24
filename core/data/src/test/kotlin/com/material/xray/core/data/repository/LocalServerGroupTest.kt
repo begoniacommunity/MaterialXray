@@ -61,6 +61,32 @@ class LocalServerGroupTest {
     }
 
     @Test
+    fun `a share link that cannot be read is skipped without rejecting the others`() = runBlocking {
+        withRepository { repository, database ->
+            val id = requireNotNull(
+                repository.addLink(
+                    "vless://id@one.example:443#One\n" +
+                        "vless://id@bad.example:443?security=tls&pcs=not-a-fingerprint#Bad\n" +
+                        "hysteria2://secret@two.example:443#Two",
+                ),
+            )
+            assertEquals(listOf("One", "Two"), database.serverDao().getBySubscription(id).map { it.name })
+        }
+    }
+
+    @Test
+    fun `share links that all fail to parse are not added`() = runBlocking {
+        withRepository { repository, _ ->
+            try {
+                repository.addLink("vless://id@bad.example:443?pcs=not-a-fingerprint#Bad\nvless://missing-port.example#Worse")
+                org.junit.Assert.fail("Unreadable links must not be added as servers")
+            } catch (_: IOException) {
+                assertTrue(repository.getAllSubscriptions().isEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `text with a line that is not a share link is treated as a subscription URL`() = runBlocking {
         withRepository { repository, _ ->
             try {

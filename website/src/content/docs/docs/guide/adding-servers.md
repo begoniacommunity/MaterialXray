@@ -5,7 +5,7 @@ description: Paste a link, scan a QR code, add manually, or open a deeplink.
 
 Tap **Add new server or subscription** on the home screen. You can:
 
-- **Paste from clipboard**: a subscription URL, or one or more share links separated by new lines, spaces, commas or semicolons.
+- **Paste from clipboard**: a subscription URL, or one or more share links separated by new lines, spaces, commas or semicolons. A link the app cannot read is skipped and the rest are added.
 - **Scan QR code**: the camera is used only for scanning, and you can always paste instead.
 - **Add manually**: type the link and set options yourself. For a single share link, **Name** renames the server.
 

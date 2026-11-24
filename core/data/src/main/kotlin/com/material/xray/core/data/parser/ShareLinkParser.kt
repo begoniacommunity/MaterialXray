@@ -6,6 +6,9 @@ class ShareLinkParser {
 
     fun parse(uri: String): ServerConfig? = parseWith(directParsers, uri.trim())
 
+    /** True when [uri] uses a scheme a user can add directly, whether or not the link itself parses. */
+    fun hasShareLinkScheme(uri: String): Boolean = directSchemes.any(uri::startsWith)
+
     fun parseMultiple(text: String): List<ServerConfig> = text.lines()
         .map { it.trim() }
         .filter { it.isNotEmpty() }
