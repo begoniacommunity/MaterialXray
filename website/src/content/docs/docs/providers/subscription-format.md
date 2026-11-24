@@ -50,7 +50,7 @@ A full Xray configuration object, or an array of them. Each one becomes a server
 
 ## JSON first
 
-With **JSON first** on, the client requests `<url>/json` before the URL itself, a convention among panels that serve Xray JSON on a sibling path. If that endpoint answers with a `4xx` status (other than `408` or `429`), an empty body or no configs, the client fetches the original URL. A timeout, a connection error, a `5xx`, `408` or `429` fails the refresh instead and keeps the current servers, because the original URL may list fewer servers than the JSON one. A URL that already ends in `/json` is fetched once.
+With **JSON first** on, the client requests `<url>/json` before the URL itself, a convention among panels that serve Xray JSON on a sibling path. If that endpoint answers with a `4xx` status (other than `408` or `429`), an empty body or no configs, the client fetches the original URL. After a timeout, a connection error, a `5xx`, `408` or `429` it does the same, but a subscription that already holds JSON profiles only takes JSON profiles from the original URL: if that URL answers with a share-link list, the refresh fails and keeps the current servers, because the list may hold fewer servers than the JSON one. A URL that already ends in `/json` is fetched once.
 
 ## Redirects
 

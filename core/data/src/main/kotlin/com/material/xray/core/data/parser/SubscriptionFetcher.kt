@@ -124,12 +124,19 @@ class SubscriptionFetcher(
      */
     fun parseJsonConfig(body: String): ServerConfig? = parseJsonSubscription(body).firstOrNull()
 
+    /**
+     * @param protectJsonProfiles whether the subscription holds JSON profiles, which a share link
+     * list must not replace. When /json cannot be reached, or answers with a server error or a
+     * rate limit, the saved URL is fetched instead; with this set, its result only counts if it
+     * holds JSON profiles too, and the fetch fails with the /json error otherwise.
+     */
     suspend fun fetchWithMetadata(
         url: String,
         identity: SubscriptionRequestIdentity = SubscriptionRequestIdentity(),
         preferJson: Boolean = false,
         allowInsecureUpdates: Boolean = false,
         requireHardwareIdConsent: Boolean = false,
+        protectJsonProfiles: Boolean = true,
     ): FetchedSubscription {
         val normalizedUrl = url.trim()
         val httpUrl = normalizedUrl.toHttpUrlOrNull()
@@ -143,7 +150,7 @@ class SubscriptionFetcher(
                 // the device in cleartext. OkHttp follows redirects internally, so enforce that boundary at
                 // the client level. The per-subscription opt-in deliberately relaxes both transport checks.
                 val client = baseClient.subscriptionClient(allowInsecureUpdates)
-                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson, allowInsecureUpdates, requireHardwareIdConsent)
+                fetchWithMetadata(client, httpUrl, normalizedUrl, identity, preferJson, allowInsecureUpdates, requireHardwareIdConsent, protectJsonProfiles)
             }
         }
     }
@@ -156,7 +163,9 @@ class SubscriptionFetcher(
         preferJson: Boolean,
         allowInsecureUpdates: Boolean,
         requireHardwareIdConsent: Boolean,
+        protectJsonProfiles: Boolean,
     ): FetchedSubscription {
+        var jsonFailure: Exception? = null
         if (preferJson) {
             httpUrl.jsonEndpointOrNull()?.let { jsonUrl ->
                 val jsonSubscription = try {
@@ -169,9 +178,8 @@ class SubscriptionFetcher(
                         requireHardwareIdConsent = requireHardwareIdConsent,
                     )
                 } catch (error: Exception) {
-                    // A flaky /json must fail the refresh rather than fall back: the base URL may carry
-                    // fewer servers, and losing the selected one used to cost the user their connection.
-                    if (!error.meansNoJsonEndpoint()) throw error
+                    if (error.endsFetch()) throw error
+                    if (!error.meansNoJsonEndpoint()) jsonFailure = error
                     null
                 }
                 if (jsonSubscription != null && jsonSubscription.configs.isNotEmpty()) {
@@ -180,7 +188,7 @@ class SubscriptionFetcher(
             }
         }
 
-        return fetchUrl(
+        val fetched = fetchUrl(
             client,
             httpUrl,
             identity,
@@ -188,6 +196,12 @@ class SubscriptionFetcher(
             allowInsecureUpdates = allowInsecureUpdates,
             requireHardwareIdConsent = requireHardwareIdConsent,
         )
+        // A flaky /json must fail the refresh rather than swap JSON profiles for the saved URL's share
+        // links: that list may carry fewer servers, and losing the selected one used to cost the user
+        // their connection. A panel may also answer with a server error for a path it does not serve,
+        // so the saved URL still counts when nothing is lost by using it.
+        jsonFailure?.let { if (protectJsonProfiles && fetched.configs.none { config -> config.rawConfigJson.isNotBlank() }) throw it }
+        return fetched
     }
 
     private fun fetchUrl(
@@ -320,12 +334,14 @@ class SubscriptionFetcher(
         return body.string()
     }
 
+    /** Cancellation and missing hardware ID consent say nothing about /json, and no other URL may be tried. */
+    private fun Exception.endsFetch(): Boolean = this is CancellationException || this is SubscriptionHardwareIdRequiredException
+
     /**
      * True when /json answered with something that is not a JSON subscription, so the provider has
      * no such endpoint. Transport errors, server errors and rate limits say nothing about that.
      */
     private fun Exception.meansNoJsonEndpoint(): Boolean = when {
-        this is CancellationException || this is SubscriptionHardwareIdRequiredException -> false
         this is SubscriptionFetchException && reason == SubscriptionFetchException.Reason.HTTP_STATUS -> {
             val code = statusCode ?: 0
             code in 400..499 && code != HTTP_REQUEST_TIMEOUT && code != HTTP_TOO_MANY_REQUESTS

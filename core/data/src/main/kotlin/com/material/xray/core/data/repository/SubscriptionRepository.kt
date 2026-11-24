@@ -110,11 +110,12 @@ class SubscriptionRepository(
         )
         val sendHardwareId = settingsRepository.subscriptionSendHardwareId.first()
         val fetched = try {
-            fetcher.fetchWithMetadata(trimmedUrl, draft.requestIdentity(sendHardwareId), preferJson, allowInsecureUpdates, requireHardwareIdConsent = true)
+            // A new subscription has no servers a fallback from /json could lose.
+            fetcher.fetchWithMetadata(trimmedUrl, draft.requestIdentity(sendHardwareId), preferJson, allowInsecureUpdates, requireHardwareIdConsent = true, protectJsonProfiles = false)
         } catch (_: SubscriptionHardwareIdRequiredException) {
             if (!confirmHardwareId()) return null
             // Consent belongs to this subscription. Keep the user's global preference intact.
-            fetcher.fetchWithMetadata(trimmedUrl, draft.requestIdentity(true), preferJson, allowInsecureUpdates)
+            fetcher.fetchWithMetadata(trimmedUrl, draft.requestIdentity(true), preferJson, allowInsecureUpdates, protectJsonProfiles = false)
                 .let { it.copy(metadata = it.metadata.copy(requiresHardwareId = true)) }
         }
         return database.withWriteTransaction {
@@ -189,7 +190,7 @@ class SubscriptionRepository(
         val existing = subscriptionDao.getById(subId)?.takeUnless { it.isLocal } ?: return null
         val identity = existing.requestIdentity(settingsRepository.subscriptionSendHardwareId.first() || existing.requiresHardwareId)
         val preferJson = existing.preferJson ?: settingsRepository.legacySubscriptionPreferJson.first()
-        val fetched = fetchWithFallback(existing, url, identity, preferJson)
+        val fetched = fetchWithFallback(existing, url, identity, preferJson, protectJsonProfiles = preferJson && holdsJsonProfiles(subId))
         val servers = fetched.configs.mapIndexed { index, config -> config.toServerEntity(subId, index) }
 
         return PreparedRefresh(
@@ -197,6 +198,10 @@ class SubscriptionRepository(
             fetched = fetched,
             servers = servers,
         )
+    }
+
+    private suspend fun holdsJsonProfiles(subId: Long): Boolean = serverDao.getBySubscription(subId).any { server ->
+        runCatching { json.decodeFromString<ServerConfig>(server.configJson) }.getOrNull()?.rawConfigJson?.isNotBlank() == true
     }
 
     /**
@@ -209,6 +214,7 @@ class SubscriptionRepository(
         url: String,
         identity: SubscriptionRequestIdentity,
         preferJson: Boolean,
+        protectJsonProfiles: Boolean,
     ): FetchedSubscription = try {
         fetcher.fetchWithMetadata(
             url = url,
@@ -216,6 +222,7 @@ class SubscriptionRepository(
             preferJson = preferJson,
             allowInsecureUpdates = existing.allowInsecureUpdates,
             requireHardwareIdConsent = true,
+            protectJsonProfiles = protectJsonProfiles,
         )
     } catch (error: SubscriptionHardwareIdRequiredException) {
         throw error
@@ -230,6 +237,7 @@ class SubscriptionRepository(
                 preferJson = preferJson,
                 allowInsecureUpdates = existing.allowInsecureUpdates,
                 requireHardwareIdConsent = true,
+                protectJsonProfiles = protectJsonProfiles,
             )
         } catch (error: SubscriptionHardwareIdRequiredException) {
             throw error

@@ -923,7 +923,7 @@ class SubscriptionFetcherTest {
     }
 
     @Test
-    fun `prefer json fails instead of falling back when json endpoint is unreachable`() = runTest {
+    fun `prefer json fails instead of taking share links when json endpoint is unreachable`() = runTest {
         val requests = mutableListOf<Request>()
         val fetcher = requestAwareFetcher(requests) { request ->
             if (request.url.encodedPath.endsWith("/json")) throw SocketTimeoutException("timeout")
@@ -935,11 +935,11 @@ class SubscriptionFetcherTest {
         }.exceptionOrNull()
 
         assertTrue(error is SocketTimeoutException)
-        assertEquals(listOf("/base/json"), requests.map { it.url.encodedPath })
+        assertEquals(listOf("/base/json", "/base"), requests.map { it.url.encodedPath })
     }
 
     @Test
-    fun `prefer json fails instead of falling back on transient json status`() = runTest {
+    fun `prefer json fails instead of taking share links on transient json status`() = runTest {
         listOf(429, 503).forEach { code ->
             val requests = mutableListOf<Request>()
             val fetcher = requestAwareFetcher(requests) { request ->
@@ -955,8 +955,44 @@ class SubscriptionFetcherTest {
             }.exceptionOrNull()
 
             assertEquals(code, (error as SubscriptionFetchException).statusCode)
-            assertEquals(listOf("/base/json"), requests.map { it.url.encodedPath })
+            assertEquals(listOf("/base/json", "/base"), requests.map { it.url.encodedPath })
         }
+    }
+
+    @Test
+    fun `prefer json takes share links after a failing json endpoint when no json profiles are held`() = runTest {
+        listOf(null, 429, 502).forEach { code ->
+            val requests = mutableListOf<Request>()
+            val fetcher = requestAwareFetcher(requests) { request ->
+                when {
+                    !request.url.encodedPath.endsWith("/json") -> TestResponse("vless://uuid@base.example:443?encryption=none&type=tcp#Base", "text/plain")
+                    code == null -> throw SocketTimeoutException("timeout")
+                    else -> TestResponse("", "text/plain", code = code)
+                }
+            }
+
+            val subscription = fetcher.fetchWithMetadata(url = "https://subscriptions.example/base", preferJson = true, protectJsonProfiles = false)
+
+            assertEquals("Base", subscription.configs.single().name)
+            assertEquals(listOf("/base/json", "/base"), requests.map { it.url.encodedPath })
+        }
+    }
+
+    @Test
+    fun `prefer json takes json profiles from the saved url after a failing json endpoint`() = runTest {
+        val requests = mutableListOf<Request>()
+        val fetcher = requestAwareFetcher(requests) { request ->
+            if (request.url.encodedPath.endsWith("/json")) {
+                TestResponse("", "text/plain", code = 502)
+            } else {
+                TestResponse("""{"remarks":"Base","outbounds":[{"protocol":"trojan","settings":{"servers":[{"address":"base.example","port":443,"password":"secret"}]}}]}""", "application/json")
+            }
+        }
+
+        val subscription = fetcher.fetchWithMetadata(url = "https://subscriptions.example/base", preferJson = true)
+
+        assertEquals("Base", subscription.configs.single().name)
+        assertEquals(listOf("/base/json", "/base"), requests.map { it.url.encodedPath })
     }
 
     @Test
